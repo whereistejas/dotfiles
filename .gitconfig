@@ -1,0 +1,25 @@
+[user]
+	signingKey = xxxx
+	name = Tejas Sanap
+	email = sanap.tejas@gmail.com
+
+[alias]
+	ch = checkout
+	cm = commit -s
+	st = status
+	br = branch
+	lo = log --oneline -20
+	lg = log --graph --oneline
+	#lg = log --graph --abbrev-commit --all
+	ad = add *
+	
+[merge]
+	tool = nvim -d 
+
+[commit]
+	gpgsign = true
+
+[diff]
+	tool = nvim -d
+[init]
+	defaultBranch = main

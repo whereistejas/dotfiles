@@ -1,0 +1,29 @@
+alias gc="git clone "
+
+alias ls="exa"
+alias lsl="exa -l --header "
+alias lsa="exa -a "
+alias lsg="exa --long --git "
+alias grep="grep --color=always"
+# alias cat="bat --theme=gruvbox-light"
+alias cat="bat "
+
+alias rm="rm -rf "
+alias cp="cp -r "
+alias mkdir="mkdir -p "
+
+alias vim="$HOME/.local/nvim/bin/nvim"
+
+alias pgrep="pgrep -fil "
+alias ts="tsp "
+
+alias extmon="xrandr --output HDMI-1-1 --auto --dpi 96 --scale 1x1"
+
+# cd .. aliases
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
+alias .....="cd ../../../.."
+alias ......="cd ../../../../.."
+
+# vim: filetype=sh

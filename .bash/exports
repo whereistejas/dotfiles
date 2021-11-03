@@ -1,0 +1,16 @@
+export EDITOR="$HOME/.local/nvim/bin/nvim"
+export BROWSER="/usr/bin/firefox"
+export GPODDER_DOWNLOAD_DIR="/home/tsanap/music/podcasts/"
+export LS_OPTIONS="--color=auto"
+export FZF_DEFAULT_OPTS='--height 40%'
+
+if type rg &> /dev/null; then
+    export FZF_DEFAULT_COMMAND="rg --files"
+fi
+
+# Install Ruby Gems to ~/.gems
+export GEM_HOME="$HOME/.gems"
+
+eval `ssh-agent -s` > /dev/null
+
+# vi: filetype=sh
