@@ -1,0 +1,54 @@
+# cfg-things {{{
+cfg-bashrc() { $EDITOR ~/.bashrc ;}
+cfg-alias() { $EDITOR ~/.bash/aliases ;}
+cfg-functions() { $EDITOR ~/.bash/functions ;}
+cfg-inputrc() { $EDITOR ~/.inputrc ;}
+cfg-newsboat() { $EDITOR ~/.config/newsboat/config ;}
+cfg-newsboat-queue() { $EDITOR ~/.config/newsboat/queue ;}
+cfg-newsboat-urls() { $EDITOR ~/.config/newsboat/urls ;}
+cfg-ranger() { $EDITOR ~/.config/ranger/rc.conf ;}
+cfg-ranger-rifle() { $EDITOR ~/.config/ranger/rifle.conf ;}
+cfg-ranger-commands() { $EDITOR ~/.config/ranger/commands.py ;}
+cfg-ranger-scope() { $EDITOR ~/.config/ranger/scope.sh ;}
+cfg-rtv() { $EDITOR ~/.config/rtv/rtv.cfg ;}
+cfg-tmuxrc() { $EDITOR ~/.tmux.conf ;}
+cfg-tor() { sudo $EDITOR /etc/tor/torrc ;}
+cfg-vimrc() { $EDITOR ~/.config/nvim/init.vim;}
+cfg-qutebrowser() { $EDITOR ~/.config/qutebrowser/config.py ;}
+cfg-xterm() { $EDITOR ~/.xfiles/xterm ;}
+cfg-alacritty() { $EDITOR ~/.config/alacritty/alacritty.yml ;}
+cfg-mutt() { $EDITOR ~/.config/neomutt/muttrc ;}
+cfg-irssi() { $EDITOR ~/.irssi/config ;}
+cfg-i3() { $EDITOR ~/.config/i3/config ;}
+cfg-polybar() { $EDITOR ~/.config/polybar/config ;}
+rld-bashrc() { source ~/.bashrc ;}
+rld-xterm() { xrdb -load ~/.Xresources ;}
+
+# }}}
+
+# useful stuff
+mdcd() { mkdir -p -v $1; cd $1 ;}	# create folder then cd into it
+
+parse_git_branch() {
+     git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/'
+}
+
+# open directories {{{
+od-mus() {
+	cd "/home/user1/open_directories/Music"
+	mkdir "$2" && cd "$2"
+	wget -nd -np -r -erobots=off -N -c -A '*.m4a, *.mp3, *.flac' "$1"
+}
+
+od-vid() {
+	cd "/home/user1/open_directories/Videos"
+	mkdir "$2" && cd "$2"
+	wget -nd -np -r -erobots=off -N -c -A '*.mkv, *.mp4, *.m4v' "$1"
+}
+
+od-pdf() { cd "/home/user1/open_directories/Books" && wget -nd -np -r -erobots=off -N -c -A "*.pdf, *.epub, *.djvu, *.doc, *.docx" "$1" ; }
+
+od-ppt() { cd "/home/user1/open_directories/Books/Presentations" && wget -nd -np -r -erobots=off -N -c -A "*.pdf, *.ppt, *.pptx" "$1" ; }
+# }}}
+
+# vim: set foldmethod=marker filetype=bash

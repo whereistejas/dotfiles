@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+st -e $HOME/.local/bin/youtube-dl --write-sub --write-description --write-info-json --write-thumbnail -o '$HOME/videos/youtube/%(uploader)s/%(playlist_title)s/%(playlist_index)s-%(title)s.%(ext)s' --sub-lang en "$1"

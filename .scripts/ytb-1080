@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+st -e youtube-dl --no-playlist --write-sub --write-description --write-info-json --write-thumbnail -f 'bestvideo[height=1080]+bestaudio' -o '$HOME/videos/youtube/%(uploader)s/%(title)s.%(ext)s' --sub-lang en "$1"

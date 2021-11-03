@@ -1,0 +1,2 @@
+#!/bin/sh
+feh --no-fehbg --bg-max '/home/tsanap/pictures/wallpapers/Anime/wall5.png' 
