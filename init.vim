@@ -4,35 +4,50 @@ Plug 'tpope/vim-dispatch'
 Plug 'tpope/vim-commentary'
 Plug 'tpope/vim-surround'
 Plug 'airblade/vim-gitgutter'
+Plug 'junegunn/goyo.vim'
+
+" Haskell
+Plug 'neovimhaskell/haskell-vim'
 
 " Colorschemes
 Plug 'sainnhe/sonokai'
 Plug 'rktjmp/lush.nvim'
 Plug 'ellisonleao/gruvbox.nvim'
 Plug 'sainnhe/edge'
+Plug 'rakr/vim-one'
+Plug 'cormacrelf/vim-colors-github'
 
 Plug 'whereistejas/rust.vim', { 'branch': 'save_fold_fix' }
 Plug 'cespare/vim-toml'
 
+" Collection of common configurations for the Nvim LSP client
 Plug 'neovim/nvim-lspconfig'
+" Completion framework
+Plug 'hrsh7th/nvim-cmp'
+" LSP completion source for nvim-cmp
+Plug 'hrsh7th/cmp-nvim-lsp'
+Plug 'hrsh7th/cmp-vsnip'
+Plug 'hrsh7th/cmp-path'
+Plug 'hrsh7th/cmp-buffer'
+Plug 'hrsh7th/vim-vsnip'
+
 Plug 'simrat39/rust-tools.nvim'
-
-" Plug 'neovim/nvim-lspconfig'
-" Plug 'nvim-lua/lsp_extensions.nvim'
-
-" Plug 'hrsh7th/nvim-cmp'
-" Plug 'hrsh7th/cmp-nvim-lsp'
 
 Plug 'nvim-lua/plenary.nvim'
 Plug 'nvim-lua/popup.nvim'
 Plug 'nvim-telescope/telescope.nvim'
 Plug 'nvim-telescope/telescope-fzf-native.nvim', { 'do': 'make' }
 
-" Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 call plug#end()
 
 syntax on
 filetype plugin indent on
+
+" Plugin {{{
+let g:goyo_linenr = 1
+let g:goyo_width = 120
+" }}}
 
 " Options {{{
 set number
@@ -95,7 +110,7 @@ inoremap <right> <nop>
 nnoremap j gj
 nnoremap k gk
 nnoremap ; :
-nnoremap 4 <End>
+nnoremap 1 <End>
 nnoremap 5 %
 nnoremap qq zczAzz
 nnoremap <Space> za
@@ -132,23 +147,30 @@ nnoremap <C-h> :nohlsearch<cr>
 
 " Telescope {{{
 nnoremap <leader>f :Telescope find_files<CR>
-nnoremap <leader>fg :Telescope git_bcommits<CR>
+nnoremap <leader>b <cmd>Telescope buffers<cr>
 nnoremap <leader>d :Telescope lsp_document_symbols<CR>
 nnoremap <leader>g :Telescope git_commits<CR>
 " }}}
 
 " LSP {{{
-nnoremap <silent> <c-]>	   <cmd>lua vim.lsp.buf.definition()<CR>
+nnoremap <silent> <C-]>	   <cmd>lua vim.lsp.buf.definition()<CR>
+nnoremap <silent> <C-I>	   :pop<CR>
+nnoremap <silent> <C-I>	   :pop<CR>
 nnoremap <silent> K        <cmd>lua vim.lsp.buf.hover()<CR>
 nnoremap <silent> gD       <cmd>lua vim.lsp.buf.implementation()<CR>
-nnoremap <silent> <c-k>    <cmd>lua vim.lsp.buf.signature_help()<CR>
+nnoremap <silent> <C-K>    <cmd>lua vim.lsp.buf.signature_help()<CR>
 nnoremap <silent> gr       <cmd>lua vim.lsp.buf.references()<CR>
 nnoremap <silent> gd       <cmd>lua vim.lsp.buf.declaration()<CR>
 nnoremap <silent> ga       <cmd>lua vim.lsp.buf.code_action()<CR>
-nnoremap <silent> ge       <cmd>lua vim.lsp.diagnostic.show_line_diagnostics()<CR>
-nnoremap <silent> <Tab>    <cmd>lua vim.lsp.diagnostic.goto_next()<CR>
+nnoremap <silent> gR	   <cmd>lua vim.lsp.buf.rename()<CR>
+nnoremap <silent> ge       <cmd>lua vim.diagnostic.open_float()<CR>
 nnoremap <silent> <S-tab>  <cmd>lua vim.lsp.diagnostic.goto_prev()<CR>
 " }}}
+
+" Git {{{
+nnoremap <leader>hh :GitGutterPreviewHunk<CR>
+" }}}
+
 " }}}
 
 " Tabs, splits and buffers {{{
@@ -157,136 +179,130 @@ set splitright
 " }}}
 
 " Rust {{{
-let g:rustfmt_autosave = 2
+let g:rustfmt_autosave = 1
 let g:rust_fold = 1
+autocmd Filetype rust set foldmethod=syntax
 " autocmd Filetype rust set foldmethod=expr
 " autocmd Filetype rust set foldexpr=nvim_treesitter#foldexpr()
 " }}}
 
 " LSP {{{
+lua <<EOF
+local nvim_lsp = require'lspconfig'
 
-lua << EOF
 local opts = {
     tools = { -- rust-tools options
-        -- Automatically set inlay hints (type hints)
         autoSetHints = true,
-
-        -- Whether to show hover actions inside the hover window
-        -- This overrides the default hover handler 
         hover_with_actions = true,
-
-        -- These apply to the default RustSetInlayHints command
         inlay_hints = {
-
-            -- Only show inlay hints for the current line
-            only_current_line = false,
-
-            -- Event which triggers a refersh of the inlay hints.
-            -- You can make this "CursorMoved" or "CursorMoved,CursorMovedI" but
-            -- not that this may cause  higher CPU usage.
-            -- This option is only respected when only_current_line and
-            -- autoSetHints both are true.
-            only_current_line_autocmd = "CursorHold",
-
-            -- wheter to show parameter hints with the inlay hints or not
             show_parameter_hints = true,
-
-            -- prefix for parameter hints
-            -- parameter_hints_prefix = "<- ",
-
-            -- prefix for all the other hints (type, chaining)
-            -- other_hints_prefix = "=> ",
-
-            -- whether to align to the length of the longest line in the file
-            max_len_align = false,
-
-            -- padding from the left if max_len_align is true
-            max_len_align_padding = 1,
-
-            -- whether to align to the extreme right or not
-            right_align = false,
-
-            -- padding from the right if right_align is true
-            right_align_padding = 7,
-
-            -- The color of the hints
-            highlight = "Comment",
+            parameter_hints_prefix = "",
+            other_hints_prefix = "",
         },
+    },
 
-        hover_actions = {
-            -- the border that is used for the hover window
-            -- see vim.api.nvim_open_win()
-            -- border = {
-            --     {"╭", "FloatBorder"}, {"─", "FloatBorder"},
-            --     {"╮", "FloatBorder"}, {"│", "FloatBorder"},
-            --     {"╯", "FloatBorder"}, {"─", "FloatBorder"},
-            --     {"╰", "FloatBorder"}, {"│", "FloatBorder"}
-            -- },
-
-            -- whether the hover action window gets automatically focused
-            auto_focus = false
-        },
-
-    -- all the opts to send to nvim-lspconfig
-    -- these override the defaults set by rust-tools.nvim
     -- see https://github.com/neovim/nvim-lspconfig/blob/master/CONFIG.md#rust_analyzer
     server = {
- 			checkOnSave = {
- 				command = "clippy"
- 			},
-             assist = {
-                 importGranularity = "module",
-                 importPrefix = "by_self",
-             },
-             cargo = {
-                 loadOutDirsFromCheck = true
-             },
-             procMacro = {
-                 enable = true
-             },
- 			completions = {
- 				addCallParenthesis = true,
- 				addCallArgumentSnippets = true,
- 				autoimport = {
- 					enable = true
- 				},
- 			}
-		} -- rust-analyer options
-	}
+        -- on_attach is a callback called when the language server attachs to the buffer
+        -- on_attach = on_attach,
+        settings = {
+            -- to enable rust-analyzer settings visit:
+            -- https://github.com/rust-analyzer/rust-analyzer/blob/master/docs/user/generated_config.adoc
+            ["rust-analyzer"] = {
+                -- enable clippy on save
+                checkOnSave = {
+                    command = "clippy"
+                },
+				-- enable proc macro support
+				procMacro = {
+					enable = true
+				},
+				cargo = {
+					loadOutDirsFromCheck = true,
+					runBuildScripts = true
+				},
+				diagnostics = {
+					disabled = {"unresolved-proc-macro"}
+				},
+            }
+        }
+    },
 }
 
 require('rust-tools').setup(opts)
-
-vim.lsp.handlers["textDocument/publishDiagnostics"] = vim.lsp.with(
-	vim.lsp.diagnostic.on_publish_diagnostics, {
-		virtual_text = true,
-		signs = true,
-		update_in_insert = true,
-  }
-)
-
 EOF
 
+" Setup Completion
+" See https://github.com/hrsh7th/nvim-cmp#basic-configuration
+lua <<EOF
+local cmp = require'cmp'
+cmp.setup({
+  -- Enable LSP snippets
+  snippet = {
+    expand = function(args)
+        vim.fn["vsnip#anonymous"](args.body)
+    end,
+  },
+  mapping = {
+    ['<C-p>'] = cmp.mapping.select_prev_item(),
+    ['<C-n>'] = cmp.mapping.select_next_item(),
+    -- Add tab support
+    ['<S-Tab>'] = cmp.mapping.select_prev_item(),
+    ['<Tab>'] = cmp.mapping.select_next_item(),
+    ['<C-d>'] = cmp.mapping.scroll_docs(-4),
+    ['<C-f>'] = cmp.mapping.scroll_docs(4),
+    ['<C-Space>'] = cmp.mapping.complete(),
+    ['<C-e>'] = cmp.mapping.close(),
+    ['<CR>'] = cmp.mapping.confirm({
+      behavior = cmp.ConfirmBehavior.Insert,
+      select = true,
+    })
+  },
 
-" " Hover to show Diagnostics
-" " autocmd CursorHold *.rs lua vim.lsp.diagnostic.show_line_diagnostics()
-
+  -- Installed sources
+  sources = {
+    { name = 'nvim_lsp' },
+    { name = 'vsnip' },
+    { name = 'path' },
+    { name = 'buffer' },
+  },
+})
+EOF
 " }}}
 
-" " Treesitter {{{
-" lua <<EOF
-" require'nvim-treesitter.configs'.setup {
-" 	ensure_installed = 'rust',
-"   	highlight = {
-" 		enable = true,
-"   	  	additional_vim_regex_highlighting = false,
-"   	},
-" 	indent = {
-"     	enable = true
-"   	}
-" }
-" EOF
-" " }}}
+" Treesitter {{{
+lua <<EOF
+require'nvim-treesitter.configs'.setup {
+	ensure_installed = {"rust"},
+  	highlight = {
+		enable = true,
+  	  	additional_vim_regex_highlighting = false,
+  	},
+	indent = {
+    	enable = true
+  	},
+    incremental_selection = {
+        enable = true,
+      	keymaps = {
+			init_selection = "gv",
+			node_incremental = "gvn",
+			scope_incremental = "gvs",
+			node_decremental = "gvd",
+      	},
+    }
+}
+EOF
+" }}}
+
+" Telescope {{{
+lua <<EOF
+require('telescope').setup({  
+	defaults = { 
+		file_ignore_patterns = { "node_modules", "vendor", "borsh_stable" }
+	} 
+})
+EOF
+" }}}
 
 " Terminal toggle {{{
 " With this function you can reuse the same terminal in neovim.
@@ -343,7 +359,18 @@ function! MonkeyTerminalClose()
 endfunction
 
 " With this maps you can now toggle the terminal
-nnoremap <silent> <C-T> :call MonkeyTerminalToggle()<cr>
-tnoremap <silent> <C-T> <C-\><C-n>:call MonkeyTerminalToggle()<cr>
+" nnoremap <silent> <C-W> :call MonkeyTerminalToggle()<cr>
+" tnoremap <silent> <C-W> <C-\><C-n>:call MonkeyTerminalToggle()<cr>
+" }}}
+
+" Haskell {{{
+autocmd Filetype haskell set tabstop=2 shiftwidth=2 expandtab
+let g:haskell_enable_quantification = 1   " to enable highlighting of `forall`
+let g:haskell_enable_recursivedo = 1      " to enable highlighting of `mdo` and `rec`
+let g:haskell_enable_arrowsyntax = 1      " to enable highlighting of `proc`
+let g:haskell_enable_pattern_synonyms = 1 " to enable highlighting of `pattern`
+let g:haskell_enable_typeroles = 1        " to enable highlighting of type roles
+let g:haskell_enable_static_pointers = 1  " to enable highlighting of `static`
+let g:haskell_backpack = 1                " to enable highlighting of backpack keywords
 " }}}
 " vim: ft=vim

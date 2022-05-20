@@ -1,25 +1,30 @@
 [user]
-	signingKey = xxxx
 	name = Tejas Sanap
 	email = sanap.tejas@gmail.com
-
+	signingkey = 9B2673DC7FA938A264315EAADB6F184212003160
 [alias]
-	ch = checkout
-	cm = commit -s
-	st = status
 	br = branch
-	lo = log --oneline -20
-	lg = log --graph --oneline
-	#lg = log --graph --abbrev-commit --all
-	ad = add *
-	
-[merge]
-	tool = nvim -d 
-
+	ch = checkout
+	lo = log --oneline -n 20
+	st = status
+	diff = diff --staged -- ':(exclude)*.lock'
+	wa = "!f() { git worktree add /Users/whereistejas/repos/workspace/worktree/$1 $2; }; f"
+	wr = "!f() { git worktree remove /Users/whereistejas/repos/workspace/worktree/$1 ; }; f"
+	wl = worktree list
+[gpg]
+	program = gpg2
 [commit]
 	gpgsign = true
-
+[core]
+	excludesfile = /Users/whereistejas/.gitignore
+[filter "lfs"]
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+	clean = git-lfs clean -- %f
 [diff]
-	tool = nvim -d
+	external = difft
+[branch]
+	autoSetupMerge = always
 [init]
 	defaultBranch = main
