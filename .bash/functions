@@ -21,6 +21,7 @@ cfg-mutt() { $EDITOR ~/.config/neomutt/muttrc ;}
 cfg-irssi() { $EDITOR ~/.irssi/config ;}
 cfg-i3() { $EDITOR ~/.config/i3/config ;}
 cfg-polybar() { $EDITOR ~/.config/polybar/config ;}
+cfg-git() { $EDITOR ~/.gitconfig ;}
 rld-bashrc() { source ~/.bashrc ;}
 rld-xterm() { xrdb -load ~/.Xresources ;}
 
@@ -28,27 +29,11 @@ rld-xterm() { xrdb -load ~/.Xresources ;}
 
 # useful stuff
 mdcd() { mkdir -p -v $1; cd $1 ;}	# create folder then cd into it
+st() { git st ;}
+lo() { git lo ;}
 
 parse_git_branch() {
-     git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/'
+     git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/ '
 }
-
-# open directories {{{
-od-mus() {
-	cd "/home/user1/open_directories/Music"
-	mkdir "$2" && cd "$2"
-	wget -nd -np -r -erobots=off -N -c -A '*.m4a, *.mp3, *.flac' "$1"
-}
-
-od-vid() {
-	cd "/home/user1/open_directories/Videos"
-	mkdir "$2" && cd "$2"
-	wget -nd -np -r -erobots=off -N -c -A '*.mkv, *.mp4, *.m4v' "$1"
-}
-
-od-pdf() { cd "/home/user1/open_directories/Books" && wget -nd -np -r -erobots=off -N -c -A "*.pdf, *.epub, *.djvu, *.doc, *.docx" "$1" ; }
-
-od-ppt() { cd "/home/user1/open_directories/Books/Presentations" && wget -nd -np -r -erobots=off -N -c -A "*.pdf, *.ppt, *.pptx" "$1" ; }
-# }}}
 
 # vim: set foldmethod=marker filetype=bash

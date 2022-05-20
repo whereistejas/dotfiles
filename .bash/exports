@@ -1,16 +1,12 @@
-export EDITOR="$HOME/.local/nvim/bin/nvim"
-export BROWSER="/usr/bin/firefox"
-export GPODDER_DOWNLOAD_DIR="/home/tsanap/music/podcasts/"
+export EDITOR="/opt/homebrew/bin/nvim"
 export LS_OPTIONS="--color=auto"
 export FZF_DEFAULT_OPTS='--height 40%'
+export PS1="\[\033[38;5;10m\]\u\[$(tput sgr0)\]\[\033[38;5;196m\] \[$(tput sgr0)\]\[\033[38;5;33m\]\W\[$(tput sgr0)\] \$(parse_git_branch)\[\033[38;5;196m\]>\[$(tput sgr0)\] "
+
+eval "$(/opt/homebrew/bin/fasd --init auto)"
 
 if type rg &> /dev/null; then
     export FZF_DEFAULT_COMMAND="rg --files"
 fi
-
-# Install Ruby Gems to ~/.gems
-export GEM_HOME="$HOME/.gems"
-
-eval `ssh-agent -s` > /dev/null
 
 # vi: filetype=sh

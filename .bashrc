@@ -1,9 +1,14 @@
-source "$HOME/.bash/sourced"
-source "$HOME/.bash/exports"
-source "$HOME/.bash/functions"
-source "$HOME/.bash/paths"
-source "$HOME/.bash/aliases"
+. "$HOME/.bash/functions"
+. "$HOME/.bash/paths"
+. "$HOME/.bash/sourced"
+. "$HOME/.bash/exports"
+. "$HOME/.bash/aliases"
 
-eval "$(fasd --init auto)"
+ulimit -n unlimited
+
+set -o vi
 
 fortune | cowsay
+[ -f "/Users/whereistejas/.ghcup/env" ] && source "/Users/whereistejas/.ghcup/env" # ghcup-env
+. "$HOME/.cargo/env"
+

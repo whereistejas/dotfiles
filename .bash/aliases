@@ -1,23 +1,22 @@
-alias gc="git clone "
-
 alias ls="exa"
 alias lsl="exa -l --header "
 alias lsa="exa -a "
 alias lsg="exa --long --git "
-alias grep="grep --color=always"
-# alias cat="bat --theme=gruvbox-light"
-alias cat="bat "
+alias grep="rg --hidden --color=always "
+alias cat="bat --theme gruvbox-light "
+alias python="/opt/homebrew/bin/python3 "
 
 alias rm="rm -rf "
 alias cp="cp -r "
 alias mkdir="mkdir -p "
 
-alias vim="$HOME/.local/nvim/bin/nvim"
+alias vim="/opt/homebrew/bin/nvim"
 
 alias pgrep="pgrep -fil "
-alias ts="tsp "
+alias z='fasd_cd -d '
 
-alias extmon="xrandr --output HDMI-1-1 --auto --dpi 96 --scale 1x1"
+alias gdf="git diff -- ':(exclude)*.lock'"
+alias gc="git clone "
 
 # cd .. aliases
 alias ..="cd .."
