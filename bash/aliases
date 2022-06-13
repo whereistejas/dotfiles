@@ -3,7 +3,7 @@ alias lsl="exa -l --header "
 alias lsa="exa -a "
 alias lsg="exa --long --git "
 alias grep="rg --hidden --color=always "
-alias cat="bat --theme gruvbox-light "
+alias cat="bat "
 alias python="/opt/homebrew/bin/python3 "
 
 alias rm="rm -rf "

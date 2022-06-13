@@ -2,5 +2,7 @@
 [[ -r "/opt/homebrew/etc/bash_completion.d/git-completion.bash" ]] && . "/opt/homebrew/etc/bash_completion.d/git-completion.bash"
 [[ -r "/opt/homebrew/etc/bash_completion.d/brew.sh" ]] && . "/opt/homebrew/etc/bash_completion.d/brew.sh"
 [[ -r "/opt/homebrew/etc/bash_completion.d/aws_bash_completer.sh" ]] && . "/opt/homebrew/etc/bash_completion.d/aws_bash_completer.sh"
+[[ -r "/Users/whereistejas/.bash/completions/rustup.sh" ]] && . "/Users/whereistejas/.bash/completions/rustup.sh"
+[[ -r "/Users/whereistejas/.bash/completions/cargo.sh" ]] && . "/Users/whereistejas/.bash/completions/cargo.sh"
 
 # vim:filetype=bash

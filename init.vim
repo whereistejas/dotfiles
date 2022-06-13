@@ -35,6 +35,7 @@ Plug 'simrat39/rust-tools.nvim'
 
 Plug 'nvim-lua/plenary.nvim'
 Plug 'nvim-lua/popup.nvim'
+Plug 'nvim-lua/lsp-status.nvim'
 Plug 'nvim-telescope/telescope.nvim'
 Plug 'nvim-telescope/telescope-fzf-native.nvim', { 'do': 'make' }
 
@@ -93,9 +94,28 @@ set noexpandtab
 " }}}
 
 " Colorscheme and Statusline {{{
-set statusline=[%n]\ %<%t\ %m%r%h%w%y%q[%{&ff}]\ \ %=\ line:%l/%L\ col:%c\ %p%%\ @%{FugitiveStatusline()}
+set statusline=[%n]       						" Buffer number
+set statusline+=\ %f       						" Relative filepath to CWD
+set statusline+=\ %m      						" Modified flag
+set statusline+=%r      						" Read only flag
+set statusline+=%h      						" Helpfile flag
+set statusline+=%q      						" Quickfix flag
+set statusline+=%w      						" Preview flag
+set statusline+=%y      						" Filetype
+set statusline+=\ %=      						" Left/right separator
+set statusline+=\ %{LspStatus()}				" LSP status
+set statusline+=\ L:\ %03.l/%03.L   			" Cursor line/total lines
+set statusline+=\ C:\ %03.3c     				" Cursor column
+set statusline+=\ P:\ %p    					" Percent through file
+set statusline+=\ @%{FugitiveStatusline()}		" Git branch
+
 set background=dark
 colorscheme sonokai
+
+let g:sonokai_style = 'andromeda'
+let g:sonokai_diagnostic_text_highlight = 1
+let g:sonokai_diagnostic_line_highlight = 1
+let g:sonokai_diagnostic_virtual_text = 1
 " }}}
 
 " Remappings {{{
@@ -123,6 +143,11 @@ nnoremap 0 ^
 " Switching buffers {{{
 nnoremap <silent> <right> :bn<CR>
 nnoremap <silent> <left> :bp<CR>
+" }}}
+
+" Switching tabs {{{
+nnoremap <silent> <A-right> :tabnext<CR>
+nnoremap <silent> <A-left> :tabprevious<CR>
 " }}}
 
 " Quickfix {{{
@@ -169,6 +194,7 @@ nnoremap <silent> <S-tab>  <cmd>lua vim.lsp.diagnostic.goto_prev()<CR>
 
 " Git {{{
 nnoremap <leader>hh :GitGutterPreviewHunk<CR>
+nnoremap <leader>gg :G<CR>
 " }}}
 
 " }}}
@@ -224,6 +250,12 @@ local opts = {
 				diagnostics = {
 					disabled = {"unresolved-proc-macro"}
 				},
+				inlayHints = {
+					  lifetimeElisionHints = {
+							enable = true,
+							useParameterNames = true
+					  },
+				},
             }
         }
     },
@@ -237,37 +269,67 @@ EOF
 lua <<EOF
 local cmp = require'cmp'
 cmp.setup({
-  -- Enable LSP snippets
-  snippet = {
-    expand = function(args)
-        vim.fn["vsnip#anonymous"](args.body)
-    end,
-  },
-  mapping = {
-    ['<C-p>'] = cmp.mapping.select_prev_item(),
-    ['<C-n>'] = cmp.mapping.select_next_item(),
-    -- Add tab support
-    ['<S-Tab>'] = cmp.mapping.select_prev_item(),
-    ['<Tab>'] = cmp.mapping.select_next_item(),
-    ['<C-d>'] = cmp.mapping.scroll_docs(-4),
-    ['<C-f>'] = cmp.mapping.scroll_docs(4),
-    ['<C-Space>'] = cmp.mapping.complete(),
-    ['<C-e>'] = cmp.mapping.close(),
-    ['<CR>'] = cmp.mapping.confirm({
-      behavior = cmp.ConfirmBehavior.Insert,
-      select = true,
-    })
-  },
+	-- Enable LSP snippets
+	snippet = {
+		expand = function(args)
+			vim.fn["vsnip#anonymous"](args.body)
+		end,
+	},
+	mapping = {
+		['<C-p>'] = cmp.mapping.select_prev_item(),
+		['<C-n>'] = cmp.mapping.select_next_item(),
+		-- Add tab support
+		['<S-Tab>'] = cmp.mapping.select_prev_item(),
+		['<Tab>'] = cmp.mapping.select_next_item(),
+		['<C-d>'] = cmp.mapping.scroll_docs(-4),
+		['<C-f>'] = cmp.mapping.scroll_docs(4),
+		['<C-Space>'] = cmp.mapping.complete(),
+		['<C-e>'] = cmp.mapping.close(),
+		['<CR>'] = cmp.mapping.confirm({
+			  behavior = cmp.ConfirmBehavior.Insert,
+			  select = true,
+		})
+	},
 
-  -- Installed sources
-  sources = {
-    { name = 'nvim_lsp' },
-    { name = 'vsnip' },
-    { name = 'path' },
-    { name = 'buffer' },
-  },
+	-- Installed sources
+	sources = {
+		{ name = 'nvim_lsp' },
+		{ name = 'vsnip' },
+		{ name = 'path' },
+		{ name = 'buffer' },
+	},
 })
 EOF
+
+lua << END
+local lsp_status = require('lsp-status')
+lsp_status.register_progress()
+
+lsp_status.config({
+	indicator_errors = 'E',
+	indicator_warnings = 'W',
+	indicator_info = 'i',
+	indicator_hint = '?',
+	indicator_ok = 'Ok',
+})
+
+local lspconfig = require('lspconfig')
+
+-- Some arbitrary servers
+lspconfig.rust_analyzer.setup({
+	on_attach = lsp_status.on_attach,
+	capabilities = lsp_status.capabilities
+})
+END
+
+" Statusline
+function! LspStatus() abort
+	if luaeval('#vim.lsp.buf_get_clients() > 0')
+		return luaeval("require('lsp-status').status()")
+	endif
+
+	return ''
+endfunction
 " }}}
 
 " Treesitter {{{
