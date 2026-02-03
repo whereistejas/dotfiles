@@ -1,0 +1,45 @@
+#!/bin/bash
+
+show_help() {
+  cat << 'EOF'
+Usage: split-test-commits.sh -r <revset> -p <path>
+
+Splits commits in a revset, moving files matching a path pattern into separate commits
+with "tests: " prefixed to their commit messages.
+
+Options:
+  -r <revset>  Revset expression (e.g., 'q::@')
+  -p <path>    Path pattern to split out (e.g., 'glob:cli/tests/**')
+  -h           Show this help message
+
+Example:
+  ./split-test-commits.sh -r 'q::@' -p 'glob:cli/tests/**'
+EOF
+  exit 0
+}
+
+REVSET=""
+PATH_PATTERN=""
+
+while getopts "r:p:h" opt; do
+  case $opt in
+    r) REVSET="$OPTARG" ;;
+    p) PATH_PATTERN="$OPTARG" ;;
+    h) show_help ;;
+    *) show_help ;;
+  esac
+done
+
+if [ -z "$REVSET" ] || [ -z "$PATH_PATTERN" ]; then
+  echo "Error: Missing required arguments"
+  echo ""
+  show_help
+fi
+
+for commit in $(jj log -r "$REVSET & files(\"$PATH_PATTERN\")" -T 'commit_id' --no-graph --reversed); do
+  original_msg=$(jj log -r "$commit" -T 'description' --no-graph)
+  short_id=$(jj log -r "$commit" -T 'commit_id.short()' --no-graph)
+  echo "Splitting commit $short_id..."
+  jj split -r "$commit" "$PATH_PATTERN" -m "tests: $original_msg"
+  echo "✓ Split $short_id"
+done

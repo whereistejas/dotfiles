@@ -1,0 +1,29 @@
+alias rg="rg --hidden"
+alias cat="bat "
+
+alias c="clear"
+
+alias rm="rm -rf "
+alias cp="cp -r "
+alias mkdir="mkdir -p "
+
+alias pgrep="pgrep -fil "
+alias z='fasd_cd -d '
+
+alias j="jj "
+alias jjl="jj l "
+alias diff="jj diff"
+
+alias ct="cargo thost "
+alias ctc="cargo tcheck "
+alias vim="nvim "
+
+alias ls="eza "
+alias lsa="eza -al"
+
+# cd .. aliases
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
+alias .....="cd ../../../.."
+alias ......="cd ../../../../.."

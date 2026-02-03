@@ -1,0 +1,10 @@
+[keys]
+abandon = ["d"]
+describe = []
+diff = ["D"]
+
+[keys.bookmark]
+set = ["s"]
+
+[ui]
+auto_refresh_interval = 1
