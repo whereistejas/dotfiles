@@ -1,0 +1,5 @@
+font-family = "Berkeley Mono"
+font-size = 13
+cursor-style = underline
+cursor-style-blink = true
+theme = "GitHub Light Default"

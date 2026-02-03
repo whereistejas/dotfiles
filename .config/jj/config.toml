@@ -1,0 +1,70 @@
+[user]
+name = "Tejas Sanap"
+email = "email@whereistejas.xyz"
+
+[signing]
+behavior = "own"
+backend = "ssh"
+key = "~/.ssh/github"
+backends.ssh.allowed-signers = "~/.config/jj/allowed-signers"
+
+[git]
+sign-on-push = true
+
+[aliases]
+e = ["edit"]
+rr = ["rebase", "-r"]
+mv = ["b", "move"]
+rc = ["util", "exec", "--", "bash", "-c", '''
+closest=$(jj log -r 'bookmarks() & ::@' --no-graph -T 'local_bookmarks.map(|b| b.name()).join(",") ++ "\n"' | head -n1 | cut -d, -f1)
+if [ -z "$closest" ]; then
+  echo "No closest bookmark found." >&2
+  exit 1
+fi
+jj bookmark set "$closest" --to "$1"
+''', ""]
+ds = ["describe"]
+nx = ["edit", "@+"]
+pv = ["edit", "@-"]
+gp = ["git", "push", "--allow-new"]
+gs = ["git", "push", "--remote", "sourcehut"]
+gf = ["git", "fetch"]
+sq = ["squash"]
+l = ["log"]
+la = ["log", "-r", "::@"]
+df = ["diff", "--name-only"]
+
+[merge-tools.diffedit3]
+program="diffedit3"
+edit-args = ["$left", "$right", "$output", "--port", "17376-17380", "--port", "0"]
+
+[ui]
+diff-formatter = ["difft", "--color=always", "--background=light", "$left", "$right"]
+diff-editor="diffedit3"
+default-command = ["log", "-n20"]
+show-cryptographic-signatures = true
+
+[colors]
+"author"="bright blue"
+"working_copy author" = "blue"
+"working_copy committer" = "blue"
+"working_copy description placeholder" = "blue"
+"description placeholder" = "blue"
+
+[template-aliases]
+'format_short_id(id)' = 'id.shortest()'
+'format_short_signature(signature)' = 'signature.email().local()'
+'blame_with_msg' = '''
+commit.commit_id().short(8)
+++ " "
+++ pad_end(20, commit.author().name())
+++ " "
+++ commit.author().timestamp().format("%Y-%m-%d")
+++ " "
+++ pad_start(4, line_number)
+++ " ["
+++ truncate_end(35, commit.description().first_line())
+++ "] "
+++ content
+'''
+

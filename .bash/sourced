@@ -1,0 +1,5 @@
+. "$HOME/.cargo/env"
+
+source <(jj util completion bash)
+eval "$(fasd --init auto)"
+[[ -r "/opt/homebrew/etc/profile.d/bash_completion.sh" ]] && . "/opt/homebrew/etc/profile.d/bash_completion.sh"
