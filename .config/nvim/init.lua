@@ -1,11 +1,4 @@
 -- =============================================================================
--- Leaders
--- =============================================================================
-
-vim.g.mapleader = " "
-vim.g.maplocalleader = "\\"
-
--- =============================================================================
 -- Options
 -- =============================================================================
 
@@ -13,17 +6,16 @@ vim.opt.clipboard = "unnamedplus"
 vim.opt.signcolumn = "yes"
 vim.opt.cursorline = true
 vim.opt.mouse = "n"
-vim.opt.completeopt:append("noselect")
 vim.wo.relativenumber = true
 
 vim.opt.tabstop = 4
 vim.opt.shiftwidth = 4
 
 local lsp_indent = {
-	lua_ls = { tabstop = 4, shiftwidth = 4, expandtab = false },
 	ts_ls = { tabstop = 2, shiftwidth = 2, expandtab = true },
 	rust_analyzer = { tabstop = 4, shiftwidth = 4, expandtab = true },
 	astro = { tabstop = 2, shiftwidth = 2, expandtab = true },
+	ocamllsp = { tabstop = 2, shiftwidth = 2, expandtab = true },
 }
 
 vim.opt.list = true
@@ -116,12 +108,18 @@ require("lazy").setup({
 				vim.keymap.set("n", "<space>t", builtin.builtin)
 				vim.keymap.set("n", "<space>b", builtin.buffers)
 				vim.keymap.set("n", "<space>f", builtin.find_files)
+				vim.keymap.set("n", "<space>fa", function()
+					builtin.find_files({
+						find_command = { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git/*" },
+					})
+				end)
 				vim.keymap.set("n", "?", builtin.live_grep)
 				vim.keymap.set("n", "<space><space>", builtin.resume)
 				vim.keymap.set("n", "<space>r", builtin.lsp_references)
 				vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
 				vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
-				vim.keymap.set("n", "<space>d", builtin.diagnostics)
+				vim.keymap.set("n", "<space>m", builtin.diagnostics)
+				vim.keymap.set("n", "<space>k", builtin.keymaps)
 				vim.keymap.set("n", "<space>c", ":Telescope file_browser path=%:p:h<CR>")
 			end
 		},
@@ -129,8 +127,8 @@ require("lazy").setup({
 		-- Theme
 		{
 			"projekt0n/github-nvim-theme",
-			lazy = false, -- or true if you want it to load on a specific event
-			priority = 1000, -- load before other plugins so the theme is applied early
+			lazy = false,
+			priority = 1000,
 			config = function()
 				require("github-theme").setup({
 					options = {
@@ -141,7 +139,7 @@ require("lazy").setup({
 						},
 					}
 				})
-				vim.cmd("colorscheme github_light") -- or github_light, github_dimmed
+				vim.cmd("colorscheme github_light")
 			end,
 		},
 
@@ -151,8 +149,8 @@ require("lazy").setup({
 			dependencies = { "nvim-lua/plenary.nvim" },
 			config = function()
 				require("codeium").setup({
-				enable_cmp_source = false,
-			})
+					enable_cmp_source = false,
+				})
 			end,
 		},
 
@@ -167,34 +165,16 @@ require("lazy").setup({
 
 			version = '1.*',
 
-			---@module 'blink.cmp'
-			---@type blink.cmp.Config
 			opts = {
-				-- 'default' (recommended) for mappings similar to built-in completions (C-y to accept)
-				-- 'super-tab' for mappings similar to vscode (tab to accept)
-				-- 'enter' for enter to accept
-				-- 'none' for no mappings
-				--
-				-- All presets have the following mappings:
-				-- C-space: Open menu or open docs if already open
-				-- C-n/C-p or Up/Down: Select next/previous item
-				-- C-e: Hide menu
-				-- C-k: Toggle signature help (if signature.enabled = true)
-				--
-				-- See :h blink-cmp-config-keymap for defining your own keymap
 				keymap = { preset = 'default' },
 
 				appearance = {
-					-- 'mono' (default) for 'Nerd Font Mono' or 'normal' for 'Nerd Font'
-					-- Adjusts spacing to ensure icons are aligned
 					nerd_font_variant = 'mono'
 				},
 
 				-- (Default) Only show the documentation popup when manually triggered
 				completion = { documentation = { auto_show = false } },
 
-				-- Default list of enabled providers defined so that you can extend it
-				-- elsewhere in your config, without redefining it, due to `opts_extend`
 				sources = {
 					default = { 'lsp', 'path', 'snippets', 'buffer', 'codeium' },
 					providers = {
@@ -206,11 +186,6 @@ require("lazy").setup({
 					},
 				},
 
-				-- (Default) Rust fuzzy matcher for typo resistance and significantly better performance
-				-- You may use a lua implementation instead by using `implementation = "lua"` or fallback to the lua implementation,
-				-- when the Rust fuzzy matcher is not available, by using `implementation = "prefer_rust"`
-				--
-				-- See the fuzzy documentation for more information
 				fuzzy = { implementation = "prefer_rust" }
 			},
 			opts_extend = { "sources.default" }
@@ -222,7 +197,10 @@ require("lazy").setup({
 			lazy = false,
 			build = ":TSUpdate",
 			config = function()
-				require("nvim-treesitter").install({ "typescript", "tsx", "lua", "rust", "astro", "json", "html", "css" })
+				require("nvim-treesitter.configs").setup({
+					ensure_installed = { "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css" },
+					highlight = { enable = true },
+				})
 			end,
 		},
 
@@ -238,6 +216,7 @@ require("lazy").setup({
 							-- See the configuration section for more details
 							-- Load luvit types when the `vim.uv` word is found
 							{ path = "${3rd}/luv/library", words = { "vim%.uv" } },
+							{ path = "blink.cmp" },
 						},
 					},
 				},
@@ -258,6 +237,13 @@ require("lazy").setup({
 					root_markers = { 'tsconfig.json', 'jsconfig.json', 'package.json', '.git' },
 				}
 
+				vim.lsp.config.ocamllsp = {
+					cmd = { 'ocamllsp' },
+					capabilities = capabilities,
+					root_markers = { 'dune-project', 'dune-workspace', '.git', '*.opam' },
+					filetypes = { 'ocaml', 'ocaml.menhir', 'ocaml.interface', 'ocaml.ocamllex', 'reason', 'dune' },
+				}
+
 				vim.lsp.config.eslint = {
 					cmd = { 'vscode-eslint-language-server', '--stdio' },
 					capabilities = capabilities,
@@ -271,9 +257,10 @@ require("lazy").setup({
 				-- Enable the LSP servers
 				vim.lsp.enable('lua_ls')
 				vim.lsp.enable('rust_analyzer')
-				vim.lsp.enable('astro')
+				-- vim.lsp.enable('astro')
 				vim.lsp.enable('ts_ls')
 				vim.lsp.enable('eslint')
+				vim.lsp.enable('ocamllsp')
 			end,
 		}
 	},
@@ -307,10 +294,10 @@ vim.api.nvim_create_autocmd("LspAttach", {
 					local bufnr = vim.api.nvim_get_current_buf()
 					client:request_sync("workspace/executeCommand", {
 						command = "eslint.applyAllFixes",
-						arguments = {{
+						arguments = { {
 							uri = vim.uri_from_bufnr(bufnr),
 							version = vim.lsp.util.buf_versions[bufnr],
-						}},
+						} },
 					}, 3000)
 				end,
 			})
