@@ -1,5 +1,8 @@
 [user]
-	name = Tejas Sanap
+	name = "Tejas Sanap"
+	email = "todo"
+	signingkey = "~/.ssh/todo"
+
 [alias]
 	unstage = restore --staged
 	br = branch
@@ -8,80 +11,85 @@
 	st = status
 	diff = df
 	df = difftool --staged
-	wa = "!f() { git worktree add /Users/whereistejas/repos/workspace/worktree/$1 -b $2; }; f"
-	wr = "!f() { git worktree remove /Users/whereistejas/repos/workspace/worktree/$1 ; }; f"
-	wl = worktree list
 	ca = commit -a --amend --no-edit
 	pu = push u
 	puf = push u --force
 	sl = stash list
 	sd = stash drop
+
 [gpg]
-	program = /opt/homebrew/bin/gpg
+	format = ssh
+
 [core]
-	excludesfile = /Users/whereistejas/.gitignore
+	excludesfile = "~/.gitignore"
 	ignorecase = false
+
 [filter "lfs"]
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 	required = true
 	clean = git-lfs clean -- %f
+
 [diff]
 	tool = difftastic
+	algorithm = histogram
+	colorMoved = plain
+	mnemonicPrefix = true
+	renames = true
+
 [difftool]
 	prompt = false
+
 [difftool "difftastic"]
 	cmd = difft "$LOCAL" "$REMOTE"
+
 [pager]
 	difftool = true
+
 [branch]
 	autoSetupMerge = always
+	sort = -committerdate
+
 [init]
 	defaultBranch = main
+
 [commit]
 	gpgsign = true
+	verbose = true
+
 [protocol "file"]
 	allow = always
+
 [mergetool]
 	keepBackup = false
+
 [http]
 	postBuffer = 157286400
 
 [column]
-        ui = auto
-[branch]
-        sort = -committerdate
-[tag]
-        sort = version:refname
-[init]
-        defaultBranch = main
-[diff]
-        algorithm = histogram
-        colorMoved = plain
-        mnemonicPrefix = true
-        renames = true
-[push]
-        default = simple
-        autoSetupRemote = true
-        followTags = true
-[fetch]
-        prune = true
-        pruneTags = true
-        all = true
+	ui = auto
 
-# why the hell not?
+[tag]
+	sort = version:refname
+
+[push]
+	default = simple
+	autoSetupRemote = true
+	followTags = true
+
+[fetch]
+	prune = true
+	pruneTags = true
+	all = true
 
 [help]
-        autocorrect = prompt
-[commit]
-        verbose = true
-[rerere]
-        enabled = true
-        autoupdate = true
-[core]
-        excludesfile = ~/.gitignore
-[rebase]
-        autoSquash = true
-        autoStash = true
-        updateRefs = true
+	autocorrect = prompt
 
+[rerere]
+	enabled = true
+	autoupdate = true
+
+[rebase]
+	autoSquash = true
+	autoStash = true
+	updateRefs = true
