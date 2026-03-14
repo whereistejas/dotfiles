@@ -1,11 +1,65 @@
+# Ghostty shell integration for Bash. This must be at the top of your bashrc!
+if [ -n "${GHOSTTY_RESOURCES_DIR}" ]; then
+    builtin source "${GHOSTTY_RESOURCES_DIR}/shell-integration/bash/ghostty.bash"
+fi
+
+export PATH="/opt/homebrew/bin:$PATH"
+export PATH="/opt/homebrew/opt/node@16/bin:$PATH"
+export PATH="/opt/homebrew/opt/ruby@3.2/bin:$PATH"
+export PATH="~/.local/bin:$PATH"
+export PATH="~/.scripts:$PATH"
+
+export EDITOR="nvim"
+export LS_OPTIONS="--color=auto"
+export GPG_TTY=$(tty)
+export PS1='\W \$ '
+export NVM_DIR="$HOME/.nvm"
+
+cfg-bashrc() { $EDITOR ~/.bashrc ;}
+cfg-vimrc() { $EDITOR ~/.config/nvim/init.lua ;}
+cfg-vim-plugins() { $EDITOR ~/.config/nvim/lua/plugins.lua ;}
+cfg-git() { $EDITOR ~/.gitconfig ;}
+rld-bashrc() { source ~/.bashrc ;}
+
+source <(jj util completion bash)
+[[ -r "/opt/homebrew/etc/profile.d/bash_completion.sh" ]] && . "/opt/homebrew/etc/profile.d/bash_completion.sh"
+[[ -r "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh" ]] && . "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh"
+[[ -r "/opt/homebrew/Cellar/autojump/22.5.3_3/share/autojump/autojump.bash" ]] && . "/opt/homebrew/Cellar/autojump/22.5.3_3/share/autojump/autojump.bash"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+. "$HOME/.cargo/env"
+
+alias rg="rg --hidden"
+alias cat="bat --theme-light=Coldark-Cold "
+
+alias c="clear"
+alias z="j "
+
+alias rm="rm -rf "
+alias cp="cp -r "
+alias mkdir="mkdir -p "
+
+alias pgrep="pgrep -fil "
+
+alias jjl="jj l "
+alias jjs="jj status "
+alias diff="jj diff"
+
+alias vim="nvim "
+
+alias ls="eza "
+alias lsa="eza -al"
+
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
+alias .....="cd ../../../.."
+alias ......="cd ../../../../.."
+
+alias v="vagrant "
+
 ulimit -n unlimited
 
 set -o vi
-
-source "$HOME/.bash/paths"
-source "$HOME/.bash/functions"
-source "$HOME/.bash/sourced"
-source "$HOME/.bash/exports"
-source "$HOME/.bash/aliases"
 
 fortune | cowsay
