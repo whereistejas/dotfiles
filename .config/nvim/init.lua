@@ -39,252 +39,202 @@ vim.keymap.set("n", "<C-s>", "<cmd>wa<CR>", { silent = true })
 vim.keymap.set("n", "<D-s>", "<cmd>wa<CR>", { silent = true })
 
 -- =============================================================================
--- Bootstrap lazy.nvim
--- =============================================================================
-
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-if not (vim.uv or vim.loop).fs_stat(lazypath) then
-	local lazyrepo = "https://github.com/folke/lazy.nvim.git"
-	local out = vim.fn.system({ "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath })
-	if vim.v.shell_error ~= 0 then
-		vim.api.nvim_echo({
-			{ "Failed to clone lazy.nvim:\n", "ErrorMsg" },
-			{ out,                            "WarningMsg" },
-			{ "\nPress any key to exit..." },
-		}, true, {})
-		vim.fn.getchar()
-		os.exit(1)
-	end
-end
-vim.opt.rtp:prepend(lazypath)
-
--- =============================================================================
 -- Plugins
 -- =============================================================================
 
-require("lazy").setup({
-	spec = {
-		"wsdjeg/vim-fetch",
-		"tpope/vim-surround",
-		"lewis6991/gitsigns.nvim",
-
-		{
-			"nicolasgb/jj.nvim",
-			version = "*", -- Use latest stable release
-			-- Or from the main branch (uncomment the branch line and comment the version line)
-			-- branch = "main",
-			config = function()
-				require("jj").setup({})
-			end,
-		},
-
-		-- Telescope
-		{
-			'nvim-telescope/telescope.nvim',
-			version = '*',
-			dependencies = {
-				'nvim-lua/plenary.nvim',
-				{ 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
-				{
-					"nvim-telescope/telescope-file-browser.nvim",
-					dependencies = { "nvim-lua/plenary.nvim" },
-				},
-			},
-			config = function()
-				require("telescope").setup {
-					defaults = {
-						hidden = true,
-						vimgrep_arguments = {
-							"rg",
-							"--color=never",
-							"--no-heading",
-							"--with-filename",
-							"--line-number",
-							"--column",
-							"--smart-case",
-							"--hidden",
-						},
-					},
-					pickers = {
-						find_files = {
-							find_command = { "rg", "--files", "--hidden", "--glob", "!.git/*" },
-						},
-					},
-				}
-				require("telescope").load_extension "file_browser"
-
-				local builtin = require("telescope.builtin")
-				vim.keymap.set("n", "<space>t", builtin.builtin)
-				vim.keymap.set("n", "<space>b", builtin.buffers)
-				vim.keymap.set("n", "<space>f", builtin.find_files)
-				vim.keymap.set("n", "<space>fa", function()
-					builtin.find_files({
-						find_command = { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git/*" },
-					})
-				end)
-				vim.keymap.set("n", "?", builtin.live_grep)
-				vim.keymap.set("n", "<space><space>", builtin.resume)
-				vim.keymap.set("n", "<space>r", builtin.lsp_references)
-				vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
-				vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
-				vim.keymap.set("n", "<space>m", builtin.diagnostics)
-				vim.keymap.set("n", "<space>k", builtin.keymaps)
-				vim.keymap.set("n", "<space>c", ":Telescope file_browser path=%:p:h<CR>")
-			end
-		},
-
-		-- Theme
-		{
-			"projekt0n/github-nvim-theme",
-			lazy = false,
-			priority = 1000,
-			config = function()
-				require("github-theme").setup({
-					options = {
-						transparent = false,
-						styles = {
-							comments = "italic",
-							keywords = "bold",
-						},
-					}
-				})
-				vim.cmd("colorscheme github_light")
-			end,
-		},
-
-		-- AI Completion
-		{
-			"Exafunction/windsurf.nvim",
-			dependencies = { "nvim-lua/plenary.nvim" },
-			config = function()
-				require("codeium").setup({
-					enable_cmp_source = false,
-				})
-			end,
-		},
-
-		-- Completion
-		{
-			'saghen/blink.cmp',
-			-- optional: provides snippets for the snippet source
-			dependencies = {
-				'rafamadriz/friendly-snippets',
-				'Exafunction/windsurf.nvim',
-			},
-
-			version = '1.*',
-
-			opts = {
-				keymap = { preset = 'default' },
-
-				appearance = {
-					nerd_font_variant = 'mono'
-				},
-
-				-- (Default) Only show the documentation popup when manually triggered
-				completion = { documentation = { auto_show = false } },
-
-				sources = {
-					default = { 'lsp', 'path', 'snippets', 'buffer', 'codeium' },
-					providers = {
-						codeium = {
-							name = 'Codeium',
-							module = 'codeium.blink',
-							async = true,
-						},
-					},
-				},
-
-				fuzzy = { implementation = "prefer_rust" }
-			},
-			opts_extend = { "sources.default" }
-		},
-
-		-- Treesitter
-		{
-			"nvim-treesitter/nvim-treesitter",
-			lazy = false,
-			build = ":TSUpdate",
-			config = function()
-				require("nvim-treesitter.configs").setup({
-					ensure_installed = { "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css" },
-					highlight = { enable = true },
-				})
-			end,
-		},
-
-		-- LSP
-		{
-			"neovim/nvim-lspconfig",
-			dependencies = {
-				{
-					"folke/lazydev.nvim",
-					ft = "lua", -- only load on lua files
-					opts = {
-						library = {
-							-- See the configuration section for more details
-							-- Load luvit types when the `vim.uv` word is found
-							{ path = "${3rd}/luv/library", words = { "vim%.uv" } },
-							{ path = "blink.cmp" },
-						},
-					},
-				},
-			},
-			config = function()
-				local capabilities = require("blink.cmp").get_lsp_capabilities()
-
-				-- Using the new vim.lsp.config API for Neovim 0.11+
-				vim.lsp.config.lua_ls = {
-					cmd = { 'lua-language-server' },
-					capabilities = capabilities,
-					root_markers = { '.luarc.json', '.luarc.jsonc', '.luacheckrc', '.stylua.toml', 'stylua.toml', 'selene.toml', 'selene.yml', '.git' },
-				}
-
-				vim.lsp.config.ts_ls = {
-					cmd = { 'typescript-language-server', '--stdio' },
-					capabilities = capabilities,
-					root_markers = { 'tsconfig.json', 'jsconfig.json', 'package.json', '.git' },
-				}
-
-				vim.lsp.config.ocamllsp = {
-					cmd = { 'ocamllsp' },
-					capabilities = capabilities,
-					root_markers = { 'dune-project', 'dune-workspace', '.git', '*.opam' },
-					filetypes = { 'ocaml', 'ocaml.menhir', 'ocaml.interface', 'ocaml.ocamllex', 'reason', 'dune' },
-				}
-
-				vim.lsp.config.eslint = {
-					cmd = { 'vscode-eslint-language-server', '--stdio' },
-					capabilities = capabilities,
-					root_markers = { '.eslintrc', '.eslintrc.js', '.eslintrc.json', '.eslintrc.yml', 'eslint.config.js', 'eslint.config.mjs', 'eslint.config.ts' },
-					settings = {
-						validate = 'on',
-						run = 'onType',
-					},
-				}
-
-				-- Enable the LSP servers
-				vim.lsp.enable('lua_ls')
-				vim.lsp.enable('rust_analyzer')
-				-- vim.lsp.enable('astro')
-				vim.lsp.enable('ts_ls')
-				vim.lsp.enable('eslint')
-				vim.lsp.enable('ocamllsp')
-			end,
-		}
-	},
-	install = { colorscheme = { "default" } },
-	checker = { enabled = true },
+-- Build hooks must be registered BEFORE vim.pack.add()
+vim.api.nvim_create_autocmd("PackChanged", {
+	callback = function(ev)
+		local name, kind = ev.data.spec.name, ev.data.kind
+		if name == "telescope-fzf-native.nvim" and (kind == "install" or kind == "update") then
+			local path = vim.fn.stdpath("data") .. "/site/pack/core/opt/telescope-fzf-native.nvim"
+			vim.fn.system({ "make", "-C", path })
+		end
+		if name == "nvim-treesitter" and kind == "update" then
+			if not ev.data.active then vim.cmd.packadd("nvim-treesitter") end
+			vim.cmd("TSUpdate")
+		end
+	end,
 })
+
+vim.pack.add({
+	-- Theme (loaded first so colorscheme is set before other plugins)
+	"https://github.com/projekt0n/github-nvim-theme",
+
+	"https://github.com/wsdjeg/vim-fetch",
+	"https://github.com/tpope/vim-surround",
+	"https://github.com/lewis6991/gitsigns.nvim",
+	{ src = "https://github.com/nicolasgb/jj.nvim", version = "v0.5.0" },
+
+	-- Telescope
+	"https://github.com/nvim-lua/plenary.nvim",
+	"https://github.com/nvim-telescope/telescope-fzf-native.nvim",
+	"https://github.com/nvim-telescope/telescope-file-browser.nvim",
+	{ src = "https://github.com/nvim-telescope/telescope.nvim", version = "v0.2.1" },
+
+	-- AI completion
+	"https://github.com/Exafunction/windsurf.nvim",
+
+	-- Completion
+	"https://github.com/rafamadriz/friendly-snippets",
+	{ src = "https://github.com/saghen/blink.cmp", version = vim.version.range("1.*") },
+
+	-- Treesitter
+	"https://github.com/nvim-treesitter/nvim-treesitter",
+
+	-- LSP
+	"https://github.com/folke/lazydev.nvim",
+	"https://github.com/neovim/nvim-lspconfig",
+})
+
+-- Enable loader now that all plugins are in runtimepath
+vim.loader.enable()
+
+-- =============================================================================
+-- Plugin configuration
+-- =============================================================================
+
+-- Theme
+require("github-theme").setup({
+	options = {
+		transparent = false,
+		styles = {
+			comments = "italic",
+			keywords = "bold",
+		},
+	},
+})
+vim.cmd("colorscheme github_light")
+
+-- gitsigns
+require("gitsigns").setup()
+
+-- jj.nvim
+require("jj").setup({})
+
+-- Telescope
+require("telescope").setup({
+	defaults = {
+		hidden = true,
+		vimgrep_arguments = {
+			"rg",
+			"--color=never",
+			"--no-heading",
+			"--with-filename",
+			"--line-number",
+			"--column",
+			"--smart-case",
+			"--hidden",
+		},
+	},
+	pickers = {
+		find_files = {
+			find_command = { "rg", "--files", "--hidden", "--glob", "!.git/*" },
+		},
+	},
+})
+require("telescope").load_extension("file_browser")
+
+local builtin = require("telescope.builtin")
+vim.keymap.set("n", "<space>t", builtin.builtin)
+vim.keymap.set("n", "<space>b", builtin.buffers)
+vim.keymap.set("n", "<space>f", builtin.find_files)
+vim.keymap.set("n", "<space>fa", function()
+	builtin.find_files({
+		find_command = { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git/*" },
+	})
+end)
+vim.keymap.set("n", "?", builtin.live_grep)
+vim.keymap.set("n", "<space><space>", builtin.resume)
+vim.keymap.set("n", "<space>r", builtin.lsp_references)
+vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
+vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
+vim.keymap.set("n", "<space>m", builtin.diagnostics)
+vim.keymap.set("n", "<space>k", builtin.keymaps)
+vim.keymap.set("n", "<space>c", ":Telescope file_browser path=%:p:h<CR>")
+
+-- Windsurf / Codeium
+require("codeium").setup({
+	enable_cmp_source = false,
+})
+
+-- blink.cmp
+require("blink.cmp").setup({
+	keymap = { preset = "default" },
+	appearance = { nerd_font_variant = "mono" },
+	completion = { documentation = { auto_show = false } },
+	sources = {
+		default = { "lsp", "path", "snippets", "buffer", "codeium" },
+		providers = {
+			codeium = {
+				name = "Codeium",
+				module = "codeium.blink",
+				async = true,
+			},
+		},
+	},
+	fuzzy = { implementation = "prefer_rust" },
+})
+
+-- Treesitter
+require("nvim-treesitter").setup()
+require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css" })
+
+-- lazydev (Lua LSP workspace libraries)
+require("lazydev").setup({
+	library = {
+		{ path = "${3rd}/luv/library", words = { "vim%.uv" } },
+		{ path = "blink.cmp" },
+	},
+})
+
+-- LSP
+local capabilities = require("blink.cmp").get_lsp_capabilities()
+
+vim.lsp.config.lua_ls = {
+	cmd = { "lua-language-server" },
+	capabilities = capabilities,
+	root_markers = { ".luarc.json", ".luarc.jsonc", ".luacheckrc", ".stylua.toml", "stylua.toml", "selene.toml", "selene.yml", ".git" },
+}
+
+vim.lsp.config.ts_ls = {
+	cmd = { "typescript-language-server", "--stdio" },
+	capabilities = capabilities,
+	root_markers = { "tsconfig.json", "jsconfig.json", "package.json", ".git" },
+}
+
+vim.lsp.config.ocamllsp = {
+	cmd = { "ocamllsp" },
+	capabilities = capabilities,
+	root_markers = { "dune-project", "dune-workspace", ".git", "*.opam" },
+	filetypes = { "ocaml", "ocaml.menhir", "ocaml.interface", "ocaml.ocamllex", "reason", "dune" },
+}
+
+vim.lsp.config.eslint = {
+	cmd = { "vscode-eslint-language-server", "--stdio" },
+	capabilities = capabilities,
+	root_markers = { ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml", "eslint.config.js", "eslint.config.mjs", "eslint.config.ts" },
+	settings = {
+		validate = "on",
+		run = "onType",
+	},
+}
+
+vim.lsp.enable("lua_ls")
+vim.lsp.enable("rust_analyzer")
+-- vim.lsp.enable("astro")
+vim.lsp.enable("ts_ls")
+vim.lsp.enable("eslint")
+vim.lsp.enable("ocamllsp")
 
 -- =============================================================================
 -- Diagnostics & LSP autocommands
 -- =============================================================================
 
-vim.diagnostic.config {
+vim.diagnostic.config({
 	virtual_text = true,
-	virtual_lines = true
-}
+	virtual_lines = true,
+})
 
 vim.api.nvim_create_autocmd("LspAttach", {
 	group = vim.api.nvim_create_augroup("lsp", { clear = true }),
@@ -314,12 +264,12 @@ vim.api.nvim_create_autocmd("LspAttach", {
 			vim.api.nvim_create_autocmd("BufWritePre", {
 				buffer = args.buf,
 				callback = function()
-					vim.lsp.buf.format {
+					vim.lsp.buf.format({
 						async = false,
 						id = args.data.client_id,
-					}
+					})
 				end,
 			})
 		end
-	end
+	end,
 })
