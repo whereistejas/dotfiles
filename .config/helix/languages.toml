@@ -1,3 +1,0 @@
-[language-server.rust-analyzer.config]
-files = { watcher = "server" }
-cargo = { allFeatures = true, extraArgs = ["--target-dir", "./.target-vscode", "--profile", "rust-analyzer"] }
