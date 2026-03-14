@@ -1,9 +1,0 @@
-cfg-bashrc() { $EDITOR ~/.bashrc ;}
-cfg-vimrc() { $EDITOR ~/.config/nvim/init.lua ;}
-cfg-vim-plugins() { $EDITOR ~/.config/nvim/lua/plugins.lua ;}
-cfg-alias() { $EDITOR ~/.bash/aliases ;}
-cfg-functions() { $EDITOR ~/.bash/functions ;}
-cfg-git() { $EDITOR ~/.gitconfig ;}
-
-rld-bashrc() { source ~/.bashrc ;}
-

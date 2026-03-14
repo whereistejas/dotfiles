@@ -3,3 +3,4 @@ font-size = 13
 cursor-style = underline
 cursor-style-blink = true
 theme = "GitHub Light Default"
+command="/opt/homebrew/bin/bash"
