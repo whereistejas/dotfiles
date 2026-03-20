@@ -1,7 +1,7 @@
 [user]
 	name = "Tejas Sanap"
-	email = "todo"
-	signingkey = "~/.ssh/todo"
+	email = "email@whereistejas.xyz"
+	signingkey = "~/.ssh/todo.pub"
 
 [alias]
 	unstage = restore --staged
@@ -17,18 +17,20 @@
 	sl = stash list
 	sd = stash drop
 
-[gpg]
-	format = ssh
+[branch]
+	autoSetupMerge = always
+	sort = -committerdate
+
+[commit]
+	gpgsign = true
+	verbose = true
+
+[column]
+	ui = auto
 
 [core]
 	excludesfile = "~/.gitignore"
 	ignorecase = false
-
-[filter "lfs"]
-	smudge = git-lfs smudge -- %f
-	process = git-lfs filter-process
-	required = true
-	clean = git-lfs clean -- %f
 
 [diff]
 	tool = difftastic
@@ -43,47 +45,48 @@
 [difftool "difftastic"]
 	cmd = difft "$LOCAL" "$REMOTE"
 
-[pager]
-	difftool = true
+[fetch]
+	prune = true
+	pruneTags = true
+	all = true
 
-[branch]
-	autoSetupMerge = always
-	sort = -committerdate
+[filter "lfs"]
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+	clean = git-lfs clean -- %f
 
 [init]
 	defaultBranch = main
 
-[commit]
-	gpgsign = true
-	verbose = true
+[gpg]
+	format = ssh
 
-[protocol "file"]
-	allow = always
+[gpg "ssh"]
+	allowedSignersFile = "~/.ssh/allowed_signers"
 
 [mergetool]
 	keepBackup = false
 
-[http]
-	postBuffer = 157286400
+[protocol "file"]
+	allow = always
 
-[column]
-	ui = auto
-
-[tag]
-	sort = version:refname
+[pager]
+	difftool = true
 
 [push]
 	default = simple
 	autoSetupRemote = true
 	followTags = true
 
-[fetch]
-	prune = true
-	pruneTags = true
-	all = true
-
 [help]
 	autocorrect = prompt
+
+[http]
+	postBuffer = 157286400
+
+[tag]
+	sort = version:refname
 
 [rerere]
 	enabled = true
