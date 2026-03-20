@@ -17,6 +17,10 @@
       "rev": "7c4faa3540d0781a28588cafbd4dd187a28ac6e3",
       "src": "https://github.com/lewis6991/gitsigns.nvim"
     },
+    "gruvbox.nvim": {
+      "rev": "334d5fd49fc8033f26408425366c66c6390c57bb",
+      "src": "https://github.com/ellisonleao/gruvbox.nvim"
+    },
     "jj.nvim": {
       "rev": "185190909ddfe79b0b03862f680c8474b72c90ed",
       "src": "https://github.com/nicolasgb/jj.nvim",
