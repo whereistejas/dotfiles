@@ -60,11 +60,12 @@ vim.api.nvim_create_autocmd("PackChanged", {
 vim.pack.add({
 	-- Theme (loaded first so colorscheme is set before other plugins)
 	"https://github.com/projekt0n/github-nvim-theme",
+	"https://github.com/ellisonleao/gruvbox.nvim",
 
 	"https://github.com/wsdjeg/vim-fetch",
 	"https://github.com/tpope/vim-surround",
 	"https://github.com/lewis6991/gitsigns.nvim",
-	{ src = "https://github.com/nicolasgb/jj.nvim", version = "v0.5.0" },
+	{ src = "https://github.com/nicolasgb/jj.nvim",             version = "v0.5.0" },
 
 	-- Telescope
 	"https://github.com/nvim-lua/plenary.nvim",
@@ -104,7 +105,8 @@ require("github-theme").setup({
 		},
 	},
 })
-vim.cmd("colorscheme github_light")
+vim.o.background = "light"
+vim.cmd("colorscheme gruvbox")
 
 -- gitsigns
 require("gitsigns").setup()
@@ -130,6 +132,7 @@ require("telescope").setup({
 	pickers = {
 		find_files = {
 			find_command = { "rg", "--files", "--hidden", "--glob", "!.git/*" },
+			cache_picker = false,
 		},
 	},
 })
@@ -150,6 +153,7 @@ vim.keymap.set("n", "<space>r", builtin.lsp_references)
 vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
 vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
 vim.keymap.set("n", "<space>m", builtin.diagnostics)
+vim.keymap.set("n", "M", vim.diagnostic.open_float)
 vim.keymap.set("n", "<space>k", builtin.keymaps)
 vim.keymap.set("n", "<space>c", ":Telescope file_browser path=%:p:h<CR>")
 
@@ -220,12 +224,23 @@ vim.lsp.config.eslint = {
 	},
 }
 
+vim.lsp.config.ruby_lsp = {
+	cmd = { "ruby-lsp" },
+	capabilities = capabilities,
+	root_markers = { "Gemfile", ".git" },
+	init_options = {
+		formatter = "standard",
+		linters = { "standard" },
+	},
+}
+
 vim.lsp.enable("lua_ls")
 vim.lsp.enable("rust_analyzer")
 -- vim.lsp.enable("astro")
 vim.lsp.enable("ts_ls")
 vim.lsp.enable("eslint")
 vim.lsp.enable("ocamllsp")
+vim.lsp.enable("ruby_lsp")
 
 -- =============================================================================
 -- Diagnostics & LSP autocommands
