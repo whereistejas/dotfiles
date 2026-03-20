@@ -15,12 +15,6 @@ export GPG_TTY=$(tty)
 export PS1='\W \$ '
 export NVM_DIR="$HOME/.nvm"
 
-cfg-bashrc() { $EDITOR ~/.bashrc ;}
-cfg-vimrc() { $EDITOR ~/.config/nvim/init.lua ;}
-cfg-vim-plugins() { $EDITOR ~/.config/nvim/lua/plugins.lua ;}
-cfg-git() { $EDITOR ~/.gitconfig ;}
-rld-bashrc() { source ~/.bashrc ;}
-
 source <(jj util completion bash)
 [[ -r "/opt/homebrew/etc/profile.d/bash_completion.sh" ]] && . "/opt/homebrew/etc/profile.d/bash_completion.sh"
 [[ -r "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh" ]] && . "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh"
@@ -56,10 +50,15 @@ alias ....="cd ../../.."
 alias .....="cd ../../../.."
 alias ......="cd ../../../../.."
 
-alias v="vagrant "
+cfg-bashrc() { $EDITOR ~/.bashrc ;}
+cfg-vimrc() { $EDITOR ~/.config/nvim/init.lua ;}
+cfg-git() { $EDITOR ~/.gitconfig ;}
+cfg-jj() { $EDITOR ~/.config/jj/config.toml ;}
+rld-bashrc() { source ~/.bashrc ;}
 
 ulimit -n unlimited
 
 set -o vi
 
 fortune | cowsay
+
