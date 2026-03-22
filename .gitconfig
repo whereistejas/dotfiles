@@ -1,7 +1,7 @@
 [user]
 	name = "Tejas Sanap"
 	email = "email@whereistejas.xyz"
-	signingkey = "~/.ssh/todo.pub"
+	signingkey = "~/.ssh/github.pub"
 
 [alias]
 	unstage = restore --staged
