@@ -1,5 +1,8 @@
-.idea
-.DS_Store
-.jj
-*.binpb
-.config/raycast/extensions
+**/raycast/extensions
+
+**/jj/repos
+.jj/repo
+.jj/working_copy
+
+**/.DS_Store
+
