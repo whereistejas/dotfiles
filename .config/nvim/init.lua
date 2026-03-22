@@ -41,6 +41,8 @@ vim.keymap.set("n", "<D-s>", "<cmd>wa<CR>", { silent = true })
 -- =============================================================================
 -- Plugins
 -- =============================================================================
+--
+-- Always use this blog for documentation on how to use `vim.pack`: https://echasnovski.com/blog/2026-03-13-a-guide-to-vim-pack
 
 -- Build hooks must be registered BEFORE vim.pack.add()
 vim.api.nvim_create_autocmd("PackChanged", {
@@ -64,8 +66,12 @@ vim.pack.add({
 
 	"https://github.com/wsdjeg/vim-fetch",
 	"https://github.com/tpope/vim-surround",
+
+	-- VCS
 	"https://github.com/lewis6991/gitsigns.nvim",
 	{ src = "https://github.com/nicolasgb/jj.nvim",             version = "v0.5.0" },
+	"https://github.com/MunifTanjim/nui.nvim",
+	"https://github.com/julienvincent/hunk.nvim",
 
 	-- Telescope
 	"https://github.com/nvim-lua/plenary.nvim",
