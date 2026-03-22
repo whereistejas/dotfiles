@@ -66,8 +66,11 @@ vim.pack.add({
 
 	"https://github.com/wsdjeg/vim-fetch",
 	"https://github.com/tpope/vim-surround",
+
+	-- VCS
 	"https://github.com/lewis6991/gitsigns.nvim",
 	{ src = "https://github.com/nicolasgb/jj.nvim",             version = "v0.5.0" },
+	"https://github.com/julienvincent/hunk.nvim",
 
 	-- Telescope
 	"https://github.com/nvim-lua/plenary.nvim",
