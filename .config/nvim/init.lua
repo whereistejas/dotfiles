@@ -137,7 +137,7 @@ require("telescope").setup({
 	},
 	pickers = {
 		find_files = {
-			find_command = { "rg", "--files", "--hidden", "--glob", "!.git/*" },
+			find_command = { "rg", "--files", "--hidden", "--glob", "!.git/*", "--sort", "path" },
 			cache_picker = false,
 		},
 	},
@@ -158,6 +158,7 @@ vim.keymap.set("n", "<space><space>", builtin.resume)
 vim.keymap.set("n", "<space>r", builtin.lsp_references)
 vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
 vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
+vim.keymap.set("n", "<space>o", builtin.lsp_document_symbols)
 vim.keymap.set("n", "<space>m", builtin.diagnostics)
 vim.keymap.set("n", "M", vim.diagnostic.open_float)
 vim.keymap.set("n", "<space>k", builtin.keymaps)
@@ -188,7 +189,8 @@ require("blink.cmp").setup({
 
 -- Treesitter
 require("nvim-treesitter").setup()
-require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css" })
+require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css", "python",
+	"ruby" })
 
 -- lazydev (Lua LSP workspace libraries)
 require("lazydev").setup({
@@ -240,6 +242,25 @@ vim.lsp.config.ruby_lsp = {
 	},
 }
 
+vim.lsp.config.ruff = {
+	cmd = { "ruff", "server" },
+	capabilities = capabilities,
+	root_markers = { "pyproject.toml", "ruff.toml", ".ruff.toml", ".git" },
+	filetypes = { "python" },
+}
+
+vim.lsp.config.ty = {
+	cmd = { "ty", "server" },
+	capabilities = capabilities,
+	root_markers = { "pyproject.toml", "ty.toml", ".git" },
+	filetypes = { "python" },
+}
+
+-- Required: Enable the language server
+vim.lsp.enable('ty')
+
+vim.lsp.enable('ruff')
+
 vim.lsp.enable("lua_ls")
 vim.lsp.enable("rust_analyzer")
 -- vim.lsp.enable("astro")
@@ -247,6 +268,8 @@ vim.lsp.enable("ts_ls")
 vim.lsp.enable("eslint")
 vim.lsp.enable("ocamllsp")
 vim.lsp.enable("ruby_lsp")
+vim.lsp.enable("ruff")
+vim.lsp.enable("ty")
 
 -- =============================================================================
 -- Diagnostics & LSP autocommands
