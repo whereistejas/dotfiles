@@ -10,6 +10,9 @@ vim.wo.relativenumber = true
 
 vim.opt.tabstop = 4
 vim.opt.shiftwidth = 4
+vim.opt.wrap = true      -- Enable soft wrapping
+vim.opt.linebreak = true -- Wrap at word boundaries
+
 
 local lsp_indent = {
 	ts_ls = { tabstop = 2, shiftwidth = 2, expandtab = true },
@@ -35,8 +38,7 @@ vim.keymap.set("n", "<up>", "<nop>")
 vim.keymap.set("n", "<down>", "<nop>")
 vim.keymap.set("n", "<left>", ":bp<CR>")
 vim.keymap.set("n", "<right>", ":bn<CR>")
-vim.keymap.set("n", "<C-s>", "<cmd>wa<CR>", { silent = true })
-vim.keymap.set("n", "<D-s>", "<cmd>wa<CR>", { silent = true })
+vim.keymap.set("n", "j", "gj")
 
 -- =============================================================================
 -- Plugins
@@ -63,6 +65,7 @@ vim.pack.add({
 	-- Theme (loaded first so colorscheme is set before other plugins)
 	"https://github.com/projekt0n/github-nvim-theme",
 	"https://github.com/ellisonleao/gruvbox.nvim",
+	"https://github.com/junegunn/goyo.vim",
 
 	"https://github.com/wsdjeg/vim-fetch",
 	"https://github.com/tpope/vim-surround",
