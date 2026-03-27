@@ -4,7 +4,7 @@
 
 vim.opt.clipboard = "unnamedplus"
 vim.opt.signcolumn = "yes"
-vim.opt.cursorline = true
+-- vim.opt.cursorline = true
 vim.opt.mouse = "n"
 vim.wo.relativenumber = true
 
@@ -121,7 +121,7 @@ vim.cmd("colorscheme gruvbox")
 require("gitsigns").setup()
 
 -- jj.nvim
-require("jj").setup({})
+require("jj").setup()
 
 -- Telescope
 require("telescope").setup({
