@@ -138,7 +138,10 @@ require("telescope").setup({
 	pickers = {
 		find_files = {
 			find_command = { "rg", "--files", "--hidden", "--glob", "!.git/*", "--sort", "path" },
-			cache_picker = false,
+			sorting_strategy = "ascending",
+			tiebreak = function(current_entry, existing_entry, _)
+				return current_entry.index < existing_entry.index
+			end,
 		},
 	},
 })
@@ -150,7 +153,11 @@ vim.keymap.set("n", "<space>b", builtin.buffers)
 vim.keymap.set("n", "<space>f", builtin.find_files)
 vim.keymap.set("n", "<space>fa", function()
 	builtin.find_files({
-		find_command = { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git/*" },
+		find_command = { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git/*", "--sort", "path" },
+		sorting_strategy = "ascending",
+		tiebreak = function(current_entry, existing_entry, _)
+			return current_entry.index < existing_entry.index
+		end,
 	})
 end)
 vim.keymap.set("n", "?", builtin.live_grep)
@@ -247,6 +254,12 @@ vim.lsp.config.ruff = {
 	capabilities = capabilities,
 	root_markers = { "pyproject.toml", "ruff.toml", ".ruff.toml", ".git" },
 	filetypes = { "python" },
+	init_options = {
+		settings = {
+			fixAll = false,
+			organizeImports = false,
+		},
+	},
 }
 
 vim.lsp.config.ty = {
@@ -254,12 +267,16 @@ vim.lsp.config.ty = {
 	capabilities = capabilities,
 	root_markers = { "pyproject.toml", "ty.toml", ".git" },
 	filetypes = { "python" },
+	settings = {
+		ty = {
+			configuration = {
+				environment = {
+					["extra-paths"] = { "~/build/wst_core/python", "~/build/deps/tornado-openapi3/" },
+				},
+			},
+		},
+	},
 }
-
--- Required: Enable the language server
-vim.lsp.enable('ty')
-
-vim.lsp.enable('ruff')
 
 vim.lsp.enable("lua_ls")
 vim.lsp.enable("rust_analyzer")
@@ -279,6 +296,25 @@ vim.diagnostic.config({
 	virtual_text = true,
 	virtual_lines = true,
 })
+
+function _G.toggle_diagnostics()
+	local cfg = vim.diagnostic.config()
+	if cfg.virtual_text then
+		vim.diagnostic.config({
+			virtual_text = false,
+			virtual_lines = false,
+			underline = false,
+			signs = false,
+		})
+	else
+		vim.diagnostic.config({
+			virtual_text = true,
+			virtual_lines = true,
+			underline = true,
+			signs = true,
+		})
+	end
+end
 
 vim.api.nvim_create_autocmd("LspAttach", {
 	group = vim.api.nvim_create_augroup("lsp", { clear = true }),
@@ -304,7 +340,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 					}, 3000)
 				end,
 			})
-		elseif client and client.name ~= "ts_ls" then
+		elseif client and client.name ~= "ts_ls" and client.name ~= "ruff" and client.name ~= "ty" then
 			vim.api.nvim_create_autocmd("BufWritePre", {
 				buffer = args.buf,
 				callback = function()
