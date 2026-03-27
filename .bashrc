@@ -6,10 +6,9 @@ fi
 export PATH="/opt/homebrew/bin:$PATH"
 export PATH="/opt/homebrew/opt/node@16/bin:$PATH"
 export PATH="/opt/homebrew/opt/ruby@3.2/bin:$PATH"
-export PATH="~/.local/bin:$PATH"
-export PATH="~/.scripts:$PATH"
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
+export PATH="~/.local/bin:$PATH"
 
 export EDITOR="nvim"
 export LS_OPTIONS="--color=auto"
@@ -67,7 +66,17 @@ _jj_each() {
 }
 
 jjs() { _jj_each st "$1"; }
-jjl() { _jj_each la "$1"; }
+jjl() { _jj_each log "$1"; }
+
+jjgp() {
+    local bookmark
+    bookmark=$(jj log -r 'latest(::@ & bookmarks())' --no-graph -T 'local_bookmarks.join(",")' --limit 1)
+    if [ -n "$bookmark" ]; then
+        jj git push -b "$bookmark" "$@"
+    else
+        echo "No bookmark found in ancestry of @"
+    fi
+}
 
 inn() { pushd "$1" > /dev/null && shift && "$@"; popd > /dev/null; }
 
