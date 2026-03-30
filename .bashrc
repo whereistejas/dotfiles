@@ -15,6 +15,7 @@ export LS_OPTIONS="--color=auto"
 export GPG_TTY=$(tty)
 export PS1='\W \$ '
 export NVM_DIR="$HOME/.nvm"
+export NODE_EXTRA_CA_CERTS="/tmp/corp-cert.pem"
 
 [[ -r "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh" ]] && . "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh"
 [ -f /opt/homebrew/share/bash-completion/bash_completion ] && . /opt/homebrew/share/bash-completion/bash_completion

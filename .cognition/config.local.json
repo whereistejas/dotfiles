@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Exec(rg)"
+      "Exec(rg)",
+      "Exec(nvim)",
+      "Exec(jj diff)"
     ]
   }
 }
