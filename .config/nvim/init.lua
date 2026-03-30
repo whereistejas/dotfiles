@@ -5,6 +5,7 @@
 vim.opt.clipboard = "unnamedplus"
 vim.opt.signcolumn = "yes"
 -- vim.opt.cursorline = true
+vim.opt.winborder = "single"
 vim.opt.mouse = "n"
 vim.wo.relativenumber = true
 
@@ -211,6 +212,80 @@ require("lazydev").setup({
 })
 
 -- LSP
+-- Reformat long param/field lists in hover: put each element on its own line.
+-- In 0.12, vim.lsp.buf.hover() calls open_floating_preview directly (not via
+-- handlers), so this monkey-patch is the correct interception point.
+local function split_params(line)
+	-- Find first ( or { and its matching closer
+	local opos, open, close
+	for i = 1, #line do
+		local c = line:sub(i, i)
+		if c == "(" or c == "{" then
+			opos, open, close = i, c, c == "(" and ")" or "}"
+			break
+		end
+	end
+	if not opos then return end
+	local depth, cpos = 0, nil
+	for i = opos, #line do
+		local c = line:sub(i, i)
+		if c == open then depth = depth + 1 end
+		if c == close then
+			depth = depth - 1; if depth == 0 then
+				cpos = i; break
+			end
+		end
+	end
+	if not cpos then return end
+
+	-- Split inner text on top-level , or ; (respects nested brackets/generics)
+	local inner = line:sub(opos + 1, cpos - 1)
+	local parts, sep, d, buf = {}, ",", 0, {}
+	for i = 1, #inner do
+		local c = inner:sub(i, i)
+		local prev = i > 1 and inner:sub(i - 1, i - 1) or ""
+		if ("({["):find(c, 1, true) then
+			d = d + 1
+		elseif (")}]"):find(c, 1, true) then
+			d = math.max(0, d - 1)
+		elseif c == "<" and prev:match("[%w_]") then
+			d = d + 1 -- generic <
+		elseif c == ">" and d > 0 then
+			d = d - 1 -- generic >
+		elseif d == 0 and (c == "," or c == ";") then
+			sep = c; parts[#parts + 1] = vim.trim(table.concat(buf)); buf = {}
+			goto continue
+		end
+		buf[#buf + 1] = c
+		::continue::
+	end
+	local tail = vim.trim(table.concat(buf))
+	if tail ~= "" then parts[#parts + 1] = tail end
+	if #parts <= 1 then return end
+
+	-- Reassemble: one element per indented line
+	local out = { line:sub(1, opos) }
+	for j, p in ipairs(parts) do
+		out[#out + 1] = "    " .. p .. (j < #parts and sep or "")
+	end
+	out[#out + 1] = line:sub(cpos)
+	return out
+end
+
+local orig_open_float = vim.lsp.util.open_floating_preview
+function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
+	local formatted = {}
+	for _, ln in ipairs(contents) do
+		local split = #ln > 80 and split_params(ln)
+		if split then
+			vim.list_extend(formatted, split)
+		else
+			formatted[#formatted + 1] = ln
+		end
+	end
+	return orig_open_float(formatted, syntax, opts, ...)
+end
+
 local capabilities = require("blink.cmp").get_lsp_capabilities()
 
 vim.lsp.config.lua_ls = {
