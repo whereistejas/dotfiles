@@ -116,7 +116,7 @@ require("github-theme").setup({
 	},
 })
 vim.o.background = "light"
-vim.cmd("colorscheme gruvbox")
+vim.cmd("colorscheme github_light_tritanopia")
 
 -- gitsigns
 require("gitsigns").setup()
