@@ -1,12 +1,12 @@
 [user]
 name = "Tejas Sanap"
-email = "email@whereistejas.xyz"
+email = "tejas.sanap@beacon.io"
 
 
 [signing]
 behavior = "own"
 backend = "ssh"
-key = "~/.ssh/github.pub"
+key = "~/.ssh/beacon2.pub"
 backends.ssh.allowed-signers = "~/.ssh/allowed_signers"
 
 [aliases]
