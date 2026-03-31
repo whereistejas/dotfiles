@@ -9,6 +9,7 @@ export PATH="/opt/homebrew/opt/ruby@3.2/bin:$PATH"
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 export PATH="~/.local/bin:$PATH"
+export PATH="$HOME/toolkit/ai/bin:$PATH"
 
 export EDITOR="nvim"
 export LS_OPTIONS="--color=auto"

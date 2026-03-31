@@ -201,7 +201,7 @@ require("blink.cmp").setup({
 -- Treesitter
 require("nvim-treesitter").setup()
 require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css", "python",
-	"ruby" })
+	"ruby", "bash" })
 
 -- lazydev (Lua LSP workspace libraries)
 require("lazydev").setup({
@@ -340,6 +340,13 @@ vim.lsp.config.ruff = {
 	},
 }
 
+vim.lsp.config.bashls = {
+	cmd = { "bash-language-server", "start" },
+	capabilities = capabilities,
+	root_markers = { ".git" },
+	filetypes = { "sh", "bash" },
+}
+
 vim.lsp.config.ty = {
 	cmd = { "ty", "server" },
 	capabilities = capabilities,
@@ -365,6 +372,7 @@ vim.lsp.enable("ocamllsp")
 vim.lsp.enable("ruby_lsp")
 vim.lsp.enable("ruff")
 vim.lsp.enable("ty")
+vim.lsp.enable("bashls")
 
 -- =============================================================================
 -- Diagnostics & LSP autocommands
