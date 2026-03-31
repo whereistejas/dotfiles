@@ -2,7 +2,6 @@
 name = "Tejas Sanap"
 email = "email@whereistejas.xyz"
 
-
 [signing]
 behavior = "own"
 backend = "ssh"
