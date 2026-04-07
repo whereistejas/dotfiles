@@ -70,10 +70,14 @@ vim.pack.add({
 	"https://github.com/MunifTanjim/nui.nvim",
 	"https://github.com/julienvincent/hunk.nvim",
 
+	-- AI
+	"https://github.com/github/copilot.vim",
+
 	-- Telescope
 	"https://github.com/nvim-lua/plenary.nvim",
 	"https://github.com/nvim-telescope/telescope-fzf-native.nvim",
 	"https://github.com/nvim-telescope/telescope-file-browser.nvim",
+	"https://github.com/nvim-telescope/telescope-live-grep-args.nvim",
 	{ src = "https://github.com/nvim-telescope/telescope.nvim", version = "v0.2.1" },
 
 	-- Completion
@@ -186,6 +190,7 @@ require("telescope").setup({
 	},
 })
 require("telescope").load_extension("file_browser")
+require("telescope").load_extension("live_grep_args")
 
 local builtin = require("telescope.builtin")
 vim.keymap.set("n", "<space>t", builtin.builtin)
@@ -200,7 +205,8 @@ vim.keymap.set("n", "<space>fa", function()
 		end,
 	})
 end)
-vim.keymap.set("n", "?", builtin.live_grep)
+-- vim.keymap.set("n", "?", builtin.live_grep)
+vim.keymap.set("n", "?", ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>")
 vim.keymap.set("n", "<space><space>", builtin.resume)
 vim.keymap.set("n", "<space>r", builtin.lsp_references)
 vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
@@ -214,7 +220,8 @@ vim.api.nvim_set_hl(0, "JJChangeId", { bold = true })
 
 local JJ_ID_WIDTH = 12
 local JJ_AGE_WIDTH = 15
-local jj_log_tpl = 'change_id.shortest() ++ "\t" ++ change_id.short(12) ++ "\t" ++ committer.timestamp().ago() ++ "\t" ++ coalesce(description.first_line(), "(no description)") ++ "\n"'
+local jj_log_tpl =
+'change_id.shortest() ++ "\t" ++ change_id.short(12) ++ "\t" ++ committer.timestamp().ago() ++ "\t" ++ coalesce(description.first_line(), "(no description)") ++ "\n"'
 
 local function jj_cd_to_repo()
 	local repo = find_jj_repo()
@@ -246,8 +253,8 @@ local function jj_log_entry_maker(e)
 		value = e,
 		display = function()
 			return line, {
-				{ { 0, short_len }, "JJChangeId" },
-				{ { short_len, JJ_ID_WIDTH }, "Comment" },
+				{ { 0, short_len },                        "JJChangeId" },
+				{ { short_len, JJ_ID_WIDTH },              "Comment" },
 				{ { age_start, age_start + JJ_AGE_WIDTH }, "Comment" },
 			}
 		end,
@@ -347,9 +354,22 @@ require("blink.cmp").setup({
 require("nvim-treesitter").setup()
 require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css", "python",
 	"ruby", "bash" })
-vim.keymap.set("n", "gn", function() require("nvim-treesitter.incremental_selection").init_selection() end)
-vim.keymap.set("v", "gn", function() require("nvim-treesitter.incremental_selection").node_incremental() end)
-vim.keymap.set("v", "gi", function() require("nvim-treesitter.incremental_selection").node_decremental() end)
+-- Treesitter incremental selection via vim.treesitter._select (same engine as `an`/`in`)
+local ts_select = require("vim.treesitter._select")
+
+local function ts_init()
+	vim.cmd("normal! v")
+	ts_select.select_parent(1)
+end
+
+vim.keymap.set("n", "<Up>",    ts_init)
+vim.keymap.set("n", "<Down>",  ts_init)
+vim.keymap.set("n", "<Left>",  function() vim.cmd("normal! v"); ts_select.select_prev(1) end)
+vim.keymap.set("n", "<Right>", function() vim.cmd("normal! v"); ts_select.select_next(1) end)
+vim.keymap.set("v", "<Up>",    function() ts_select.select_parent(1) end)
+vim.keymap.set("v", "<Down>",  function() ts_select.select_child(1) end)
+vim.keymap.set("v", "<Left>",  function() ts_select.select_prev(1) end)
+vim.keymap.set("v", "<Right>", function() ts_select.select_next(1) end)
 
 -- lazydev (Lua LSP workspace libraries)
 require("lazydev").setup({
@@ -489,7 +509,7 @@ vim.lsp.config.ruff = {
 }
 
 vim.lsp.config.bashls = {
-	cmd = { "bash-language-server", "start" },
+	cmd = { "bun", vim.env.HOME .. "/.bun/bin/bash-language-server", "start" },
 	capabilities = capabilities,
 	root_markers = { ".git" },
 	filetypes = { "sh", "bash" },

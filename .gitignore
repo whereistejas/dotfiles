@@ -5,6 +5,7 @@
 .jj/working_copy
 
 **/.config/beacon
+**/.config/github-copilot
 **/.config/karabiner/automatic_backups
 **/.config/cni
 **/.config/cognition/skills
