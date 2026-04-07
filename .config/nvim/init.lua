@@ -340,10 +340,33 @@ vim.keymap.set("n", "<space>jf", function()
 end)
 
 -- blink.cmp
+-- Disable auto-completion popup in markdown files while Goyo is active.
+-- You can still trigger it manually with <C-space>.
+vim.g.goyo_active = false
+vim.api.nvim_create_autocmd("User", {
+	pattern = "GoyoEnter",
+	callback = function() vim.g.goyo_active = true end,
+})
+vim.api.nvim_create_autocmd("User", {
+	pattern = "GoyoLeave",
+	callback = function() vim.g.goyo_active = false end,
+})
+
 require("blink.cmp").setup({
 	keymap = { preset = "default" },
 	appearance = { nerd_font_variant = "mono" },
-	completion = { documentation = { auto_show = false } },
+	completion = {
+		documentation = { auto_show = false },
+		trigger = {
+			-- Don't show the popup automatically in markdown while Goyo is on.
+			show_on_insert_on_trigger_character = not (vim.g.goyo_active and vim.bo.filetype == "markdown"),
+		},
+	},
+	-- In markdown+Goyo the popup is suppressed; trigger manually with <C-space>.
+	enabled = function()
+		return not (vim.g.goyo_active and vim.bo.filetype == "markdown")
+			or vim.fn.pumvisible() == 1 -- keep it alive if the menu is already open
+	end,
 	sources = {
 		default = { "lsp", "path", "snippets", "buffer" },
 	},
@@ -597,7 +620,9 @@ vim.api.nvim_create_autocmd("LspAttach", {
 					}, 3000)
 				end,
 			})
-		elseif client and client.name ~= "ts_ls" and client.name ~= "ruff" and client.name ~= "ty" then
+		-- Only format if the server supports it, and skip LSPs where another tool owns formatting (eslint for TS, ruff/ty for Python)
+		elseif client and client.server_capabilities.documentFormattingProvider
+			and client.name ~= "ts_ls" and client.name ~= "ruff" and client.name ~= "ty" then
 			vim.api.nvim_create_autocmd("BufWritePre", {
 				buffer = args.buf,
 				callback = function()
