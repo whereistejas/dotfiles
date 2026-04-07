@@ -14,20 +14,13 @@ vim.opt.shiftwidth = 4
 vim.opt.wrap = true      -- Enable soft wrapping
 vim.opt.linebreak = true -- Wrap at word boundaries
 
-
-local lsp_indent = {
-	ts_ls = { tabstop = 2, shiftwidth = 2, expandtab = true },
-	rust_analyzer = { tabstop = 4, shiftwidth = 4, expandtab = true },
-	astro = { tabstop = 2, shiftwidth = 2, expandtab = true },
-	ocamllsp = { tabstop = 2, shiftwidth = 2, expandtab = true },
-}
-
 vim.opt.list = true
 vim.opt.listchars = { tab = "→ ", trail = "·", nbsp = "␣", lead = "·" }
 
 vim.opt.foldmethod = "expr"
 vim.opt.foldlevelstart = 99
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
 
 -- =============================================================================
 -- Keymaps
@@ -82,9 +75,6 @@ vim.pack.add({
 	"https://github.com/nvim-telescope/telescope-fzf-native.nvim",
 	"https://github.com/nvim-telescope/telescope-file-browser.nvim",
 	{ src = "https://github.com/nvim-telescope/telescope.nvim", version = "v0.2.1" },
-
-	-- AI completion
-	"https://github.com/Exafunction/windsurf.nvim",
 
 	-- Completion
 	"https://github.com/rafamadriz/friendly-snippets",
@@ -174,11 +164,6 @@ vim.keymap.set("n", "<space>m", builtin.diagnostics)
 vim.keymap.set("n", "M", vim.diagnostic.open_float)
 vim.keymap.set("n", "<space>k", builtin.keymaps)
 vim.keymap.set("n", "<space>c", ":Telescope file_browser path=%:p:h<CR>")
-
--- Windsurf / Codeium
-require("codeium").setup({
-	enable_cmp_source = false,
-})
 
 -- blink.cmp
 require("blink.cmp").setup({
@@ -406,11 +391,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
 	group = vim.api.nvim_create_augroup("lsp", { clear = true }),
 	callback = function(args)
 		local client = vim.lsp.get_client_by_id(args.data.client_id)
-		if client and lsp_indent[client.name] then
-			for opt, val in pairs(lsp_indent[client.name]) do
-				vim.bo[args.buf][opt] = val
-			end
-		end
 
 		if client and client.name == "eslint" then
 			vim.api.nvim_create_autocmd("BufWritePre", {
