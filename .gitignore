@@ -7,11 +7,7 @@
 **/.config/beacon
 **/.config/karabiner/automatic_backups
 **/.config/cni
-**/.config/cognition/skills/confluence
-**/.config/cognition/skills/jira
-**/.config/cognition/skills/podcast
-**/.config/cognition/skills/review
-**/.config/cognition/skills/gl
+**/.config/cognition/skills
 
 **/.DS_Store
 
