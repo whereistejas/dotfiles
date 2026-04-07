@@ -1,5 +1,9 @@
 {
   "plugins": {
+    "amp.nvim": {
+      "rev": "3b9ad5ef0328de1b35cc9bfa723a37db5daf9434",
+      "src": "https://github.com/sourcegraph/amp.nvim"
+    },
     "blink.cmp": {
       "rev": "78336bc89ee5365633bcf754d93df01678b5c08f",
       "src": "https://github.com/saghen/blink.cmp",
