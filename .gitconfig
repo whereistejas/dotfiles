@@ -1,7 +1,7 @@
 [user]
 	name = "Tejas Sanap"
 	email = "email@whereistejas.xyz"
-	signingkey = "~/.ssh/beacon2.pub"
+	signingkey = "~/.ssh/github.pub"
 
 [alias]
 	unstage = restore --staged
