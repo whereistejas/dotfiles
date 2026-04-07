@@ -57,8 +57,7 @@ alias pgrep="pgrep -fil "
 alias z="j "
 
 alias diff="jj diff"
-alias nvim="nvim-server connect"
-alias vim="nvim-server connect"
+alias vim="nvim "
 
 # Functions
 _jj_each() {
