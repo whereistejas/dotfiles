@@ -15,3 +15,11 @@
 
 **/.DS_Store
 
+# Cursor — handled by .config/cursor/.gitignore (keeps only skills)
+
+# Pi — ignore everything except agent/settings.json
+.config/pi/agent/bin/
+.config/pi/agent/sessions/
+.config/pi/agent/auth.json
+.config/pi/extensions/
+
