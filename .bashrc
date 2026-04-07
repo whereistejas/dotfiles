@@ -27,30 +27,32 @@ export NODE_EXTRA_CA_CERTS="/tmp/corp-cert.pem"
 source <(jj util completion bash)
 . "$HOME/.cargo/env"
 
-alias rg="rg --hidden"
-alias cat="bat --theme-light=Coldark-Cold "
-
-alias c="clear"
-alias z="j "
-
-alias rm="rm -rf "
-alias cp="cp -r "
-alias mkdir="mkdir -p "
-
-alias pgrep="pgrep -fil "
-
-alias diff="jj diff"
-
-alias vim="nvim "
-
-alias ls="eza "
-alias lsa="eza -al"
-
 alias ..="cd .."
 alias ...="cd ../.."
 alias ....="cd ../../.."
 alias .....="cd ../../../.."
 alias ......="cd ../../../../.."
+
+alias c="clear"
+
+alias rm="rm -rf "
+alias cp="cp -r "
+alias mkdir="mkdir -p "
+alias rg="rg --hidden"
+alias cat="bat --theme-light=Coldark-Cold "
+alias ls="eza "
+alias lsa="eza -al"
+
+alias pgrep="pgrep -fil "
+
+alias z="j "
+
+alias diff="jj diff"
+alias vim="nvim "
+
+alias oc="opencode "
+alias oo="opencode "
+alias claude="opencode "
 
 _jj_each() {
     local cmd="$1"; shift
