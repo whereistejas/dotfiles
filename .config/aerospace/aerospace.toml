@@ -10,7 +10,7 @@ config-version = 2
 after-startup-command = []
 
 # Start AeroSpace at login
-start-at-login = false
+start-at-login = true 
 
 # Normalizations. See: https://nikitabobko.github.io/AeroSpace/guide#normalization
 enable-normalization-flatten-containers = true
@@ -107,6 +107,7 @@ on-mode-changed = []
     # '''
 
     # See: https://nikitabobko.github.io/AeroSpace/commands#layout
+    alt-f = 'layout floating tiling'
     alt-slash = 'layout tiles horizontal vertical'
     alt-comma = 'layout accordion horizontal vertical'
 
