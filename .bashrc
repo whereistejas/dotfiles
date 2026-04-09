@@ -10,6 +10,7 @@ export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 export PATH="~/.local/bin:$PATH"
 export PATH="$HOME/toolkit/ai/bin:$PATH"
+export PATH="$HOME/build/dotfiles/scripts:$PATH"
 
 export EDITOR="nvim"
 export LS_OPTIONS="--color=auto"
@@ -48,11 +49,8 @@ alias pgrep="pgrep -fil "
 alias z="j "
 
 alias diff="jj diff"
-alias vim="nvim "
-
-alias oc="opencode "
-alias oo="opencode "
-alias claude="opencode "
+alias nvim="nvim-server connect"
+alias vim="nvim-server connect"
 
 _jj_each() {
     local cmd="$1"; shift
