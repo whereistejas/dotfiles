@@ -9,5 +9,8 @@
 **/.config/cni
 **/.config/cognition/skills
 
+**/.claude/
+**/.claude.json
+
 **/.DS_Store
 

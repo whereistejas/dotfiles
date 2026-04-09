@@ -106,18 +106,64 @@ require("github-theme").setup({
 	},
 })
 vim.o.background = "light"
-vim.cmd("colorscheme github_light_tritanopia")
+vim.o.background = "light"
+vim.cmd("colorscheme gruvbox")
 
 -- gitsigns
 require("gitsigns").setup()
+vim.keymap.set("n", "]h", function() require("gitsigns").nav_hunk("next") end)
+vim.keymap.set("n", "[h", function() require("gitsigns").nav_hunk("prev") end)
 
 -- jj.nvim
 require("jj").setup()
+
+-- Auto-detect jj repo: walk up from buffer path, stopping at cwd.
+local function find_jj_repo()
+	local cwd = vim.fn.getcwd()
+	local dir = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":p:h")
+	while #dir >= #cwd do
+		if vim.fn.isdirectory(dir .. "/.jj") == 1 then return dir end
+		local parent = vim.fn.fnamemodify(dir, ":h")
+		if parent == dir then break end
+		dir = parent
+	end
+	return nil
+end
+
+-- cd into jj repo. If last arg names a repo dir under cwd, use that and
+-- strip it from args. Otherwise detect from current buffer.
+local function cd_to_jj_repo(args)
+	if #args > 0 then
+		local candidate = vim.fn.getcwd() .. "/" .. args[#args]
+		if vim.fn.isdirectory(candidate .. "/.jj") == 1 then
+			vim.cmd.cd(candidate)
+			table.remove(args)
+			return
+		end
+	end
+	local repo = find_jj_repo()
+	if repo then vim.cmd.cd(repo) end
+end
+
+-- Wrap jj.cmd.j so the original :J command (with completion) stays intact.
+local jj_cmd = require("jj.cmd")
+local orig_j = jj_cmd.j
+jj_cmd.j = function(args)
+	if type(args) == "string" then args = vim.split(args, "%s+") end
+	cd_to_jj_repo(args)
+	return orig_j(args)
+end
 
 -- Telescope
 require("telescope").setup({
 	defaults = {
 		hidden = true,
+		mappings = {
+			i = {
+				["<C-d>"] = function(bufnr) require("telescope.actions").preview_scrolling_down(bufnr) end,
+				["<C-u>"] = function(bufnr) require("telescope.actions").preview_scrolling_up(bufnr) end,
+			},
+		},
 		vimgrep_arguments = {
 			"rg",
 			"--color=never",
@@ -164,6 +210,127 @@ vim.keymap.set("n", "<space>m", builtin.diagnostics)
 vim.keymap.set("n", "M", vim.diagnostic.open_float)
 vim.keymap.set("n", "<space>k", builtin.keymaps)
 vim.keymap.set("n", "<space>c", ":Telescope file_browser path=%:p:h<CR>")
+vim.api.nvim_set_hl(0, "JJChangeId", { bold = true })
+
+local JJ_ID_WIDTH = 12
+local JJ_AGE_WIDTH = 15
+local jj_log_tpl = 'change_id.shortest() ++ "\t" ++ change_id.short(12) ++ "\t" ++ committer.timestamp().ago() ++ "\t" ++ coalesce(description.first_line(), "(no description)") ++ "\n"'
+
+local function jj_cd_to_repo()
+	local repo = find_jj_repo()
+	if repo then vim.cmd.cd(repo) end
+	return vim.fn.fnamemodify(vim.fn.getcwd(), ":t")
+end
+
+local function jj_log_entries(extra_args)
+	local cmd = "jj log -r '::@' --no-graph -T " .. vim.fn.shellescape(jj_log_tpl)
+	if extra_args then cmd = cmd .. " " .. extra_args end
+	local lines = vim.fn.systemlist(cmd)
+	if vim.v.shell_error ~= 0 then return nil end
+	local entries = {}
+	for _, line in ipairs(lines) do
+		local short, full, age, desc = line:match("^(%S+)\t(%S+)\t(.-)\t(.*)$")
+		if short then
+			table.insert(entries, { id_short = short, id_full = full, age = age, desc = desc })
+		end
+	end
+	return #entries > 0 and entries or nil
+end
+
+local function jj_log_entry_maker(e)
+	local age_pad = e.age .. string.rep(" ", math.max(0, JJ_AGE_WIDTH - #e.age))
+	local line = e.id_full .. "  " .. age_pad .. "  " .. e.desc
+	local short_len = #e.id_short
+	local age_start = JJ_ID_WIDTH + 2
+	return {
+		value = e,
+		display = function()
+			return line, {
+				{ { 0, short_len }, "JJChangeId" },
+				{ { short_len, JJ_ID_WIDTH }, "Comment" },
+				{ { age_start, age_start + JJ_AGE_WIDTH }, "Comment" },
+			}
+		end,
+		ordinal = e.id_short .. " " .. e.desc,
+	}
+end
+
+local function jj_diff_previewer(title, cmd_fn)
+	return require("telescope.previewers").new_buffer_previewer({
+		title = title,
+		define_preview = function(self, entry)
+			local out = vim.fn.systemlist(cmd_fn(entry))
+			vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, out)
+			vim.bo[self.state.bufnr].filetype = "diff"
+		end,
+	})
+end
+
+-- jj status: changed files in current commit
+vim.keymap.set("n", "<space>j", function()
+	local repo_name = jj_cd_to_repo()
+	local lines = vim.fn.systemlist("jj diff --summary")
+	if vim.v.shell_error ~= 0 or #lines == 0 then
+		vim.notify("No changes in current jj commit", vim.log.levels.INFO)
+		return
+	end
+	local files = {}
+	for _, line in ipairs(lines) do
+		local name = line:match("^[MADRC]%s+(.+)$")
+		if name then table.insert(files, name) end
+	end
+	require("telescope.pickers").new({}, {
+		prompt_title = "jj status: " .. repo_name,
+		finder = require("telescope.finders").new_table({ results = files }),
+		sorter = require("telescope.config").values.generic_sorter({}),
+		previewer = jj_diff_previewer("jj diff", function(entry)
+			return "jj diff --git " .. vim.fn.shellescape(entry.value)
+		end),
+	}):find()
+end)
+
+-- jj log: commits on the current change
+vim.keymap.set("n", "<space>jl", function()
+	local repo_name = jj_cd_to_repo()
+	local entries = jj_log_entries()
+	if not entries then
+		vim.notify("No jj log entries", vim.log.levels.INFO)
+		return
+	end
+	require("telescope.pickers").new({}, {
+		prompt_title = "jj log: " .. repo_name,
+		finder = require("telescope.finders").new_table({ results = entries, entry_maker = jj_log_entry_maker }),
+		sorter = require("telescope.config").values.generic_sorter({}),
+		previewer = jj_diff_previewer("jj show", function(entry)
+			return "jj show --no-pager --git " .. vim.fn.shellescape(entry.value.id_short)
+		end),
+	}):find()
+end)
+
+-- jj file log: commits that changed the current file
+vim.keymap.set("n", "<space>jf", function()
+	jj_cd_to_repo()
+	local bufpath = vim.api.nvim_buf_get_name(0)
+	if bufpath == "" then
+		vim.notify("No file in current buffer", vim.log.levels.WARN)
+		return
+	end
+	local rel = vim.fn.fnamemodify(bufpath, ":.")
+	local entries = jj_log_entries(vim.fn.shellescape(rel))
+	if not entries then
+		vim.notify("No commits touching " .. rel, vim.log.levels.INFO)
+		return
+	end
+	local filename = vim.fn.fnamemodify(rel, ":t")
+	require("telescope.pickers").new({}, {
+		prompt_title = "jj log: " .. filename,
+		finder = require("telescope.finders").new_table({ results = entries, entry_maker = jj_log_entry_maker }),
+		sorter = require("telescope.config").values.generic_sorter({}),
+		previewer = jj_diff_previewer("jj diff: " .. filename, function(entry)
+			return "jj diff -r " .. vim.fn.shellescape(entry.value.id_short) .. " --git " .. vim.fn.shellescape(rel)
+		end),
+	}):find()
+end)
 
 -- blink.cmp
 require("blink.cmp").setup({
@@ -180,6 +347,9 @@ require("blink.cmp").setup({
 require("nvim-treesitter").setup()
 require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css", "python",
 	"ruby", "bash" })
+vim.keymap.set("n", "gn", function() require("nvim-treesitter.incremental_selection").init_selection() end)
+vim.keymap.set("v", "gn", function() require("nvim-treesitter.incremental_selection").node_incremental() end)
+vim.keymap.set("v", "gi", function() require("nvim-treesitter.incremental_selection").node_decremental() end)
 
 -- lazydev (Lua LSP workspace libraries)
 require("lazydev").setup({
@@ -325,6 +495,13 @@ vim.lsp.config.bashls = {
 	filetypes = { "sh", "bash" },
 }
 
+vim.lsp.config.marksman = {
+	cmd = { "marksman", "server" },
+	capabilities = capabilities,
+	root_markers = { ".marksman.toml", ".git" },
+	filetypes = { "markdown", "markdown.mdx" },
+}
+
 vim.lsp.config.ty = {
 	cmd = { "ty", "server" },
 	capabilities = capabilities,
@@ -351,6 +528,7 @@ vim.lsp.enable("ruby_lsp")
 vim.lsp.enable("ruff")
 vim.lsp.enable("ty")
 vim.lsp.enable("bashls")
+vim.lsp.enable("marksman")
 
 -- =============================================================================
 -- Diagnostics & LSP autocommands

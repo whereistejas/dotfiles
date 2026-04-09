@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Persistent headless Neovim server.
+#
+# Usage:
+#   nvim-server connect         Connect to server (starts it if needed)
+#   nvim-server stop            Stop the server
+#   nvim-server diagnostics <file>  Get LSP diagnostics for a file
+#
+# Note: there is no "status" command. Use "diagnostics" on any file
+# to check if the server is alive — it will error if not running.
+
+SOCK="/tmp/nvim-server-$(printf '%s' "$PWD" | shasum | cut -c1-8).sock"
+SCRIPTS="$(dirname "$0")"
+
+_is_running() {
+  nvim --server "$SOCK" --remote-expr '1' &>/dev/null
+}
+
+_start() {
+  rm -f "$SOCK"
+  nvim --headless --listen "$SOCK" &
+  for _ in $(seq 1 20); do
+    [ -e "$SOCK" ] && return 0
+    sleep 0.1
+  done
+}
+
+case "${1:-}" in
+  connect)
+    _is_running || _start
+    shift
+    nvim --server "$SOCK" --remote-ui "$@"
+    ;;
+  stop)
+    if _is_running; then
+      nvim --server "$SOCK" --remote-send ":qa!<CR>" 2>/dev/null
+      rm -f "$SOCK"
+      echo "Stopped"
+    else
+      echo "Not running"
+    fi
+    ;;
+  diagnostics)
+    file="${2:?Usage: nvim-server diagnostics <file>}"
+    file="$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
+    _is_running || { echo "Server not running. Start with: nvim-server connect" >&2; exit 1; }
+    nvim --server "$SOCK" --remote-send ":e $file<CR>" 2>/dev/null
+    sleep 3
+    nvim --server "$SOCK" --remote-send ":source $SCRIPTS/nvim-server-diagnostics.lua<CR>" 2>/dev/null
+    sleep 0.5
+    nvim --server "$SOCK" --remote-expr "execute('messages')" 2>/dev/null | grep -v "^W[0-9]*:" | grep -v "^$"
+    ;;
+  *)
+    sed -n '2,11s/^# \?//p' "$0"
+    exit 1
+    ;;
+esac
