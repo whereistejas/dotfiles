@@ -2,6 +2,6 @@ font-family = "Berkeley Mono"
 font-size = 13
 cursor-style = underline
 cursor-style-blink = true
-theme = "Github Light Default"
+theme = "Gruvbox Light"
 command="/opt/homebrew/bin/bash"
 macos-option-as-alt = true
