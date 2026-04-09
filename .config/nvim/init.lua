@@ -155,7 +155,14 @@ local orig_j = jj_cmd.j
 jj_cmd.j = function(args)
 	if type(args) == "string" then args = vim.split(args, "%s+") end
 	cd_to_jj_repo(args)
-	return orig_j(args)
+	local win_before = vim.api.nvim_get_current_win()
+	local result = orig_j(args)
+	vim.api.nvim_echo({}, false, {})
+	-- If the command opened a new split, move it to the far left.
+	if vim.api.nvim_get_current_win() ~= win_before then
+		vim.cmd("wincmd H")
+	end
+	return result
 end
 
 -- Telescope
