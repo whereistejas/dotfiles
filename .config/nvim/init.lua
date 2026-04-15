@@ -69,6 +69,7 @@ vim.pack.add({
 	{ src = "https://github.com/nicolasgb/jj.nvim",             version = "v0.5.0" },
 	"https://github.com/MunifTanjim/nui.nvim",
 	"https://github.com/julienvincent/hunk.nvim",
+	"https://github.com/esmuellert/codediff.nvim",
 
 	-- AI
 	"https://github.com/github/copilot.vim",
@@ -118,8 +119,29 @@ require("gitsigns").setup()
 vim.keymap.set("n", "]h", function() require("gitsigns").nav_hunk("next") end)
 vim.keymap.set("n", "[h", function() require("gitsigns").nav_hunk("prev") end)
 
+-- codediff
+require("codediff").setup({
+	keymaps = {
+		view = {
+			next_hunk = "]h",
+			prev_hunk = "[h",
+		},
+	},
+})
+
 -- jj.nvim
-require("jj").setup()
+require("jj").setup({
+	diff = {
+		backend = "codediff",
+	},
+	cmd = {
+		keymaps = {
+			log = {
+				diff = "p",
+			},
+		},
+	},
+})
 
 -- Auto-detect jj repo: walk up from buffer path, stopping at cwd.
 local function find_jj_repo()
