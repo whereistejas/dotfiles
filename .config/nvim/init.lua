@@ -138,6 +138,7 @@ require("jj").setup({
 		keymaps = {
 			log = {
 				diff = "p",
+				push = "<S-p>",
 			},
 		},
 	},
