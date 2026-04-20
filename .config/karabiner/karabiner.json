@@ -5,6 +5,28 @@
             "complex_modifications": {
                 "rules": [
                     {
+                        "description": "British layout: section/plus-minus key -> grave/tilde",
+                        "enabled": true,
+                        "manipulators": [
+                            {
+                                "type": "basic",
+                                "conditions": [
+                                    {
+                                        "type": "input_source_if",
+                                        "input_sources": [
+                                            { "input_source_id": "com\\.apple\\.keylayout\\.British" }
+                                        ]
+                                    }
+                                ],
+                                "from": {
+                                    "key_code": "non_us_backslash",
+                                    "modifiers": { "optional": ["any"] }
+                                },
+                                "to": [{ "key_code": "grave_accent_and_tilde" }]
+                            }
+                        ]
+                    },
+                    {
                         "description": "Double tap tilde to Escape",
                         "enabled": false,
                         "manipulators": [
@@ -84,16 +106,7 @@
                         "product_id": 45929,
                         "vendor_id": 1133
                     },
-                    "simple_modifications": [
-                        {
-                            "from": { "key_code": "non_us_backslash" },
-                            "to": [{ "key_code": "grave_accent_and_tilde" }]
-                        }
-                    ]
-                },
-                {
-                    "identifiers": { "is_keyboard": true },
-                    "ignore": true
+                    "simple_modifications": []
                 }
             ],
             "fn_function_keys": [
@@ -104,6 +117,12 @@
             ],
             "name": "Default profile",
             "selected": true,
+            "simple_modifications": [
+                {
+                    "from": { "key_code": "grave_accent_and_tilde" },
+                    "to": [{ "key_code": "grave_accent_and_tilde" }]
+                }
+            ],
             "virtual_hid_keyboard": {
                 "country_code": 0,
                 "keyboard_type_v2": "ansi"

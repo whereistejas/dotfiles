@@ -180,13 +180,20 @@ jj_cmd.j = function(args)
 	cd_to_jj_repo(args)
 	local win_before = vim.api.nvim_get_current_win()
 	local result = orig_j(args)
-	vim.api.nvim_echo({}, false, {})
-	-- If the command opened a new split, move it to the far left.
+	-- Defer the window move so orig_j's messages don't pile up and trigger
+	-- the hit-enter prompt when wincmd H forces a redraw. Silence the move
+	-- itself and redraw to clear any pending message lines.
 	if vim.api.nvim_get_current_win() ~= win_before then
-		vim.cmd("wincmd H")
+		vim.schedule(function()
+			vim.cmd("silent! wincmd H")
+			vim.cmd("redraw")
+		end)
 	end
 	return result
 end
+
+vim.keymap.set("n", "<leader>jj", "<cmd>J log<CR>", { desc = "jj log (jj.nvim)" })
+vim.keymap.set("n", "<leader>js", "<cmd>J status<CR>", { desc = "jj status (jj.nvim)" })
 
 -- Telescope
 require("telescope").setup({
@@ -304,7 +311,7 @@ local function jj_diff_previewer(title, cmd_fn)
 end
 
 -- jj status: changed files in current commit
-vim.keymap.set("n", "<space>j", function()
+vim.keymap.set("n", "<space>js", function()
 	local repo_name = jj_cd_to_repo()
 	local lines = vim.fn.systemlist("jj diff --summary")
 	if vim.v.shell_error ~= 0 or #lines == 0 then
@@ -327,7 +334,7 @@ vim.keymap.set("n", "<space>j", function()
 end)
 
 -- jj log: commits on the current change
-vim.keymap.set("n", "<space>jl", function()
+vim.keymap.set("n", "<space>jj", function()
 	local repo_name = jj_cd_to_repo()
 	local entries = jj_log_entries()
 	if not entries then
