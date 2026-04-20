@@ -41,8 +41,8 @@ diff-instructions = false
 show-cryptographic-signatures = true
 default-command = "la"
 
-[git]
-auto-local-bookmark = false
+[remotes.origin]
+auto-track-bookmarks = "*"
 
 [colors]
 "author"="bright blue"
@@ -54,7 +54,7 @@ auto-local-bookmark = false
 
 [template-aliases]
 'format_short_id(id)' = 'id.shortest()'
-'format_short_signature(signature)' = 'signature.email().local()'
+'format_short_signature(signature)' = 'signature.email()'
 'blame_with_msg' = '''
 commit.commit_id().short(8)
 ++ " "
