@@ -77,6 +77,7 @@ _jj_each() {
 
 jjs() { _jj_each st "$1"; }
 jjl() { _jj_each log "$1"; }
+jjgf() { _jj_each gf "$1"; }
 
 jjgp() {
     local bookmark
