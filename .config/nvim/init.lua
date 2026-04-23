@@ -230,31 +230,11 @@ require("telescope").load_extension("file_browser")
 require("telescope").load_extension("live_grep_args")
 
 local builtin = require("telescope.builtin")
-vim.keymap.set("n", "<space>t", builtin.builtin)
-vim.keymap.set("n", "<space>b", builtin.buffers)
-vim.keymap.set("n", "<space>f", builtin.find_files)
-vim.keymap.set("n", "<space>fa", function()
-	builtin.find_files({
-		find_command = { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git/*", "--sort", "path" },
-		sorting_strategy = "ascending",
-		tiebreak = function(current_entry, existing_entry, _)
-			return current_entry.index < existing_entry.index
-		end,
-	})
-end)
--- vim.keymap.set("n", "?", builtin.live_grep)
-vim.keymap.set("n", "?", ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>")
-vim.keymap.set("n", "<space><space>", builtin.resume)
-vim.keymap.set("n", "<space>r", builtin.lsp_references)
-vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
-vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
-vim.keymap.set("n", "<space>o", builtin.lsp_document_symbols)
-vim.keymap.set("n", "<space>m", builtin.diagnostics)
-vim.keymap.set("n", "M", vim.diagnostic.open_float)
-vim.keymap.set("n", "<space>k", builtin.keymaps)
-vim.keymap.set("n", "<space>c", ":Telescope file_browser path=%:p:h<CR>")
+
+-- jj picker highlight
 vim.api.nvim_set_hl(0, "JJChangeId", { bold = true })
 
+-- jj picker helpers
 local JJ_ID_WIDTH = 12
 local JJ_AGE_WIDTH = 15
 local jj_log_tpl =
@@ -310,8 +290,25 @@ local function jj_diff_previewer(title, cmd_fn)
 	})
 end
 
+-- Custom pickers
+local function find_files_all()
+	builtin.find_files({
+		find_command = { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git/*", "--sort", "path" },
+		sorting_strategy = "ascending",
+		tiebreak = function(current_entry, existing_entry, _)
+			return current_entry.index < existing_entry.index
+		end,
+	})
+end
+
+local live_grep_args = require("telescope").extensions.live_grep_args.live_grep_args
+
+local function file_browser_here()
+	vim.cmd("Telescope file_browser path=%:p:h")
+end
+
 -- jj status: changed files in current commit
-vim.keymap.set("n", "<space>js", function()
+local function jj_status_picker()
 	local repo_name = jj_cd_to_repo()
 	local lines = vim.fn.systemlist("jj diff --summary")
 	if vim.v.shell_error ~= 0 or #lines == 0 then
@@ -331,10 +328,10 @@ vim.keymap.set("n", "<space>js", function()
 			return "jj diff --git " .. vim.fn.shellescape(entry.value)
 		end),
 	}):find()
-end)
+end
 
 -- jj log: commits on the current change
-vim.keymap.set("n", "<space>jj", function()
+local function jj_log_picker()
 	local repo_name = jj_cd_to_repo()
 	local entries = jj_log_entries()
 	if not entries then
@@ -349,10 +346,10 @@ vim.keymap.set("n", "<space>jj", function()
 			return "jj show --no-pager --git " .. vim.fn.shellescape(entry.value.id_short)
 		end),
 	}):find()
-end)
+end
 
 -- jj file log: commits that changed the current file
-vim.keymap.set("n", "<space>jf", function()
+local function jj_file_log_picker()
 	jj_cd_to_repo()
 	local bufpath = vim.api.nvim_buf_get_name(0)
 	if bufpath == "" then
@@ -374,7 +371,26 @@ vim.keymap.set("n", "<space>jf", function()
 			return "jj diff -r " .. vim.fn.shellescape(entry.value.id_short) .. " --git " .. vim.fn.shellescape(rel)
 		end),
 	}):find()
-end)
+end
+
+-- Telescope keymaps
+vim.keymap.set("n", "<space>t", builtin.builtin)
+vim.keymap.set("n", "<space>b", builtin.buffers)
+vim.keymap.set("n", "<space>f", builtin.find_files)
+vim.keymap.set("n", "<space>fa", find_files_all)
+vim.keymap.set("n", "?", live_grep_args)
+vim.keymap.set("n", "<space><space>", builtin.resume)
+vim.keymap.set("n", "<space>r", builtin.lsp_references)
+vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
+vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
+vim.keymap.set("n", "<space>o", builtin.lsp_document_symbols)
+vim.keymap.set("n", "<space>m", builtin.diagnostics)
+vim.keymap.set("n", "M", vim.diagnostic.open_float)
+vim.keymap.set("n", "<space>k", builtin.keymaps)
+vim.keymap.set("n", "<space>c", file_browser_here)
+vim.keymap.set("n", "<space>js", jj_status_picker)
+vim.keymap.set("n", "<space>jj", jj_log_picker)
+vim.keymap.set("n", "<space>jf", jj_file_log_picker)
 
 -- blink.cmp
 -- Disable auto-completion popup in markdown files while Goyo is active.
@@ -424,8 +440,6 @@ end
 
 vim.keymap.set("n", "<Up>",    ts_init)
 vim.keymap.set("n", "<Down>",  ts_init)
-vim.keymap.set("n", "<Left>",  function() vim.cmd("normal! v"); ts_select.select_prev(1) end)
-vim.keymap.set("n", "<Right>", function() vim.cmd("normal! v"); ts_select.select_next(1) end)
 vim.keymap.set("v", "<Up>",    function() ts_select.select_parent(1) end)
 vim.keymap.set("v", "<Down>",  function() ts_select.select_child(1) end)
 vim.keymap.set("v", "<Left>",  function() ts_select.select_prev(1) end)
