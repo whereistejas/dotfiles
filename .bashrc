@@ -19,7 +19,7 @@ export PATH="/opt/homebrew/opt/ruby@3.2/bin:$PATH"
 # PATH — user tools
 export PATH="$BUN_INSTALL/bin:$PATH"
 export PATH="~/.local/bin:$PATH"
-export PATH="$HOME/toolkit/ai/bin:$PATH"
+export PATH="$HOME/build/toolkit/ai/bin:$PATH"
 export PATH="$HOME/build/dotfiles/scripts:$PATH"
 
 # Tool initialisers (nvm, cargo) — sourced AFTER base PATH so they
