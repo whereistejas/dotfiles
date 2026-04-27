@@ -7,7 +7,6 @@ vim.opt.signcolumn = "yes"
 -- vim.opt.cursorline = true
 vim.opt.winborder = "single"
 vim.opt.mouse = "n"
-vim.wo.relativenumber = true
 
 vim.opt.tabstop = 4
 vim.opt.shiftwidth = 4
@@ -20,7 +19,12 @@ vim.opt.listchars = { tab = "→ ", trail = "·", nbsp = "␣", lead = "·" }
 vim.opt.foldmethod = "expr"
 vim.opt.foldlevelstart = 99
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
+
+vim.wo.relativenumber = true
 vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+
+vim.opt.ignorecase = true
+vim.opt.smartcase = true
 
 -- =============================================================================
 -- Keymaps
@@ -438,11 +442,11 @@ local function ts_init()
 	ts_select.select_parent(1)
 end
 
-vim.keymap.set("n", "<Up>",    ts_init)
-vim.keymap.set("n", "<Down>",  ts_init)
-vim.keymap.set("v", "<Up>",    function() ts_select.select_parent(1) end)
-vim.keymap.set("v", "<Down>",  function() ts_select.select_child(1) end)
-vim.keymap.set("v", "<Left>",  function() ts_select.select_prev(1) end)
+vim.keymap.set("n", "<Up>", ts_init)
+vim.keymap.set("n", "<Down>", ts_init)
+vim.keymap.set("v", "<Up>", function() ts_select.select_parent(1) end)
+vim.keymap.set("v", "<Down>", function() ts_select.select_child(1) end)
+vim.keymap.set("v", "<Left>", function() ts_select.select_prev(1) end)
 vim.keymap.set("v", "<Right>", function() ts_select.select_next(1) end)
 
 -- lazydev (Lua LSP workspace libraries)
@@ -671,7 +675,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 					}, 3000)
 				end,
 			})
-		-- Only format if the server supports it, and skip LSPs where another tool owns formatting (eslint for TS, ruff/ty for Python)
+			-- Only format if the server supports it, and skip LSPs where another tool owns formatting (eslint for TS, ruff/ty for Python)
 		elseif client and client.server_capabilities.documentFormattingProvider
 			and client.name ~= "ts_ls" and client.name ~= "ruff" and client.name ~= "ty" then
 			vim.api.nvim_create_autocmd("BufWritePre", {
