@@ -52,6 +52,16 @@ persistent-workspaces = ["1", "2", "3", "4"]
 # See: https://nikitabobko.github.io/AeroSpace/commands#mode
 on-mode-changed = []
 
+[workspace-to-monitor-force-assignment]
+    1 = "secondary"
+    2 = "secondary"
+    3 = "secondary"
+    4 = "secondary"
+    5 = "secondary"
+    # put a couple on the laptop if you want
+    6 = "main"
+    7 = "main"
+
 # Possible values: (qwerty|dvorak|colemak)
 # See https://nikitabobko.github.io/AeroSpace/guide#key-mapping
 [key-mapping]
