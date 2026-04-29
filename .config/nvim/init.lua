@@ -26,6 +26,12 @@ vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 
+-- Pick up vifm's bundled vim plugin (syntax, ftdetect, ftplugin) from brew.
+local vifm_rtp = (vim.env.HOMEBREW_PREFIX or "/opt/homebrew") .. "/opt/vifm/share/vifm/vim"
+if vim.uv.fs_stat(vifm_rtp) then
+	vim.opt.runtimepath:append(vifm_rtp)
+end
+
 -- =============================================================================
 -- Keymaps
 -- =============================================================================
