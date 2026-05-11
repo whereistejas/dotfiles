@@ -9,7 +9,6 @@ export LS_OPTIONS="--color=auto"
 export GPG_TTY=$(tty)
 export PS1='\W \$ '
 export NVM_DIR="$HOME/.nvm"
-export NODE_EXTRA_CA_CERTS="/tmp/corp-cert.pem"
 export BUN_INSTALL="$HOME/.bun"
 
 # PATH — base platform tools (lowest priority, added first)
