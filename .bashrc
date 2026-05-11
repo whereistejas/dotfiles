@@ -11,6 +11,9 @@ export PS1='\W \$ '
 export NVM_DIR="$HOME/.nvm"
 export BUN_INSTALL="$HOME/.bun"
 
+# security find-certificate -a -p /Library/Keychains/System.keychain > /tmp/corp-cert.pem
+export NODE_EXTRA_CA_CERTS=/tmp/corp-cert.pem
+
 # PATH — base platform tools (lowest priority, added first)
 export PATH="/opt/homebrew/bin:$PATH"
 export PATH="/opt/homebrew/opt/ruby@3.2/bin:$PATH"
@@ -57,6 +60,8 @@ alias z="j "
 
 alias diff="jj diff"
 alias vim="nvim "
+
+alias pi='bun run $(which pi)'
 
 # Functions
 _jj_each() {
