@@ -612,7 +612,11 @@ vim.lsp.config.ty = {
 		ty = {
 			configuration = {
 				environment = {
-					["extra-paths"] = { "~/build/wst_core/python", "~/build/deps/tornado-openapi3/" },
+					["extra-paths"] = {
+						vim.fn.expand("~/build/git/wst_core/python"),
+						vim.fn.expand("~/build/git/wst_master"),
+						vim.fn.expand("~/build/git/tornado-openapi3"),
+					},
 				},
 			},
 		},
