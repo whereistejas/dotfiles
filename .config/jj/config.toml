@@ -32,6 +32,10 @@ edit-args = ["-c", "DiffEditor $left $right $output"]
 program="diffedit3"
 edit-args = ["$left", "$right", "$output", "--port", "17376-17380", "--port", "0"]
 
+[merge-tools.jj-hunk]
+program = "jj-hunk"
+edit-args = ["select", "$left", "$right"]
+
 [ui]
 # diff-formatter = ["difft", "--color=always", "--background=light", "$left", "$right"]
 # diff-editor="diffedit3"

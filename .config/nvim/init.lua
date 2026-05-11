@@ -69,7 +69,7 @@ vim.pack.add({
 	-- Theme (loaded first so colorscheme is set before other plugins)
 	"https://github.com/projekt0n/github-nvim-theme",
 	"https://github.com/ellisonleao/gruvbox.nvim",
-	"https://github.com/junegunn/goyo.vim",
+	"https://github.com/shortcuts/no-neck-pain.nvim",
 
 	"https://github.com/wsdjeg/vim-fetch",
 	"https://github.com/tpope/vim-surround",
@@ -399,34 +399,17 @@ vim.keymap.set("n", "<space>js", jj_status_picker)
 vim.keymap.set("n", "<space>jj", jj_log_picker)
 vim.keymap.set("n", "<space>jf", jj_file_log_picker)
 
--- blink.cmp
--- Disable auto-completion popup in markdown files while Goyo is active.
--- You can still trigger it manually with <C-space>.
-vim.g.goyo_active = false
-vim.api.nvim_create_autocmd("User", {
-	pattern = "GoyoEnter",
-	callback = function() vim.g.goyo_active = true end,
-})
-vim.api.nvim_create_autocmd("User", {
-	pattern = "GoyoLeave",
-	callback = function() vim.g.goyo_active = false end,
-})
+-- no-neck-pain (centered layout)
+require("no-neck-pain").setup({ width = 120 })
+vim.keymap.set("n", "<space>g", "<cmd>NoNeckPain<CR>", { desc = "Toggle centered layout" })
 
+-- blink.cmp
 require("blink.cmp").setup({
 	keymap = { preset = "default" },
 	appearance = { nerd_font_variant = "mono" },
 	completion = {
 		documentation = { auto_show = false },
-		trigger = {
-			-- Don't show the popup automatically in markdown while Goyo is on.
-			show_on_insert_on_trigger_character = not (vim.g.goyo_active and vim.bo.filetype == "markdown"),
-		},
 	},
-	-- In markdown+Goyo the popup is suppressed; trigger manually with <C-space>.
-	enabled = function()
-		return not (vim.g.goyo_active and vim.bo.filetype == "markdown")
-			or vim.fn.pumvisible() == 1 -- keep it alive if the menu is already open
-	end,
 	sources = {
 		default = { "lsp", "path", "snippets", "buffer" },
 	},
