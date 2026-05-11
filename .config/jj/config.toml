@@ -10,15 +10,15 @@ backends.ssh.allowed-signers = "~/.ssh/allowed_signers"
 
 [aliases]
 e = ["edit"]
-mv = ["b", "move"]
+mv = ["b", "move", "--allow-backwards"]
 ds = ["describe"]
 nx = ["edit", "@+"]
 pv = ["edit", "@-"]
-gp = ["git", "push"]
+gp = ["git", "push", "--remote", "origin"]
 gs = ["git", "push", "--remote", "sourcehut"]
 gf = ["git", "fetch", "--branch", "main", "--branch", "master"]
 sq = ["squash"]
-l = ["log"]
+l = ["log", "-r", "bookmarks()"]
 la = ["log", "-r", "trunk()::@"]
 df = ["diff", "--name-only"]
 ndiff = ["diffedit", "--tool", "nvimdiff"]
@@ -42,7 +42,7 @@ show-cryptographic-signatures = true
 default-command = "la"
 
 [remotes.origin]
-auto-track-bookmarks = "*"
+auto-track-bookmarks = 'exact:"main" | exact:"master"'
 
 [colors]
 "author"="bright blue"
@@ -55,6 +55,20 @@ auto-track-bookmarks = "*"
 [template-aliases]
 'format_short_id(id)' = 'id.shortest()'
 'format_short_signature(signature)' = 'signature.email()'
+'format_short_commit_header(commit)' = '''
+separate(" ",
+  format_short_change_id_with_change_offset(commit),
+  format_short_signature(commit.author()),
+  format_timestamp(commit_timestamp(commit)),
+  commit.bookmarks(),
+  commit.working_copies(),
+  format_short_commit_id(commit.commit_id()),
+  format_commit_labels(commit),
+  if(config("ui.show-cryptographic-signatures").as_boolean(),
+    format_short_cryptographic_signature(commit.signature())
+  ),
+)
+'''
 'blame_with_msg' = '''
 commit.commit_id().short(8)
 ++ " "
