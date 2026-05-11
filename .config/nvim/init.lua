@@ -76,13 +76,10 @@ vim.pack.add({
 
 	-- VCS
 	"https://github.com/lewis6991/gitsigns.nvim",
-	{ src = "https://github.com/nicolasgb/jj.nvim",             version = "v0.5.0" },
+	{ src = "https://github.com/nicolasgb/jj.nvim",             version = "v0.6.0" },
 	"https://github.com/MunifTanjim/nui.nvim",
 	"https://github.com/julienvincent/hunk.nvim",
 	"https://github.com/esmuellert/codediff.nvim",
-
-	-- AI
-	"https://github.com/github/copilot.vim",
 
 	-- Telescope
 	"https://github.com/nvim-lua/plenary.nvim",
