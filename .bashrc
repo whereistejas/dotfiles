@@ -46,10 +46,9 @@ alias ......="cd ../../../../.."
 
 alias c="clear"
 
-alias rm="rm -rf "
 alias cp="cp -r "
 alias mkdir="mkdir -p "
-alias rg="rg --hidden"
+alias rg="rg --hidden --smart-case "
 alias cat="bat --theme-light=Coldark-Cold "
 alias ls="eza "
 alias lsa="eza -al"
