@@ -1,2 +1,16 @@
 [ui]
 theme = "gruvbox-light"
+
+[[actions]]
+name = "copy-change-id"
+desc = "copy change id to clipboard"
+key = "shift+c"
+scope = "revisions"
+lua = '''
+local id = context.change_id()
+if id then
+  id = id:sub(1, 8)
+  copy_to_clipboard(id)
+  flash("Copied: " .. id)
+end
+'''

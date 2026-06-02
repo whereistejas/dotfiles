@@ -179,6 +179,18 @@ local function cd_to_jj_repo(args)
 	if repo then vim.cmd.cd(repo) end
 end
 
+-- jj.nvim hardcodes `:J log` to --limit 20; bump it unless the caller overrode.
+local jj_log_module = require("jj.cmd.log")
+local orig_log = jj_log_module.log
+jj_log_module.log = function(opts)
+	opts = opts or {}
+	if not opts.raw_flags and not opts.limit then
+		opts.limit = 9999
+	end
+	return orig_log(opts)
+end
+require("jj.cmd").log = jj_log_module.log
+
 -- Wrap jj.cmd.j so the original :J command (with completion) stays intact.
 local jj_cmd = require("jj.cmd")
 local orig_j = jj_cmd.j
@@ -203,6 +215,25 @@ vim.keymap.set("n", "<leader>jj", "<cmd>J log<CR>", { desc = "jj log (jj.nvim)" 
 vim.keymap.set("n", "<leader>js", "<cmd>J status<CR>", { desc = "jj status (jj.nvim)" })
 
 -- Telescope
+-- Sorter that keeps fuzzy filtering but preserves finder order (rg --sort path),
+-- so results stay grouped by folder while you type. Lower score = higher in the
+-- list under sorting_strategy = "ascending", and entry.index follows path order.
+local function path_order_sorter()
+	local sorters = require("telescope.sorters")
+	local base = sorters.get_fzy_sorter()
+	return sorters.Sorter:new({
+		discard = true,
+		scoring_function = function(_, prompt, line, entry)
+			local score = base:scoring_function(prompt, line, entry)
+			if score == nil or score == -1 then return -1 end
+			return entry and entry.index or 1
+		end,
+		highlighter = function(_, prompt, display)
+			return base:highlighter(prompt, display)
+		end,
+	})
+end
+
 require("telescope").setup({
 	defaults = {
 		hidden = true,
@@ -227,6 +258,7 @@ require("telescope").setup({
 		find_files = {
 			find_command = { "rg", "--files", "--hidden", "--glob", "!.git/*", "--sort", "path" },
 			sorting_strategy = "ascending",
+			sorter = path_order_sorter(),
 			tiebreak = function(current_entry, existing_entry, _)
 				return current_entry.index < existing_entry.index
 			end,
@@ -391,6 +423,16 @@ vim.keymap.set("n", "<space>r", builtin.lsp_references)
 vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
 vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
 vim.keymap.set("n", "<space>o", builtin.lsp_document_symbols)
+
+vim.keymap.set("n", "<space>O", function()
+	vim.lsp.buf.document_symbol({
+		on_list = function(opts)
+			vim.fn.setloclist(0, {}, " ", opts)
+			vim.cmd("vert leftabove lopen 40")
+		end,
+	})
+end, { desc = "Document symbols (left split)" })
+
 vim.keymap.set("n", "<space>m", builtin.diagnostics)
 vim.keymap.set("n", "M", vim.diagnostic.open_float)
 vim.keymap.set("n", "<space>k", builtin.keymaps)
