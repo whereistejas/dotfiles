@@ -58,7 +58,47 @@ auto-track-bookmarks = 'exact:"main" | exact:"master"'
 
 [template-aliases]
 'format_short_id(id)' = 'id.shortest()'
-'format_short_signature(signature)' = 'signature.email()'
+'format_short_change_id(id)' = 'id.shortest(4)'
+'builtin_log_compact(commit)' = '''
+if(commit.root(),
+  format_root_commit(commit),
+  label(
+    separate(" ",
+      if(commit.current_working_copy(), "working_copy"),
+      if(commit.immutable(), "immutable", "mutable"),
+      if(commit.conflict(), "conflicted"),
+    ),
+    separate(" ",
+      format_short_change_id_with_change_offset(commit),
+      if(commit.empty(), empty_commit_marker),
+      if(commit.description(),
+        commit.description().first_line(),
+        label(if(commit.empty(), "empty"), description_placeholder),
+      ),
+      format_short_signature(commit.author()),
+      format_relative_timestamp(commit_timestamp(commit)),
+      commit.bookmarks(),
+      commit.working_copies(),
+      format_commit_labels(commit),
+      if(config("ui.show-cryptographic-signatures").as_boolean(),
+        format_short_cryptographic_signature(commit.signature())
+      ),
+    ) ++ "\n",
+  )
+)
+'''
+'format_relative_timestamp(ts)' = '''
+if(ts.before("1 day ago"),
+  ts.format("%Y-%m-%d"),
+  ts.ago().replace(regex:"(\\d+) (\\w)\\w* ago", "$1$2 ago"),
+)
+'''
+'format_short_signature(signature)' = '''
+if(signature.name(),
+  signature.name().split(" ").first(),
+  signature.email(),
+)
+'''
 'format_short_commit_header(commit)' = '''
 separate(" ",
   format_short_change_id_with_change_offset(commit),
@@ -66,7 +106,6 @@ separate(" ",
   format_timestamp(commit_timestamp(commit)),
   commit.bookmarks(),
   commit.working_copies(),
-  format_short_commit_id(commit.commit_id()),
   format_commit_labels(commit),
   if(config("ui.show-cryptographic-signatures").as_boolean(),
     format_short_cryptographic_signature(commit.signature())
