@@ -19,6 +19,11 @@
 
 # Cursor — handled by .config/cursor/.gitignore (keeps only skills)
 
-# Pi — ignore everything except agent/settings.json
-.config/pi
+# Pi — ignore everything except agent/{AGENTS.md,settings.json,skills}
+.config/pi/*
+!.config/pi/agent
+.config/pi/agent/*
+!.config/pi/agent/AGENTS.md
+!.config/pi/agent/settings.json
+!.config/pi/agent/skills
 

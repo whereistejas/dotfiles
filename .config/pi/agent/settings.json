@@ -1,0 +1,21 @@
+{
+  "lastChangelogVersion": "0.79.0",
+  "theme": "light",
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-opus-4-8",
+  "defaultThinkingLevel": "high",
+  "npmCommand": [
+    "bun"
+  ],
+  "packages": [
+    "https://github.com/kepano/obsidian-skills",
+    "git:github.com/laulauland/jj-hunk",
+    "npm:pi-mcp-adapter",
+    "/Users/tejas.sanap/build/git/pi-figma-remote-auth"
+  ],
+  "skills": [
+    "~/.pi/agent/git/github.com/laulauland/jj-hunk"
+  ],
+  "quietStartup": true,
+  "hideThinkingBlock": false
+}
