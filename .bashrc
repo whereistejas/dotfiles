@@ -1,41 +1,36 @@
-# Ghostty shell integration for Bash. This must be at the top of your bashrc!
-if [ -n "${GHOSTTY_RESOURCES_DIR}" ]; then
-    builtin source "${GHOSTTY_RESOURCES_DIR}/shell-integration/bash/ghostty.bash"
+# Portable bashrc, shared between macOS and the Linux dev container.
+# macOS-only setup lives in .bashrc.macos, sourced first below.
+
+# Dotfiles repo: real checkout on the host, read-only mount in the container.
+DOTFILES="$HOME/build/dotfiles"
+[ -d /opt/dotfiles ] && DOTFILES=/opt/dotfiles
+
+# Ghostty integration must run first; Homebrew gets lowest PATH priority.
+[ "$(uname -s)" = Darwin ] && [ -f "$DOTFILES/.bashrc.macos" ] && source "$DOTFILES/.bashrc.macos"
+
+# Dev container: Nix toolchain profile (sshd login shells don't inherit ENV).
+if [ -d /nix/var/nix/profiles/devtools ]; then
+    export PATH="/nix/var/nix/profiles/devtools/bin:$PATH"
+    export PKG_CONFIG_PATH="/nix/var/nix/profiles/devtools/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+    # ghostty.terminfo from the profile; trailing ':' keeps ncurses' defaults.
+    export TERMINFO_DIRS="/nix/var/nix/profiles/devtools/share/terminfo:${TERMINFO_DIRS:-}"
 fi
+[ -f /etc/corp-cert.pem ] && export NODE_EXTRA_CA_CERTS=/etc/corp-cert.pem
 
 # Environment variables (non-PATH)
 export EDITOR="nvim"
 export LS_OPTIONS="--color=auto"
 export GPG_TTY=$(tty)
 export PS1='\W \$ '
-export NVM_DIR="$HOME/.nvm"
 export BUN_INSTALL="$HOME/.bun"
-
-# security find-certificate -a -p /Library/Keychains/System.keychain > /tmp/corp-cert.pem
-export NODE_EXTRA_CA_CERTS=/tmp/corp-cert.pem
-
-# PATH — base platform tools (lowest priority, added first)
-export PATH="/opt/homebrew/bin:$PATH"
-export PATH="/opt/homebrew/opt/ruby@3.2/bin:$PATH"
 
 # PATH — user tools
 export PATH="$BUN_INSTALL/bin:$PATH"
-export PATH="~/.local/bin:$PATH"
-export PATH="$HOME/build/toolkit/ai/bin:$PATH"
-export PATH="$HOME/build/dotfiles/scripts:$PATH"
-
-# Tool initialisers (nvm, cargo) — sourced AFTER base PATH so they
-# can prepend their own paths and take highest priority.
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-nvm use default --silent 2>/dev/null
-. "$HOME/.cargo/env"
+export PATH="$HOME/.local/bin:$PATH"
+[ -d "$HOME/.cargo/bin" ] && export PATH="$HOME/.cargo/bin:$PATH"
 
 # Completions
-[[ -r "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh" ]] && . "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh"
-[ -f /opt/homebrew/share/bash-completion/bash_completion ] && . /opt/homebrew/share/bash-completion/bash_completion
-[[ -r "/opt/homebrew/Cellar/autojump/22.5.3_3/share/autojump/autojump.bash" ]] && . "/opt/homebrew/Cellar/autojump/22.5.3_3/share/autojump/autojump.bash"
-source <(jj util completion bash)
+command -v jj >/dev/null && source <(jj util completion bash)
 
 # Aliases
 alias ..="cd .."
@@ -54,8 +49,6 @@ alias ls="eza "
 alias lsa="eza -al"
 
 alias pgrep="pgrep -fil "
-
-alias z="j "
 
 alias diff="jj diff"
 alias vim="nvim "
@@ -94,13 +87,12 @@ jjgp() {
 
 inn() { pushd "$1" > /dev/null && shift && "$@"; popd > /dev/null; }
 
-cfg-bashrc() { $EDITOR ~/build/dotfiles/.bashrc ;}
-cfg-vimrc() { $EDITOR ~/build/dotfiles/.config/nvim/init.lua ;}
-cfg-git() { $EDITOR ~/build/dotfiles/.gitconfig ;}
-cfg-jj() { $EDITOR ~/build/dotfiles/.config/jj/config.toml ;}
-rld-bashrc() { source ~/build/dotfiles/.bashrc ;}
+cfg-bashrc() { $EDITOR "$DOTFILES/.bashrc" ;}
+cfg-vimrc() { $EDITOR "$DOTFILES/.config/nvim/init.lua" ;}
+cfg-git() { $EDITOR "$DOTFILES/.gitconfig" ;}
+cfg-jj() { $EDITOR "$DOTFILES/.config/jj/config.toml" ;}
+rld-bashrc() { source "$DOTFILES/.bashrc" ;}
 
 # Interactive settings
-ulimit -n unlimited
 set -o vi
-fortune | cowsay
+command -v fortune >/dev/null && command -v cowsay >/dev/null && fortune | cowsay
