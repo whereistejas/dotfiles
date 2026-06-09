@@ -40,10 +40,20 @@ edit-args = ["select", "$left", "$right"]
 # diff-formatter = ["difft", "--color=always", "--background=light", "$left", "$right"]
 # diff-editor="diffedit3"
 # default-command = ["log", "-n20"]
+pager = ["delta", "--syntax-theme=gruvbox-light", "--line-numbers"]
+diff-formatter = ":git"
 diff-editor = ["nvim", "-c", "DiffEditor $left $right $output"]
 diff-instructions = false
 show-cryptographic-signatures = true
 default-command = "la"
+
+# Inside jjui (it sets the JJUI env var), let delta render diffs directly as a
+# diff-formatter and turn pagination off so it doesn't fight the TUI.
+[[--scope]]
+--when.environments = ["JJUI"]
+[--scope.ui]
+diff-formatter = ["delta", "--syntax-theme=gruvbox-light", "--line-numbers", "$left", "$right"]
+paginate = "never"
 
 [remotes.origin]
 auto-track-bookmarks = 'exact:"main" | exact:"master"'

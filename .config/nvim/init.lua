@@ -340,7 +340,22 @@ local function find_files_all()
 	})
 end
 
-local live_grep_args = require("telescope").extensions.live_grep_args.live_grep_args
+local live_grep_args = function(opts)
+	local prompt_parser = require("telescope-live-grep-args.prompt_parser")
+	local sorters = require("telescope.sorters")
+	local fzy = require("telescope.algos.fzy")
+	opts = vim.tbl_extend("force", opts or {}, {
+		sorter = sorters.Sorter:new({
+			scoring_function = function() return 1 end,
+			highlighter = function(_, prompt, display)
+				local parts = prompt_parser.parse(prompt, true)
+				local term = parts[1] or prompt
+				return fzy.positions(term, display)
+			end,
+		}),
+	})
+	return require("telescope").extensions.live_grep_args.live_grep_args(opts)
+end
 
 local function file_browser_here()
 	vim.cmd("Telescope file_browser path=%:p:h")

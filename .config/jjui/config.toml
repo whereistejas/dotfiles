@@ -1,6 +1,18 @@
 [ui]
 theme = "gruvbox-light"
 
+[[bindings]]
+action = "revisions.refresh"
+key = "super+r"
+scope = "revisions"
+desc = "refresh"
+
+[[bindings]]
+action = "revisions.details.refresh"
+key = "super+r"
+scope = "revisions.details"
+desc = "refresh"
+
 [[actions]]
 name = "copy-change-id"
 desc = "copy change id to clipboard"
