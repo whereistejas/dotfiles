@@ -1,0 +1,30 @@
+# macOS-only setup, sourced from the top of .bashrc on Darwin.
+
+# Ghostty shell integration — must run before anything else.
+if [ -n "${GHOSTTY_RESOURCES_DIR}" ]; then
+    builtin source "${GHOSTTY_RESOURCES_DIR}/shell-integration/bash/ghostty.bash"
+fi
+
+# security find-certificate -a -p /Library/Keychains/System.keychain > /tmp/corp-cert.pem
+export NODE_EXTRA_CA_CERTS=/tmp/corp-cert.pem
+
+# PATH — platform tools (lowest priority; .bashrc prepends user tools after)
+export PATH="/opt/homebrew/bin:$PATH"
+export PATH="/opt/homebrew/opt/ruby@3.2/bin:$PATH"
+export PATH="$HOME/build/toolkit/ai/bin:$PATH"
+export PATH="$HOME/build/dotfiles/scripts:$PATH"
+
+# nvm + cargo
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+nvm use default --silent 2>/dev/null
+[ -s "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+
+# Completions
+[[ -r "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh" ]] && . "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh"
+[ -f /opt/homebrew/share/bash-completion/bash_completion ] && . /opt/homebrew/share/bash-completion/bash_completion
+[[ -r "/opt/homebrew/Cellar/autojump/22.5.3_3/share/autojump/autojump.bash" ]] && . "/opt/homebrew/Cellar/autojump/22.5.3_3/share/autojump/autojump.bash"
+alias z="j "
+
+ulimit -n unlimited

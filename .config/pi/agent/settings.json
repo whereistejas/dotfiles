@@ -1,9 +1,9 @@
 {
-  "lastChangelogVersion": "0.79.0",
+  "lastChangelogVersion": "0.79.1",
   "theme": "light",
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-opus-4-8",
-  "defaultThinkingLevel": "high",
+  "defaultModel": "claude-fable-5",
+  "defaultThinkingLevel": "xhigh",
   "npmCommand": [
     "bun"
   ],
