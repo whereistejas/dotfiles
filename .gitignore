@@ -11,6 +11,7 @@
 **/.config/zed
 **/.config/cognition/skills
 **/.config/raycast-x
+**/.config/dev-container
 
 **/.claude/
 **/.claude.json
