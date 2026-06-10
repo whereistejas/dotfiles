@@ -1,4 +1,4 @@
-# macOS-only setup, sourced from the top of .bashrc on Darwin.
+# macOS-only setup, sourced from the top of bashrc on Darwin.
 
 # Ghostty shell integration — must run before anything else.
 if [ -n "${GHOSTTY_RESOURCES_DIR}" ]; then
