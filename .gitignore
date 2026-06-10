@@ -4,27 +4,27 @@
 .jj/repo
 .jj/working_copy
 
-**/.config/beacon
-**/.config/github-copilot
-**/.config/karabiner/automatic_backups
-**/.config/cni
-**/.config/zed
-**/.config/cognition/skills
-**/.config/raycast-x
-**/.config/dev-container
+**/config/beacon
+**/config/github-copilot
+**/config/karabiner/automatic_backups
+**/config/cni
+**/config/zed
+**/config/cognition/skills
+**/config/raycast-x
+**/config/dev-container
 
 **/.claude/
 **/.claude.json
 
 **/.DS_Store
 
-# Cursor — handled by .config/cursor/.gitignore (keeps only skills)
+# Cursor — handled by config/cursor/.gitignore (keeps only skills)
 
 # Pi — ignore everything except agent/{AGENTS.md,settings.json,skills}
-.config/pi/*
-!.config/pi/agent
-.config/pi/agent/*
-!.config/pi/agent/AGENTS.md
-!.config/pi/agent/settings.json
-!.config/pi/agent/skills
+config/pi/*
+!config/pi/agent
+config/pi/agent/*
+!config/pi/agent/AGENTS.md
+!config/pi/agent/settings.json
+!config/pi/agent/skills
 

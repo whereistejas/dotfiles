@@ -1,12 +1,12 @@
 # Portable bashrc, shared between macOS and the Linux dev container.
-# macOS-only setup lives in .bashrc.macos, sourced first below.
+# macOS-only setup lives in bashrc.macos, sourced first below.
 
 # Dotfiles repo: real checkout on the host, read-only mount in the container.
 export DOTFILES="$HOME/build/dotfiles"
 [ -d /opt/dotfiles ] && DOTFILES=/opt/dotfiles
 
 # Ghostty integration must run first; Homebrew gets lowest PATH priority.
-[ "$(uname -s)" = Darwin ] && [ -f "$DOTFILES/.bashrc.macos" ] && source "$DOTFILES/.bashrc.macos"
+[ "$(uname -s)" = Darwin ] && [ -f "$DOTFILES/bashrc.macos" ] && source "$DOTFILES/bashrc.macos"
 
 # Dev container: Nix toolchain profile (sshd login shells don't inherit ENV).
 if [ -d /nix/var/nix/profiles/devtools ]; then
@@ -16,7 +16,7 @@ if [ -d /nix/var/nix/profiles/devtools ]; then
     export TERMINFO_DIRS="/nix/var/nix/profiles/devtools/share/terminfo:${TERMINFO_DIRS:-}"
 fi
 # Machine-local env (untracked): corp cert, etc.
-[ -f "$DOTFILES/.config/dev-container/env.sh" ] && source "$DOTFILES/.config/dev-container/env.sh"
+[ -f "$DOTFILES/config/dev-container/env.sh" ] && source "$DOTFILES/config/dev-container/env.sh"
 
 # Environment variables (non-PATH)
 export EDITOR="nvim"
@@ -88,11 +88,11 @@ jjgp() {
 
 inn() { pushd "$1" > /dev/null && shift && "$@"; popd > /dev/null; }
 
-cfg-bashrc() { $EDITOR "$DOTFILES/.bashrc" ;}
-cfg-vimrc() { $EDITOR "$DOTFILES/.config/nvim/init.lua" ;}
-cfg-git() { $EDITOR "$DOTFILES/.gitconfig" ;}
-cfg-jj() { $EDITOR "$DOTFILES/.config/jj/config.toml" ;}
-rld-bashrc() { source "$DOTFILES/.bashrc" ;}
+cfg-bashrc() { $EDITOR "$DOTFILES/bashrc" ;}
+cfg-vimrc() { $EDITOR "$DOTFILES/config/nvim/init.lua" ;}
+cfg-git() { $EDITOR "$DOTFILES/gitconfig" ;}
+cfg-jj() { $EDITOR "$DOTFILES/config/jj/config.toml" ;}
+rld-bashrc() { source "$DOTFILES/bashrc" ;}
 
 # Interactive settings
 set -o vi
