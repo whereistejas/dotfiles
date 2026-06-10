@@ -2,7 +2,7 @@
 # macOS-only setup lives in .bashrc.macos, sourced first below.
 
 # Dotfiles repo: real checkout on the host, read-only mount in the container.
-DOTFILES="$HOME/build/dotfiles"
+export DOTFILES="$HOME/build/dotfiles"
 [ -d /opt/dotfiles ] && DOTFILES=/opt/dotfiles
 
 # Ghostty integration must run first; Homebrew gets lowest PATH priority.
@@ -15,7 +15,8 @@ if [ -d /nix/var/nix/profiles/devtools ]; then
     # ghostty.terminfo from the profile; trailing ':' keeps ncurses' defaults.
     export TERMINFO_DIRS="/nix/var/nix/profiles/devtools/share/terminfo:${TERMINFO_DIRS:-}"
 fi
-[ -f /etc/corp-cert.pem ] && export NODE_EXTRA_CA_CERTS=/etc/corp-cert.pem
+# Machine-local env (untracked): corp cert, etc.
+[ -f "$DOTFILES/.config/dev-container/env.sh" ] && source "$DOTFILES/.config/dev-container/env.sh"
 
 # Environment variables (non-PATH)
 export EDITOR="nvim"
