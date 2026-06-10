@@ -3,6 +3,21 @@
 -- =============================================================================
 
 vim.opt.clipboard = "unnamedplus"
+-- Over SSH (dev container) there is no clipboard tool, and nvim won't
+-- auto-enable OSC 52 while 'clipboard' is set. Opt in manually, write-only:
+-- yanks/cuts go to the host clipboard via the terminal; pastes use the local
+-- register (avoids an OSC 52 read + permission prompt on every `p`).
+if vim.env.SSH_TTY then
+  local osc52 = require("vim.ui.clipboard.osc52")
+  local function local_paste()
+    return { vim.split(vim.fn.getreg('"'), "\n"), vim.fn.getregtype('"') }
+  end
+  vim.g.clipboard = {
+    name = "OSC 52 (write-only)",
+    copy = { ["+"] = osc52.copy("+"), ["*"] = osc52.copy("*") },
+    paste = { ["+"] = local_paste, ["*"] = local_paste },
+  }
+end
 vim.opt.signcolumn = "yes"
 -- vim.opt.cursorline = true
 vim.opt.winborder = "single"
@@ -629,8 +644,12 @@ vim.lsp.config.ruff = {
 	},
 }
 
+-- Host: bun-installed (needs `bun` to run, no system node). Container: the
+-- Nix-wrapped binary on PATH bundles its own node.
+local bun_bashls = vim.env.HOME .. "/.bun/bin/bash-language-server"
 vim.lsp.config.bashls = {
-	cmd = { "bun", vim.env.HOME .. "/.bun/bin/bash-language-server", "start" },
+	cmd = vim.uv.fs_stat(bun_bashls) and { "bun", bun_bashls, "start" }
+		or { "bash-language-server", "start" },
 	capabilities = capabilities,
 	root_markers = { ".git" },
 	filetypes = { "sh", "bash" },
@@ -643,6 +662,18 @@ vim.lsp.config.marksman = {
 	filetypes = { "markdown", "markdown.mdx" },
 }
 
+local ty_extra_paths = {}
+for _, p in ipairs({
+	vim.fn.expand("~/build/git/wst_core/python"),
+	vim.fn.expand("~/build/git/wst_master"),
+	vim.fn.expand("~/build/git/tornado-openapi3"),
+	"/workspace/wst_core/python",
+	"/workspace/wst_master",
+	"/workspace/tornado-openapi3",
+}) do
+	if vim.fn.isdirectory(p) == 1 then table.insert(ty_extra_paths, p) end
+end
+
 vim.lsp.config.ty = {
 	cmd = { "ty", "server" },
 	capabilities = capabilities,
@@ -652,11 +683,7 @@ vim.lsp.config.ty = {
 		ty = {
 			configuration = {
 				environment = {
-					["extra-paths"] = {
-						vim.fn.expand("~/build/git/wst_core/python"),
-						vim.fn.expand("~/build/git/wst_master"),
-						vim.fn.expand("~/build/git/tornado-openapi3"),
-					},
+					["extra-paths"] = ty_extra_paths,
 				},
 			},
 		},

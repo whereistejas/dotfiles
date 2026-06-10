@@ -6,7 +6,7 @@ export DOTFILES="$HOME/build/dotfiles"
 [ -d /opt/dotfiles ] && DOTFILES=/opt/dotfiles
 
 # Ghostty integration must run first; Homebrew gets lowest PATH priority.
-[ "$(uname -s)" = Darwin ] && [ -f "$DOTFILES/bashrc.macos" ] && source "$DOTFILES/bashrc.macos"
+[[ "$OSTYPE" == darwin* ]] && [ -f "$DOTFILES/bashrc.macos" ] && source "$DOTFILES/bashrc.macos"
 
 # Dev container: Nix toolchain profile (sshd login shells don't inherit ENV).
 if [ -d /nix/var/nix/profiles/devtools ]; then
@@ -87,6 +87,12 @@ jjgp() {
 }
 
 inn() { pushd "$1" > /dev/null && shift && "$@"; popd > /dev/null; }
+
+# Clipboard over SSH (dev container): OSC 52 — the terminal on the host side
+# does the copy, so `cmd | pbcopy` works through ssh with no extra plumbing.
+if ! command -v pbcopy >/dev/null; then
+    pbcopy() { printf '\e]52;c;%s\a' "$(base64 -w0)" > /dev/tty; }
+fi
 
 cfg-bashrc() { $EDITOR "$DOTFILES/bashrc" ;}
 cfg-vimrc() { $EDITOR "$DOTFILES/config/nvim/init.lua" ;}
