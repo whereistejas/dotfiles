@@ -9,9 +9,7 @@
   ],
   "packages": [
     "https://github.com/kepano/obsidian-skills",
-    "git:github.com/laulauland/jj-hunk",
-    "npm:pi-mcp-adapter",
-    "/Users/tejas.sanap/build/git/pi-figma-remote-auth"
+    "git:github.com/laulauland/jj-hunk"
   ],
   "skills": [
     "~/.pi/agent/git/github.com/laulauland/jj-hunk"

@@ -1,6 +1,6 @@
 # Dotfiles
 
-Configuration files for macOS, managed with [Jujutsu](https://martinvonz.github.io/jj/).
+Configuration files for macOS, managed with [Jujutsu](https://martinvonz.github.io/jj/). The bash setup is portable and shared with a Linux dev container.
 
 ## Software
 
@@ -18,6 +18,7 @@ Configuration files for macOS, managed with [Jujutsu](https://martinvonz.github.
 ### Version Control
 
 - [Jujutsu (jj)](https://martinvonz.github.io/jj/) — primary VCS
+- [jjui](https://github.com/idursun/jjui) — TUI for jj
 - Git — secondary VCS, SSH commit signing via `gpg.format = ssh`
 - [Difftastic](https://difftastic.wilfred.me/) — structural diff tool
 - Git LFS
@@ -25,11 +26,12 @@ Configuration files for macOS, managed with [Jujutsu](https://martinvonz.github.
 ### Editor
 
 - [Neovim](https://neovim.io/) — primary editor (single `init.lua`, uses built-in `vim.pack`)
-- [GitHub Copilot](https://github.com/features/copilot) — AI completion
+- [Cursor](https://cursor.com/) — only skills tracked
 
 ### CLI Tools
 
 - [Homebrew](https://brew.sh/) — package manager
+- [container](https://github.com/apple/container) — Apple's Linux container CLI
 - [ripgrep](https://github.com/BurntSushi/ripgrep) — fast search
 - [bat](https://github.com/sharkdp/bat) — cat replacement
 - [eza](https://eza.rocks/) — ls replacement
@@ -47,7 +49,7 @@ Configuration files for macOS, managed with [Jujutsu](https://martinvonz.github.
 ### Apps
 
 - [Raycast](https://www.raycast.com/) — launcher
-- [Claude Code](https://claude.ai/code) — AI assistant
+- [pi](https://github.com/earendil-works/pi) — AI coding agent
 
 ## Neovim Dependencies
 
@@ -81,7 +83,6 @@ Managed via `vim.pack` (Neovim's built-in package manager):
 - nvim-treesitter
 - nvim-lspconfig, lazydev.nvim
 - blink.cmp, friendly-snippets
-- gitsigns.nvim, jj.nvim, hunk.nvim
-- copilot.vim
-- vim-surround, vim-fetch, goyo.vim
+- gitsigns.nvim, jj.nvim, hunk.nvim (+ nui.nvim), codediff.nvim
+- vim-surround, vim-fetch, no-neck-pain.nvim
 - github-nvim-theme, gruvbox.nvim
