@@ -7,7 +7,7 @@ Configuration files for macOS, managed with [Jujutsu](https://martinvonz.github.
 ### Terminal & Shell
 
 - [Ghostty](https://ghostty.org/) — terminal emulator
-- Bash — shell (vi mode, readline customizations in `.inputrc`)
+- Bash — shell (vi mode, readline customizations in `inputrc`)
 - [Berkeley Mono](https://berkeleygraphics.com/typefaces/berkeley-mono/) — terminal font
 
 ### Window Management
