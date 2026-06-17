@@ -1,6 +1,64 @@
 [ui]
 theme = "gruvbox-light"
 
+[preview]
+# Pipe diffs through git-delta (light gruvbox theme lives in ~/.gitconfig).
+# jjui prepends `jj`, so `jj util exec -- sh -c '... | delta'` routes the diff
+# through delta; `--git` gives delta the git-format input it needs, and delta
+# colourises even when its output is captured by jjui's pipe.
+revision_command = ["util", "exec", "--", "sh", "-c", "jj show --git --color=never -r $change_id | delta"]
+file_command = ["util", "exec", "--", "sh", "-c", "jj diff --git --color=never -r $change_id '$file' | delta"]
+
+# Make the built-in `d` diff view render through git-delta, mirroring the preview
+# pane. jjui captures `jj`'s stdout into its own diff view and never routes it
+# through `ui.pager`, so delta (a pager/stdin filter) is bypassed by default. We
+# recreate the `diff-formatter=:git | pager=delta` pipeline by hand via
+# `jj util exec` and feed the result to `diff.show`. Overriding the built-ins by
+# name keeps the default `d` binding and help-bar label intact.
+[[actions]]
+name = "revisions.diff"
+lua = '''
+local id = context.change_id()
+if not id then
+  return
+end
+local out, err = jj("util", "exec", "--", "sh", "-c",
+  "jj show --git --color=never -r " .. id .. " | delta")
+if err then
+  flash({ text = err, error = true })
+  return
+end
+diff.show(out)
+'''
+
+[[actions]]
+name = "revisions.details.diff"
+lua = '''
+local id = context.change_id()
+local file = context.file()
+if not id or not file then
+  return
+end
+local files = context.checked_files()
+if #files == 0 then
+  files = { file }
+end
+local function shq(s)
+  return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+local cmd = "jj diff --git --color=never -r " .. id
+for _, f in ipairs(files) do
+  cmd = cmd .. " " .. shq(f)
+end
+cmd = cmd .. " | delta"
+local out, err = jj("util", "exec", "--", "sh", "-c", cmd)
+if err then
+  flash({ text = err, error = true })
+  return
+end
+diff.show(out)
+'''
+
 [[bindings]]
 action = "revisions.refresh"
 key = "super+r"
@@ -12,6 +70,51 @@ action = "revisions.details.refresh"
 key = "super+r"
 scope = "revisions.details"
 desc = "refresh"
+
+[[actions]]
+name = "semantic-diff"
+desc = "semantic diff (difftastic)"
+key = "shift+d"
+scope = "revisions"
+lua = '''
+local id = context.change_id()
+if not id then
+  return
+end
+local out, err = jj("diff", "-r", id, "--tool", "difft")
+if err then
+  flash({ text = err, error = true })
+  return
+end
+diff.show(out)
+'''
+
+[[actions]]
+name = "semantic-diff-file"
+desc = "semantic file diff (difftastic)"
+key = "shift+d"
+scope = "revisions.details"
+lua = '''
+local id = context.change_id()
+local file = context.file()
+if not id or not file then
+  return
+end
+local files = context.checked_files()
+if #files == 0 then
+  files = { file }
+end
+local args = { "diff", "-r", id, "--tool", "difft" }
+for _, f in ipairs(files) do
+  table.insert(args, f)
+end
+local out, err = jj(args)
+if err then
+  flash({ text = err, error = true })
+  return
+end
+diff.show(out)
+'''
 
 [[actions]]
 name = "copy-change-id"

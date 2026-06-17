@@ -1,3 +1,8 @@
+if vim.fn.has("nvim-0.12.3") ~= 1 then
+	vim.notify("init.lua requires nvim >= 0.12.3 (vim.treesitter.select)", vim.log.levels.ERROR)
+	return
+end
+
 -- =============================================================================
 -- Options
 -- =============================================================================
@@ -8,15 +13,15 @@ vim.opt.clipboard = "unnamedplus"
 -- yanks/cuts go to the host clipboard via the terminal; pastes use the local
 -- register (avoids an OSC 52 read + permission prompt on every `p`).
 if vim.env.SSH_TTY then
-  local osc52 = require("vim.ui.clipboard.osc52")
-  local function local_paste()
-    return { vim.split(vim.fn.getreg('"'), "\n"), vim.fn.getregtype('"') }
-  end
-  vim.g.clipboard = {
-    name = "OSC 52 (write-only)",
-    copy = { ["+"] = osc52.copy("+"), ["*"] = osc52.copy("*") },
-    paste = { ["+"] = local_paste, ["*"] = local_paste },
-  }
+	local osc52 = require("vim.ui.clipboard.osc52")
+	local function local_paste()
+		return { vim.split(vim.fn.getreg('"'), "\n"), vim.fn.getregtype('"') }
+	end
+	vim.g.clipboard = {
+		name = "OSC 52 (write-only)",
+		copy = { ["+"] = osc52.copy("+"), ["*"] = osc52.copy("*") },
+		paste = { ["+"] = local_paste, ["*"] = local_paste },
+	}
 end
 vim.opt.signcolumn = "yes"
 -- vim.opt.cursorline = true
@@ -46,18 +51,6 @@ local vifm_rtp = (vim.env.HOMEBREW_PREFIX or "/opt/homebrew") .. "/opt/vifm/shar
 if vim.uv.fs_stat(vifm_rtp) then
 	vim.opt.runtimepath:append(vifm_rtp)
 end
-
--- =============================================================================
--- Keymaps
--- =============================================================================
-
-vim.keymap.set("n", "0", "^")
-vim.keymap.set("n", "9", "$")
-vim.keymap.set("n", "<up>", "<nop>")
-vim.keymap.set("n", "<down>", "<nop>")
-vim.keymap.set("n", "<left>", ":bp<CR>")
-vim.keymap.set("n", "<right>", ":bn<CR>")
-vim.keymap.set("n", "j", "gj")
 
 -- =============================================================================
 -- Plugins
@@ -93,8 +86,6 @@ vim.pack.add({
 	"https://github.com/lewis6991/gitsigns.nvim",
 	{ src = "https://github.com/nicolasgb/jj.nvim",             version = "v0.6.0" },
 	"https://github.com/MunifTanjim/nui.nvim",
-	"https://github.com/julienvincent/hunk.nvim",
-	"https://github.com/esmuellert/codediff.nvim",
 
 	-- Telescope
 	"https://github.com/nvim-lua/plenary.nvim",
@@ -119,52 +110,10 @@ vim.pack.add({
 vim.loader.enable()
 
 -- =============================================================================
--- Plugin configuration
+-- Functions
 -- =============================================================================
 
--- Theme
-require("github-theme").setup({
-	options = {
-		transparent = false,
-		styles = {
-			comments = "italic",
-			keywords = "bold",
-		},
-	},
-})
-vim.o.background = "light"
-vim.o.background = "light"
-vim.cmd("colorscheme gruvbox")
-
--- gitsigns
-require("gitsigns").setup()
-vim.keymap.set("n", "]h", function() require("gitsigns").nav_hunk("next") end)
-vim.keymap.set("n", "[h", function() require("gitsigns").nav_hunk("prev") end)
-
--- codediff
-require("codediff").setup({
-	keymaps = {
-		view = {
-			next_hunk = "]h",
-			prev_hunk = "[h",
-		},
-	},
-})
-
--- jj.nvim
-require("jj").setup({
-	diff = {
-		backend = "codediff",
-	},
-	cmd = {
-		keymaps = {
-			log = {
-				diff = "p",
-				push = "<S-p>",
-			},
-		},
-	},
-})
+local builtin = require("telescope.builtin")
 
 -- Auto-detect jj repo: walk up from buffer path, stopping at cwd.
 local function find_jj_repo()
@@ -194,45 +143,10 @@ local function cd_to_jj_repo(args)
 	if repo then vim.cmd.cd(repo) end
 end
 
--- jj.nvim hardcodes `:J log` to --limit 20; bump it unless the caller overrode.
-local jj_log_module = require("jj.cmd.log")
-local orig_log = jj_log_module.log
-jj_log_module.log = function(opts)
-	opts = opts or {}
-	if not opts.raw_flags and not opts.limit then
-		opts.limit = 9999
-	end
-	return orig_log(opts)
-end
-require("jj.cmd").log = jj_log_module.log
-
--- Wrap jj.cmd.j so the original :J command (with completion) stays intact.
-local jj_cmd = require("jj.cmd")
-local orig_j = jj_cmd.j
-jj_cmd.j = function(args)
-	if type(args) == "string" then args = vim.split(args, "%s+") end
-	cd_to_jj_repo(args)
-	local win_before = vim.api.nvim_get_current_win()
-	local result = orig_j(args)
-	-- Defer the window move so orig_j's messages don't pile up and trigger
-	-- the hit-enter prompt when wincmd H forces a redraw. Silence the move
-	-- itself and redraw to clear any pending message lines.
-	if vim.api.nvim_get_current_win() ~= win_before then
-		vim.schedule(function()
-			vim.cmd("silent! wincmd H")
-			vim.cmd("redraw")
-		end)
-	end
-	return result
-end
-
-vim.keymap.set("n", "<leader>jj", "<cmd>J log<CR>", { desc = "jj log (jj.nvim)" })
-vim.keymap.set("n", "<leader>js", "<cmd>J status<CR>", { desc = "jj status (jj.nvim)" })
-
--- Telescope
--- Sorter that keeps fuzzy filtering but preserves finder order (rg --sort path),
--- so results stay grouped by folder while you type. Lower score = higher in the
--- list under sorting_strategy = "ascending", and entry.index follows path order.
+-- Telescope sorter that keeps fuzzy filtering but preserves finder order
+-- (rg --sort path), so results stay grouped by folder while you type. Lower
+-- score = higher in the list under sorting_strategy = "ascending", and
+-- entry.index follows path order.
 local function path_order_sorter()
 	local sorters = require("telescope.sorters")
 	local base = sorters.get_fzy_sorter()
@@ -249,102 +163,7 @@ local function path_order_sorter()
 	})
 end
 
-require("telescope").setup({
-	defaults = {
-		hidden = true,
-		mappings = {
-			i = {
-				["<C-d>"] = function(bufnr) require("telescope.actions").preview_scrolling_down(bufnr) end,
-				["<C-u>"] = function(bufnr) require("telescope.actions").preview_scrolling_up(bufnr) end,
-			},
-		},
-		vimgrep_arguments = {
-			"rg",
-			"--color=never",
-			"--no-heading",
-			"--with-filename",
-			"--line-number",
-			"--column",
-			"--smart-case",
-			"--hidden",
-		},
-	},
-	pickers = {
-		find_files = {
-			find_command = { "rg", "--files", "--hidden", "--glob", "!.git/*", "--sort", "path" },
-			sorting_strategy = "ascending",
-			sorter = path_order_sorter(),
-			tiebreak = function(current_entry, existing_entry, _)
-				return current_entry.index < existing_entry.index
-			end,
-		},
-	},
-})
-require("telescope").load_extension("file_browser")
-require("telescope").load_extension("live_grep_args")
-
-local builtin = require("telescope.builtin")
-
--- jj picker highlight
-vim.api.nvim_set_hl(0, "JJChangeId", { bold = true })
-
--- jj picker helpers
-local JJ_ID_WIDTH = 12
-local JJ_AGE_WIDTH = 15
-local jj_log_tpl =
-'change_id.shortest() ++ "\t" ++ change_id.short(12) ++ "\t" ++ committer.timestamp().ago() ++ "\t" ++ coalesce(description.first_line(), "(no description)") ++ "\n"'
-
-local function jj_cd_to_repo()
-	local repo = find_jj_repo()
-	if repo then vim.cmd.cd(repo) end
-	return vim.fn.fnamemodify(vim.fn.getcwd(), ":t")
-end
-
-local function jj_log_entries(extra_args)
-	local cmd = "jj log -r '::@' --no-graph -T " .. vim.fn.shellescape(jj_log_tpl)
-	if extra_args then cmd = cmd .. " " .. extra_args end
-	local lines = vim.fn.systemlist(cmd)
-	if vim.v.shell_error ~= 0 then return nil end
-	local entries = {}
-	for _, line in ipairs(lines) do
-		local short, full, age, desc = line:match("^(%S+)\t(%S+)\t(.-)\t(.*)$")
-		if short then
-			table.insert(entries, { id_short = short, id_full = full, age = age, desc = desc })
-		end
-	end
-	return #entries > 0 and entries or nil
-end
-
-local function jj_log_entry_maker(e)
-	local age_pad = e.age .. string.rep(" ", math.max(0, JJ_AGE_WIDTH - #e.age))
-	local line = e.id_full .. "  " .. age_pad .. "  " .. e.desc
-	local short_len = #e.id_short
-	local age_start = JJ_ID_WIDTH + 2
-	return {
-		value = e,
-		display = function()
-			return line, {
-				{ { 0, short_len },                        "JJChangeId" },
-				{ { short_len, JJ_ID_WIDTH },              "Comment" },
-				{ { age_start, age_start + JJ_AGE_WIDTH }, "Comment" },
-			}
-		end,
-		ordinal = e.id_short .. " " .. e.desc,
-	}
-end
-
-local function jj_diff_previewer(title, cmd_fn)
-	return require("telescope.previewers").new_buffer_previewer({
-		title = title,
-		define_preview = function(self, entry)
-			local out = vim.fn.systemlist(cmd_fn(entry))
-			vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, out)
-			vim.bo[self.state.bufnr].filetype = "diff"
-		end,
-	})
-end
-
--- Custom pickers
+-- Custom telescope pickers
 local function find_files_all()
 	builtin.find_files({
 		find_command = { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git/*", "--sort", "path" },
@@ -355,7 +174,7 @@ local function find_files_all()
 	})
 end
 
-local live_grep_args = function(opts)
+local function live_grep_args(opts)
 	local prompt_parser = require("telescope-live-grep-args.prompt_parser")
 	local sorters = require("telescope.sorters")
 	local fzy = require("telescope.algos.fzy")
@@ -376,149 +195,8 @@ local function file_browser_here()
 	vim.cmd("Telescope file_browser path=%:p:h")
 end
 
--- jj status: changed files in current commit
-local function jj_status_picker()
-	local repo_name = jj_cd_to_repo()
-	local lines = vim.fn.systemlist("jj diff --summary")
-	if vim.v.shell_error ~= 0 or #lines == 0 then
-		vim.notify("No changes in current jj commit", vim.log.levels.INFO)
-		return
-	end
-	local files = {}
-	for _, line in ipairs(lines) do
-		local name = line:match("^[MADRC]%s+(.+)$")
-		if name then table.insert(files, name) end
-	end
-	require("telescope.pickers").new({}, {
-		prompt_title = "jj status: " .. repo_name,
-		finder = require("telescope.finders").new_table({ results = files }),
-		sorter = require("telescope.config").values.generic_sorter({}),
-		previewer = jj_diff_previewer("jj diff", function(entry)
-			return "jj diff --git " .. vim.fn.shellescape(entry.value)
-		end),
-	}):find()
-end
-
--- jj log: commits on the current change
-local function jj_log_picker()
-	local repo_name = jj_cd_to_repo()
-	local entries = jj_log_entries()
-	if not entries then
-		vim.notify("No jj log entries", vim.log.levels.INFO)
-		return
-	end
-	require("telescope.pickers").new({}, {
-		prompt_title = "jj log: " .. repo_name,
-		finder = require("telescope.finders").new_table({ results = entries, entry_maker = jj_log_entry_maker }),
-		sorter = require("telescope.config").values.generic_sorter({}),
-		previewer = jj_diff_previewer("jj show", function(entry)
-			return "jj show --no-pager --git " .. vim.fn.shellescape(entry.value.id_short)
-		end),
-	}):find()
-end
-
--- jj file log: commits that changed the current file
-local function jj_file_log_picker()
-	jj_cd_to_repo()
-	local bufpath = vim.api.nvim_buf_get_name(0)
-	if bufpath == "" then
-		vim.notify("No file in current buffer", vim.log.levels.WARN)
-		return
-	end
-	local rel = vim.fn.fnamemodify(bufpath, ":.")
-	local entries = jj_log_entries(vim.fn.shellescape(rel))
-	if not entries then
-		vim.notify("No commits touching " .. rel, vim.log.levels.INFO)
-		return
-	end
-	local filename = vim.fn.fnamemodify(rel, ":t")
-	require("telescope.pickers").new({}, {
-		prompt_title = "jj log: " .. filename,
-		finder = require("telescope.finders").new_table({ results = entries, entry_maker = jj_log_entry_maker }),
-		sorter = require("telescope.config").values.generic_sorter({}),
-		previewer = jj_diff_previewer("jj diff: " .. filename, function(entry)
-			return "jj diff -r " .. vim.fn.shellescape(entry.value.id_short) .. " --git " .. vim.fn.shellescape(rel)
-		end),
-	}):find()
-end
-
--- Telescope keymaps
-vim.keymap.set("n", "<space>t", builtin.builtin)
-vim.keymap.set("n", "<space>b", builtin.buffers)
-vim.keymap.set("n", "<space>f", builtin.find_files)
-vim.keymap.set("n", "<space>fa", find_files_all)
-vim.keymap.set("n", "?", live_grep_args)
-vim.keymap.set("n", "<space><space>", builtin.resume)
-vim.keymap.set("n", "<space>r", builtin.lsp_references)
-vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
-vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
-vim.keymap.set("n", "<space>o", builtin.lsp_document_symbols)
-
-vim.keymap.set("n", "<space>O", function()
-	vim.lsp.buf.document_symbol({
-		on_list = function(opts)
-			vim.fn.setloclist(0, {}, " ", opts)
-			vim.cmd("vert leftabove lopen 40")
-		end,
-	})
-end, { desc = "Document symbols (left split)" })
-
-vim.keymap.set("n", "<space>m", builtin.diagnostics)
-vim.keymap.set("n", "M", vim.diagnostic.open_float)
-vim.keymap.set("n", "<space>k", builtin.keymaps)
-vim.keymap.set("n", "<space>c", file_browser_here)
-vim.keymap.set("n", "<space>js", jj_status_picker)
-vim.keymap.set("n", "<space>jj", jj_log_picker)
-vim.keymap.set("n", "<space>jf", jj_file_log_picker)
-
--- no-neck-pain (centered layout)
-require("no-neck-pain").setup({ width = 120 })
-vim.keymap.set("n", "<space>g", "<cmd>NoNeckPain<CR>", { desc = "Toggle centered layout" })
-
--- blink.cmp
-require("blink.cmp").setup({
-	keymap = { preset = "default" },
-	appearance = { nerd_font_variant = "mono" },
-	completion = {
-		documentation = { auto_show = false },
-	},
-	sources = {
-		default = { "lsp", "path", "snippets", "buffer" },
-	},
-	fuzzy = { implementation = "prefer_rust" },
-})
-
--- Treesitter
-require("nvim-treesitter").setup()
-require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css", "python",
-	"ruby", "bash" })
--- Treesitter incremental selection via vim.treesitter._select (same engine as `an`/`in`)
-local ts_select = require("vim.treesitter._select")
-
-local function ts_init()
-	vim.cmd("normal! v")
-	ts_select.select_parent(1)
-end
-
-vim.keymap.set("n", "<Up>", ts_init)
-vim.keymap.set("n", "<Down>", ts_init)
-vim.keymap.set("v", "<Up>", function() ts_select.select_parent(1) end)
-vim.keymap.set("v", "<Down>", function() ts_select.select_child(1) end)
-vim.keymap.set("v", "<Left>", function() ts_select.select_prev(1) end)
-vim.keymap.set("v", "<Right>", function() ts_select.select_next(1) end)
-
--- lazydev (Lua LSP workspace libraries)
-require("lazydev").setup({
-	library = {
-		{ path = "${3rd}/luv/library", words = { "vim%.uv" } },
-		{ path = "blink.cmp" },
-	},
-})
-
--- LSP
--- Reformat long param/field lists in hover: put each element on its own line.
--- In 0.12, vim.lsp.buf.hover() calls open_floating_preview directly (not via
--- handlers), so this monkey-patch is the correct interception point.
+-- Split a long signature line (params/fields) one element per line; used by
+-- the LSP hover override below.
 local function split_params(line)
 	-- Find first ( or { and its matching closer
 	local opos, open, close
@@ -576,6 +254,185 @@ local function split_params(line)
 	return out
 end
 
+-- Toggle all diagnostic display (virtual text/lines, underline, signs).
+function _G.toggle_diagnostics()
+	local cfg = vim.diagnostic.config()
+	if cfg.virtual_text then
+		vim.diagnostic.config({
+			virtual_text = false,
+			virtual_lines = false,
+			underline = false,
+			signs = false,
+		})
+	else
+		vim.diagnostic.config({
+			virtual_text = true,
+			virtual_lines = true,
+			underline = true,
+			signs = true,
+		})
+	end
+end
+
+-- =============================================================================
+-- Plugin setup
+-- =============================================================================
+
+-- Theme
+require("github-theme").setup({
+	options = {
+		transparent = false,
+		styles = {
+			comments = "italic",
+			keywords = "bold",
+		},
+	},
+})
+vim.o.background = "light"
+vim.cmd("colorscheme gruvbox")
+
+-- gitsigns
+require("gitsigns").setup()
+
+-- jj.nvim
+require("jj").setup({
+	diff = {
+		-- native = Neovim's built-in diff mode (nvim -d); no external diff plugin
+		backend = "native",
+	},
+	cmd = {
+		keymaps = {
+			-- Aligned with jjui's `revisions` scope keybindings.
+			log = {
+				-- jjui parity
+				diff = "d",
+				describe = "<CR>",
+				edit = "e",
+				edit_immutable = "<M-e>",
+				new = "n",
+				abandon = "a",
+				rebase = "r",
+				squash = "<S-s>",
+				split = "s",
+				bookmark = "b",
+				undo = "u",
+				redo = "<S-u>",
+				change_revset = "<S-l>",
+				summary = "<S-k>",
+				-- jj.nvim-only (no jjui log-scope equivalent)
+				push = "<S-p>",
+				push_all = "<C-p>",
+				fetch = "f",
+				open_pr = "o",
+				open_pr_list = "<S-o>",
+				quick_squash = "<C-s>",
+				new_after = "<C-n>",
+				new_after_immutable = "<S-n>",
+				tag_set = "<S-t>",
+				history = "<S-h>",
+				select_next_revision = "gj",
+				select_prev_revision = "gk",
+			},
+			summary_tooltip = {
+				diff = "d",
+				edit = "<CR>",
+			},
+		},
+	},
+})
+
+-- jj.nvim hardcodes `:J log` to --limit 20; bump it unless the caller overrode.
+local jj_log_module = require("jj.cmd.log")
+local orig_log = jj_log_module.log
+jj_log_module.log = function(opts)
+	opts = opts or {}
+	if not opts.raw_flags and not opts.limit then
+		opts.limit = 9999
+	end
+	return orig_log(opts)
+end
+require("jj.cmd").log = jj_log_module.log
+
+-- Wrap jj.cmd.j so the original :J command (with completion) stays intact.
+local jj_cmd = require("jj.cmd")
+local orig_j = jj_cmd.j
+jj_cmd.j = function(args)
+	if type(args) == "string" then args = vim.split(args, "%s+") end
+	cd_to_jj_repo(args)
+	return orig_j(args)
+end
+
+-- Telescope
+require("telescope").setup({
+	defaults = {
+		hidden = true,
+		mappings = {
+			i = {
+				["<C-d>"] = function(bufnr) require("telescope.actions").preview_scrolling_down(bufnr) end,
+				["<C-u>"] = function(bufnr) require("telescope.actions").preview_scrolling_up(bufnr) end,
+			},
+		},
+		vimgrep_arguments = {
+			"rg",
+			"--color=never",
+			"--no-heading",
+			"--with-filename",
+			"--line-number",
+			"--column",
+			"--smart-case",
+			"--hidden",
+		},
+	},
+	pickers = {
+		find_files = {
+			find_command = { "rg", "--files", "--hidden", "--glob", "!.git/*", "--sort", "path" },
+			sorting_strategy = "ascending",
+			sorter = path_order_sorter(),
+			tiebreak = function(current_entry, existing_entry, _)
+				return current_entry.index < existing_entry.index
+			end,
+		},
+	},
+})
+require("telescope").load_extension("file_browser")
+require("telescope").load_extension("live_grep_args")
+
+-- no-neck-pain (centered layout)
+require("no-neck-pain").setup({ width = 120 })
+
+-- blink.cmp
+require("blink.cmp").setup({
+	keymap = { preset = "default" },
+	appearance = { nerd_font_variant = "mono" },
+	completion = {
+		documentation = { auto_show = false },
+	},
+	sources = {
+		default = { "lsp", "path", "snippets", "buffer" },
+	},
+	fuzzy = { implementation = "prefer_rust" },
+})
+
+-- Treesitter
+require("nvim-treesitter").setup()
+require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css", "python",
+	"ruby", "bash" })
+
+-- lazydev (Lua LSP workspace libraries)
+require("lazydev").setup({
+	library = {
+		{ path = "${3rd}/luv/library", words = { "vim%.uv" } },
+		{ path = "blink.cmp" },
+	},
+})
+
+-- =============================================================================
+-- LSP
+-- =============================================================================
+
+-- Reformat long param/field lists in hover: put each element on its own line.
+-- In 0.12, vim.lsp.buf.hover() calls open_floating_preview directly (not via
+-- handlers), so this monkey-patch is the correct interception point.
 local orig_open_float = vim.lsp.util.open_floating_preview
 function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
 	local formatted = {}
@@ -702,33 +559,95 @@ vim.lsp.enable("ty")
 vim.lsp.enable("bashls")
 vim.lsp.enable("marksman")
 
--- =============================================================================
--- Diagnostics & LSP autocommands
--- =============================================================================
-
+-- Diagnostics
 vim.diagnostic.config({
 	virtual_text = true,
 	virtual_lines = true,
 })
 
-function _G.toggle_diagnostics()
-	local cfg = vim.diagnostic.config()
-	if cfg.virtual_text then
-		vim.diagnostic.config({
-			virtual_text = false,
-			virtual_lines = false,
-			underline = false,
-			signs = false,
-		})
-	else
-		vim.diagnostic.config({
-			virtual_text = true,
-			virtual_lines = true,
-			underline = true,
-			signs = true,
-		})
-	end
+-- =============================================================================
+-- Keymaps
+-- =============================================================================
+
+-- General
+vim.keymap.set("n", "0", "^")
+vim.keymap.set("n", "9", "$")
+vim.keymap.set("n", "<left>", ":bp<CR>")
+vim.keymap.set("n", "<right>", ":bn<CR>")
+vim.keymap.set("n", "j", "gj")
+
+-- Treesitter node selection (nvim 0.12.3+):
+--   <up>/<down> expand to parent / shrink to child (normal + visual)
+--   <left>/<right> select prev / next sibling (visual only)
+vim.keymap.set({ "n", "x" }, "<up>", function() vim.treesitter.select("parent", vim.v.count1) end)
+vim.keymap.set({ "n", "x" }, "<down>", function() vim.treesitter.select("child", vim.v.count1) end)
+vim.keymap.set("x", "<left>", function() vim.treesitter.select("prev", vim.v.count1) end)
+vim.keymap.set("x", "<right>", function() vim.treesitter.select("next", vim.v.count1) end)
+
+-- Window navigation — move between splits in every mode (insert/visual/terminal too).
+-- <Cmd> runs wincmd without leaving the current mode.
+for key, desc in pairs({
+	h = "Move to left split",
+	j = "Move to split below",
+	k = "Move to split above",
+	l = "Move to right split",
+}) do
+	vim.keymap.set({ "n", "i", "v", "t" }, "<D-" .. key .. ">", "<Cmd>wincmd " .. key .. "<CR>", { desc = desc })
 end
+
+-- Double-<Tab> cycles to the next window/split.
+vim.keymap.set("n", "<Tab><Tab>", "<C-w>w", { desc = "Cycle to next window" })
+
+-- Tabs — switch to tab N in every mode (insert/visual/terminal too).
+-- <Cmd> runs the command without leaving the current mode.
+for i = 1, 4 do
+	vim.keymap.set({ "n", "i", "v", "t" }, "<D-" .. i .. ">", "<Cmd>tabnext " .. i .. "<CR>", { desc = "Go to tab " .. i })
+end
+
+-- Terminal — double <Esc> leaves terminal mode (single <Esc> still reaches the program).
+vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
+
+-- Git (gitsigns)
+vim.keymap.set("n", "]h", function() require("gitsigns").nav_hunk("next") end)
+vim.keymap.set("n", "[h", function() require("gitsigns").nav_hunk("prev") end)
+
+-- jj.nvim
+vim.keymap.set("n", "<leader>jj", "<cmd>J log<CR>", { desc = "jj log (jj.nvim)" })
+vim.keymap.set("n", "<leader>js", "<cmd>J status<CR>", { desc = "jj status (jj.nvim)" })
+
+-- Telescope
+vim.keymap.set("n", "<space>t", builtin.builtin)
+vim.keymap.set("n", "<space>b", builtin.buffers)
+vim.keymap.set("n", "<space>f", builtin.find_files)
+vim.keymap.set("n", "<space>fa", find_files_all)
+vim.keymap.set("n", "?", live_grep_args)
+vim.keymap.set("n", "<space><space>", builtin.resume)
+vim.keymap.set("n", "<space>r", builtin.lsp_references)
+vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
+vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
+vim.keymap.set("n", "<space>o", builtin.lsp_document_symbols)
+vim.keymap.set("n", "<space>O", function()
+	vim.lsp.buf.document_symbol({
+		on_list = function(opts)
+			vim.fn.setloclist(0, {}, " ", opts)
+			vim.cmd("vert leftabove lopen 40")
+		end,
+	})
+end, { desc = "Document symbols (left split)" })
+vim.keymap.set("n", "<space>m", builtin.diagnostics)
+vim.keymap.set("n", "M", vim.diagnostic.open_float)
+vim.keymap.set("n", "<space>k", builtin.keymaps)
+vim.keymap.set("n", "<space>c", file_browser_here)
+
+-- Layout
+vim.keymap.set("n", "<space>g", "<cmd>NoNeckPain<CR>", { desc = "Toggle centered layout" })
+
+-- Terminal
+vim.keymap.set("t", "<S-Esc>", [[<C-\><C-n>]], { desc = "Exit terminal mode" })
+
+-- =============================================================================
+-- Autocommands
+-- =============================================================================
 
 vim.api.nvim_create_autocmd("LspAttach", {
 	group = vim.api.nvim_create_augroup("lsp", { clear = true }),
