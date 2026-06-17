@@ -5,3 +5,15 @@ cursor-style-blink = true
 theme = "Gruvbox Light"
 command="/opt/homebrew/bin/bash"
 macos-option-as-alt = true
+
+# Forward cmd+1..4 to the app (overrides Ghostty's default goto_tab) so
+# neovim's <D-1>..<D-4> tab mappings receive them. csi:NN;9u = codepoint NN
+# with the super modifier (9 = 1 + Super 8). 49-52 are the digits 1-4.
+keybind = cmd+1=csi:49;9u
+keybind = cmd+digit_1=csi:49;9u
+keybind = cmd+2=csi:50;9u
+keybind = cmd+digit_2=csi:50;9u
+keybind = cmd+3=csi:51;9u
+keybind = cmd+digit_3=csi:51;9u
+keybind = cmd+4=csi:52;9u
+keybind = cmd+digit_4=csi:52;9u

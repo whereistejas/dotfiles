@@ -70,6 +70,28 @@
 [pager]
 	difftool = true
 
+[delta]
+	features = gruvbox-light
+	navigate = true
+	light = true
+	line-numbers = true
+	hyperlinks = true
+
+[delta "gruvbox-light"]
+	syntax-theme = gruvbox-light
+	light = true
+	file-style = "#076678" bold
+	file-decoration-style = "#076678" ul
+	hunk-header-decoration-style = "#928374" box
+	minus-style = syntax "#f2d6cd"
+	minus-emph-style = syntax "#eaa9a0"
+	plus-style = syntax "#e3e9c1"
+	plus-emph-style = syntax "#c4cf95"
+	zero-style = syntax
+	line-numbers-minus-style = "#cc241d"
+	line-numbers-plus-style = "#98971a"
+	line-numbers-zero-style = "#928374"
+
 [push]
 	default = simple
 	autoSetupRemote = true

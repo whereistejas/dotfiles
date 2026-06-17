@@ -1,8 +1,8 @@
 {
-  "lastChangelogVersion": "0.79.1",
+  "lastChangelogVersion": "0.79.10",
   "theme": "light",
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-fable-5",
+  "defaultModel": "claude-opus-4-8",
   "defaultThinkingLevel": "xhigh",
   "npmCommand": [
     "bun"
@@ -15,5 +15,8 @@
     "~/.pi/agent/git/github.com/laulauland/jj-hunk"
   ],
   "quietStartup": true,
-  "hideThinkingBlock": false
+  "hideThinkingBlock": false,
+  "warnings": {
+    "anthropicExtraUsage": false
+  }
 }

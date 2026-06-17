@@ -12,6 +12,7 @@
 **/config/cognition/skills
 **/config/raycast-x
 **/config/dev-container
+**/config/jj/workspaces
 
 **/.claude/
 **/.claude.json

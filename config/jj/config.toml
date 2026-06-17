@@ -21,107 +21,44 @@ sq = ["squash"]
 l = ["log", "-r", "bookmarks()"]
 la = ["log", "-r", "trunk()::@"]
 df = ["diff", "--name-only"]
+sd = ["diff", "--tool", "difft"]
 ndiff = ["diffedit", "--tool", "nvimdiff"]
 clone = ["git", "clone"]
 
 [merge-tools.nvimdiff]
 program = "nvim"
-edit-args = ["-c", "DiffEditor $left $right $output"]
-
-[merge-tools.diffedit3]
-program="diffedit3"
-edit-args = ["$left", "$right", "$output", "--port", "17376-17380", "--port", "0"]
+# Native nvim -d diff editing: jj calls this once per changed file
+# (file-by-file), so $left/$output are individual files, not directories.
+# Left = parent (reference), right = $output (edit this; jj snapshots it back).
+edit-args = ["-d", "$left", "$output", "-c", "wincmd l", "-c", "setlocal noro modifiable"]
+edit-invocation-mode = "file-by-file"
+# Read-only viewing via `jj diff --tool nvimdiff`: left = parent, right = child.
+# Also file-by-file so $left/$right are individual files (not dirs).
+diff-args = ["-d", "$left", "$right"]
+diff-invocation-mode = "file-by-file"
+merge-args = ["-f", "-d", "$output", "-M", "$left", "$base", "$right",
+              "-c", "wincmd J", "-c", "set modifiable", "-c", "set write",
+              "-c", "/<<<<<</+2"]
+merge-tool-edits-conflict-markers = true
 
 [merge-tools.jj-hunk]
 program = "jj-hunk"
 edit-args = ["select", "$left", "$right"]
 
 [ui]
-# diff-formatter = ["difft", "--color=always", "--background=light", "$left", "$right"]
-# diff-editor="diffedit3"
-# default-command = ["log", "-n20"]
-pager = ["delta", "--syntax-theme=gruvbox-light", "--line-numbers"]
+paginate = "auto"
+pager = ["delta", "--pager", "less -FRX"]
 diff-formatter = ":git"
-diff-editor = ["nvim", "-c", "DiffEditor $left $right $output"]
+diff-editor = "nvimdiff"
+merge-editor = "mergiraf"
 diff-instructions = false
 show-cryptographic-signatures = true
-default-command = "la"
-
-# Inside jjui (it sets the JJUI env var), let delta render diffs directly as a
-# diff-formatter and turn pagination off so it doesn't fight the TUI.
-[[--scope]]
---when.environments = ["JJUI"]
-[--scope.ui]
-diff-formatter = ["delta", "--syntax-theme=gruvbox-light", "--line-numbers", "$left", "$right"]
-paginate = "never"
+default-command = "status"
 
 [remotes.origin]
 auto-track-bookmarks = 'exact:"main" | exact:"master"'
 
-[colors]
-"author"="bright blue"
-"working_copy author" = "blue"
-"working_copy committer" = "blue"
-"working_copy description placeholder" = "blue"
-"description placeholder" = "blue"
-"tag" = "bright yellow"
-
 [template-aliases]
-'format_short_id(id)' = 'id.shortest()'
-'format_short_change_id(id)' = 'id.shortest(4)'
-'builtin_log_compact(commit)' = '''
-if(commit.root(),
-  format_root_commit(commit),
-  label(
-    separate(" ",
-      if(commit.current_working_copy(), "working_copy"),
-      if(commit.immutable(), "immutable", "mutable"),
-      if(commit.conflict(), "conflicted"),
-    ),
-    separate(" ",
-      format_short_change_id_with_change_offset(commit),
-      if(commit.empty(), empty_commit_marker),
-      if(commit.description(),
-        commit.description().first_line(),
-        label(if(commit.empty(), "empty"), description_placeholder),
-      ),
-      format_short_signature(commit.author()),
-      format_relative_timestamp(commit_timestamp(commit)),
-      commit.bookmarks(),
-      commit.working_copies(),
-      format_commit_labels(commit),
-      if(config("ui.show-cryptographic-signatures").as_boolean(),
-        format_short_cryptographic_signature(commit.signature())
-      ),
-    ) ++ "\n",
-  )
-)
-'''
-'format_relative_timestamp(ts)' = '''
-if(ts.before("1 day ago"),
-  ts.format("%Y-%m-%d"),
-  ts.ago().replace(regex:"(\\d+) (\\w)\\w* ago", "$1$2 ago"),
-)
-'''
-'format_short_signature(signature)' = '''
-if(signature.name(),
-  signature.name().split(" ").first(),
-  signature.email(),
-)
-'''
-'format_short_commit_header(commit)' = '''
-separate(" ",
-  format_short_change_id_with_change_offset(commit),
-  format_short_signature(commit.author()),
-  format_timestamp(commit_timestamp(commit)),
-  commit.bookmarks(),
-  commit.working_copies(),
-  format_commit_labels(commit),
-  if(config("ui.show-cryptographic-signatures").as_boolean(),
-    format_short_cryptographic_signature(commit.signature())
-  ),
-)
-'''
 'blame_with_msg' = '''
 commit.commit_id().short(8)
 ++ " "
