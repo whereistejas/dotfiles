@@ -1,15 +1,16 @@
 {
-  "lastChangelogVersion": "0.79.10",
+  "lastChangelogVersion": "0.80.2",
   "theme": "light",
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-4-8",
-  "defaultThinkingLevel": "xhigh",
+  "defaultThinkingLevel": "high",
   "npmCommand": [
     "bun"
   ],
   "packages": [
     "https://github.com/kepano/obsidian-skills",
-    "git:github.com/laulauland/jj-hunk"
+    "git:github.com/laulauland/jj-hunk",
+    "npm:@diegopetrucci/pi-claude-fast"
   ],
   "skills": [
     "~/.pi/agent/git/github.com/laulauland/jj-hunk"
