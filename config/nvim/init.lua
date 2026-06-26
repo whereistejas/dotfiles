@@ -274,6 +274,67 @@ function _G.toggle_diagnostics()
 	end
 end
 
+-- Copy the visual selection with context — relative path, line range, and the
+-- enclosing LSP symbol path (e.g. Class.method) — to the clipboard.
+local symbol_kind = vim.lsp.protocol.SymbolKind
+local symbol_containers = {
+	[symbol_kind.Class] = true,
+	[symbol_kind.Method] = true,
+	[symbol_kind.Function] = true,
+	[symbol_kind.Constructor] = true,
+	[symbol_kind.Struct] = true,
+	[symbol_kind.Interface] = true,
+	[symbol_kind.Module] = true,
+	[symbol_kind.Namespace] = true,
+	[symbol_kind.Enum] = true,
+}
+
+local function symbol_path(symbols, line, acc)
+	acc = acc or {}
+	for _, sym in ipairs(symbols) do
+		local range = sym.range or (sym.location and sym.location.range)
+		if range and range.start.line <= line and line <= range["end"].line then
+			if symbol_containers[sym.kind] then acc[#acc + 1] = sym.name end
+			if sym.children then symbol_path(sym.children, line, acc) end
+		end
+	end
+	return acc
+end
+
+local function lsp_symbol_location(bufnr, line)
+	if #vim.lsp.get_clients({ bufnr = bufnr, method = "textDocument/documentSymbol" }) == 0 then
+		return nil
+	end
+	local params = { textDocument = vim.lsp.util.make_text_document_params(bufnr) }
+	local res = vim.lsp.buf_request_sync(bufnr, "textDocument/documentSymbol", params, 1000)
+	if not res then return nil end
+	for _, r in pairs(res) do
+		if r.result and #r.result > 0 then
+			local parts = symbol_path(r.result, line)
+			if #parts > 0 then return table.concat(parts, ".") end
+		end
+	end
+	return nil
+end
+
+local function copy_selection_with_context()
+	local bufnr = vim.api.nvim_get_current_buf()
+	local mode = vim.fn.mode()
+	local p1, p2 = vim.fn.getpos("v"), vim.fn.getpos(".")
+	local sline, eline = math.min(p1[2], p2[2]), math.max(p1[2], p2[2])
+
+	local path = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ":.")
+	local text = table.concat(vim.fn.getregion(p1, p2, { type = mode }), "\n")
+	local loc = lsp_symbol_location(bufnr, sline - 1)
+
+	local header = string.format("%s:%d-%d", path, sline, eline)
+	if loc then header = header .. string.format(" (%s)", loc) end
+
+	local out = string.format("%s\n```%s\n%s\n```\n", header, vim.bo[bufnr].filetype, text)
+	vim.fn.setreg("+", out)
+	vim.notify("Copied: " .. header)
+end
+
 -- =============================================================================
 -- Plugin setup
 -- =============================================================================
@@ -583,6 +644,10 @@ vim.keymap.set({ "n", "x" }, "<up>", function() vim.treesitter.select("parent", 
 vim.keymap.set({ "n", "x" }, "<down>", function() vim.treesitter.select("child", vim.v.count1) end)
 vim.keymap.set("x", "<left>", function() vim.treesitter.select("prev", vim.v.count1) end)
 vim.keymap.set("x", "<right>", function() vim.treesitter.select("next", vim.v.count1) end)
+
+-- Copy selection + context (path:line-range (Symbol.path)) to the clipboard
+vim.keymap.set("x", "Y", copy_selection_with_context,
+	{ desc = "Copy selection with path/range/symbol context" })
 
 -- Window navigation — move between splits in every mode (insert/visual/terminal too).
 -- <Cmd> runs wincmd without leaving the current mode.

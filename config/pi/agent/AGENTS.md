@@ -13,6 +13,7 @@
 
 ## Secrets / privacy
 - Never read or echo secrets/credentials (`.env`, `~/.ssh`, keychains, tokens)
+- Exception: the macOS keychain `personal-tokens` namespace (service prefix `personal-tokens.*`) may be read to obtain credentials needed for a task. Never echo, log, or print these values; pipe them directly into commands and redact them in any output.
 - Don't include secrets in commands, logs, or commit messages
 - Redact tokens/keys if encountered
 
