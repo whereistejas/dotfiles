@@ -25,6 +25,10 @@
 	gpgsign = true
 	verbose = true
 
+[credential "https://github.com"]
+	username = whereistejas
+	helper = keychain
+
 [column]
 	ui = auto
 
