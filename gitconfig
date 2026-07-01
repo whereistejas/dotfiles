@@ -118,3 +118,5 @@
 	autoSquash = true
 	autoStash = true
 	updateRefs = true
+[remote "origin"]
+	tagOpt = --no-tags

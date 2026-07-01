@@ -57,6 +57,7 @@ default-command = "status"
 
 [remotes.origin]
 auto-track-bookmarks = 'exact:"main" | exact:"master"'
+fetch-tags = "none"
 
 [template-aliases]
 'blame_with_msg' = '''

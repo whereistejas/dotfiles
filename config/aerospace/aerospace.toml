@@ -52,6 +52,11 @@ persistent-workspaces = ["1", "2", "3", "4"]
 # See: https://nikitabobko.github.io/AeroSpace/commands#mode
 on-mode-changed = []
 
+# Force Neovide windows into the tiling layer (they can register as floating).
+[[on-window-detected]]
+    if.app-id = 'com.neovide.neovide'
+    run = 'layout tiling'
+
 [workspace-to-monitor-force-assignment]
     1 = "secondary"
     2 = "secondary"
@@ -157,8 +162,8 @@ on-mode-changed = []
     # See: https://nikitabobko.github.io/AeroSpace/commands#mode
     alt-shift-semicolon = 'mode service'
 
-    ctrl-right = 'workspace next --wrap-around'
-    ctrl-left = 'workspace prev --wrap-around'
+    alt-leftSquareBracket = 'workspace prev --wrap-around'
+    alt-rightSquareBracket = 'workspace next --wrap-around'
 
 # 'service' binding mode declaration.
 # See: https://nikitabobko.github.io/AeroSpace/guide#binding-modes

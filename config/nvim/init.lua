@@ -633,8 +633,6 @@ vim.diagnostic.config({
 -- General
 vim.keymap.set("n", "0", "^")
 vim.keymap.set("n", "9", "$")
-vim.keymap.set("n", "<left>", ":bp<CR>")
-vim.keymap.set("n", "<right>", ":bn<CR>")
 vim.keymap.set("n", "j", "gj")
 
 -- Treesitter node selection (nvim 0.12.3+):
@@ -650,14 +648,26 @@ vim.keymap.set("x", "Y", copy_selection_with_context,
 	{ desc = "Copy selection with path/range/symbol context" })
 
 -- Window navigation — move between splits in every mode (insert/visual/terminal too).
--- <Cmd> runs wincmd without leaving the current mode.
+-- <Cmd> runs wincmd without leaving the current mode. Uses ⌘+letters so the
+-- keyboard nav sub-layer (D held → cmd+hjkl) drives splits, leaving arrows free
+-- for macOS text navigation (opt/cmd+arrow).
 for key, desc in pairs({
-	h = "Move to left split",
-	j = "Move to split below",
-	k = "Move to split above",
-	l = "Move to right split",
+	h = "Focus split left",
+	j = "Focus split down",
+	k = "Focus split up",
+	l = "Focus split right",
 }) do
 	vim.keymap.set({ "n", "i", "v", "t" }, "<D-" .. key .. ">", "<Cmd>wincmd " .. key .. "<CR>", { desc = desc })
+end
+
+-- Move splits — ⌘-shift-hjkl (mirrors focus; like AeroSpace alt-shift-hjkl).
+for key, desc in pairs({
+	H = "Move split left",
+	J = "Move split down",
+	K = "Move split up",
+	L = "Move split right",
+}) do
+	vim.keymap.set({ "n", "i", "v", "t" }, "<D-S-" .. key:lower() .. ">", "<Cmd>wincmd " .. key .. "<CR>", { desc = desc })
 end
 
 -- Double-<Tab> cycles to the next window/split.
@@ -668,6 +678,10 @@ vim.keymap.set("n", "<Tab><Tab>", "<C-w>w", { desc = "Cycle to next window" })
 for i = 1, 4 do
 	vim.keymap.set({ "n", "i", "v", "t" }, "<D-" .. i .. ">", "<Cmd>tabnext " .. i .. "<CR>", { desc = "Go to tab " .. i })
 end
+
+-- Tab prev/next — mirror AeroSpace's alt-[ / alt-] for workspaces.
+vim.keymap.set({ "n", "i", "v", "t" }, "<D-[>", "<Cmd>tabprevious<CR>", { desc = "Previous tab" })
+vim.keymap.set({ "n", "i", "v", "t" }, "<D-]>", "<Cmd>tabnext<CR>", { desc = "Next tab" })
 
 -- Terminal — double <Esc> leaves terminal mode (single <Esc> still reaches the program).
 vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
