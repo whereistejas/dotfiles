@@ -17,3 +17,22 @@ keybind = cmd+3=csi:51;9u
 keybind = cmd+digit_3=csi:51;9u
 keybind = cmd+4=csi:52;9u
 keybind = cmd+digit_4=csi:52;9u
+
+# Forward cmd+hjkl and cmd+shift+hjkl to the app so neovim's <D-hjkl> split-focus
+# and <D-S-hjkl> split-move mappings receive them. Letters (not arrows) so the
+# arrow keys stay free for macOS text nav. csi:NN;<mod>u = codepoint NN;
+# mod 9 = super, mod 10 = super+shift. h=104 j=106 k=107 l=108.
+keybind = cmd+h=csi:104;9u
+keybind = cmd+j=csi:106;9u
+keybind = cmd+k=csi:107;9u
+keybind = cmd+l=csi:108;9u
+keybind = cmd+shift+h=csi:104;10u
+keybind = cmd+shift+j=csi:106;10u
+keybind = cmd+shift+k=csi:107;10u
+keybind = cmd+shift+l=csi:108;10u
+
+# Forward cmd+[ / cmd+] to the app (overrides Ghostty's default goto_split) so
+# neovim's <D-[> / <D-]> tab-cycle mappings receive them. csi:NN;9u = codepoint
+# NN with super; 91 = '[', 93 = ']'.
+keybind = cmd+[=csi:91;9u
+keybind = cmd+]=csi:93;9u
