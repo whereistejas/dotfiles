@@ -102,7 +102,9 @@ rld-bashrc() { source "$DOTFILES/bashrc" ;}
 
 # Interactive settings
 set -o vi
-command -v fortune >/dev/null && command -v cowsay >/dev/null && fortune | cowsay
+if [[ $- == *i* ]] && [ -t 1 ] && command -v fortune >/dev/null && command -v cowsay >/dev/null; then
+    fortune | cowsay
+fi
 
 
 # BEGIN opam configuration
