@@ -1,20 +1,11 @@
 {
   "plugins": {
-    "blink.cmp": {
-      "rev": "78336bc89ee5365633bcf754d93df01678b5c08f",
-      "src": "https://github.com/saghen/blink.cmp",
-      "version": "1.0.0 - 2.0.0"
-    },
-    "friendly-snippets": {
-      "rev": "6cd7280adead7f586db6fccbd15d2cac7e2188b9",
-      "src": "https://github.com/rafamadriz/friendly-snippets"
-    },
     "github-nvim-theme": {
       "rev": "c106c9472154d6b2c74b74565616b877ae8ed31d",
       "src": "https://github.com/projekt0n/github-nvim-theme"
     },
     "gitsigns.nvim": {
-      "rev": "25050e4ed39e628282831d4cbecb1850454ce915",
+      "rev": "eb60cc7b94c46005237fd34170d76f3a089a90aa",
       "src": "https://github.com/lewis6991/gitsigns.nvim"
     },
     "gruvbox.nvim": {
@@ -26,9 +17,9 @@
       "src": "https://github.com/nicolasgb/jj.nvim",
       "version": "'v0.6.0'"
     },
-    "lazydev.nvim": {
-      "rev": "ff2cbcba459b637ec3fd165a2be59b7bbaeedf0d",
-      "src": "https://github.com/folke/lazydev.nvim"
+    "mini.diff": {
+      "rev": "0743d26bd858ebe32efcf5c86a91a422a000f273",
+      "src": "https://github.com/echasnovski/mini.diff"
     },
     "no-neck-pain.nvim": {
       "rev": "4bc52782524fd50c5658685d584df6fa48fe49f9",
@@ -39,7 +30,7 @@
       "src": "https://github.com/MunifTanjim/nui.nvim"
     },
     "nvim-lspconfig": {
-      "rev": "a683e0ddf0cf64c6cd689e18ffb480ade3c162b7",
+      "rev": "292f44408498103c47996ff5c18fd366293840d8",
       "src": "https://github.com/neovim/nvim-lspconfig"
     },
     "nvim-treesitter": {

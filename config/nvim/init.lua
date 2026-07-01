@@ -28,6 +28,10 @@ vim.opt.signcolumn = "yes"
 vim.opt.winborder = "single"
 vim.opt.mouse = "n"
 
+-- Native LSP completion (replaces blink.cmp). 'fuzzy' enables fuzzy matching,
+-- 'popup' shows the item's info in a floating window.
+vim.opt.completeopt = { "menuone", "noselect", "popup", "fuzzy" }
+
 vim.opt.tabstop = 4
 vim.opt.shiftwidth = 4
 vim.opt.wrap = true      -- Enable soft wrapping
@@ -83,7 +87,7 @@ vim.pack.add({
 	"https://github.com/tpope/vim-surround",
 
 	-- VCS
-	"https://github.com/lewis6991/gitsigns.nvim",
+	"https://github.com/echasnovski/mini.diff",
 	{ src = "https://github.com/nicolasgb/jj.nvim",             version = "v0.6.0" },
 	"https://github.com/MunifTanjim/nui.nvim",
 
@@ -94,15 +98,10 @@ vim.pack.add({
 	"https://github.com/nvim-telescope/telescope-live-grep-args.nvim",
 	{ src = "https://github.com/nvim-telescope/telescope.nvim", version = "v0.2.1" },
 
-	-- Completion
-	"https://github.com/rafamadriz/friendly-snippets",
-	{ src = "https://github.com/saghen/blink.cmp", version = vim.version.range("1.*") },
-
 	-- Treesitter
 	"https://github.com/nvim-treesitter/nvim-treesitter",
 
 	-- LSP
-	"https://github.com/folke/lazydev.nvim",
 	"https://github.com/neovim/nvim-lspconfig",
 })
 
@@ -352,8 +351,57 @@ require("github-theme").setup({
 vim.o.background = "light"
 vim.cmd("colorscheme gruvbox")
 
--- gitsigns
-require("gitsigns").setup()
+-- mini.diff — gutter change markers. Uses a jj-aware source that diffs the
+-- buffer against jj's working-copy parent `@-`, so signs work in jj workspaces
+-- (which have no per-workspace .git and thus break gitsigns). Falls back to the
+-- built-in git source for repos without a .jj (pure-git checkouts).
+local MiniDiff = require("mini.diff")
+
+local function buf_jj_root(bufnr)
+	local name = vim.api.nvim_buf_get_name(bufnr)
+	if name == "" or vim.bo[bufnr].buftype ~= "" then return nil end
+	local jj = vim.fs.find(".jj", { path = vim.fs.dirname(name), upward = true, type = "directory" })[1]
+	return jj and vim.fs.dirname(jj) or nil
+end
+
+local function jj_set_ref(bufnr, root)
+	local name = vim.api.nvim_buf_get_name(bufnr)
+	vim.system(
+		{ "jj", "file", "show", "-r", "@-", name },
+		{ cwd = root, text = true },
+		vim.schedule_wrap(function(obj)
+			if not vim.api.nvim_buf_is_valid(bufnr) then return end
+			-- non-zero exit => path absent in @- (new file): empty ref = all-added.
+			MiniDiff.set_ref_text(bufnr, obj.code == 0 and (obj.stdout or "") or "")
+		end)
+	)
+end
+
+local jj_source = {
+	name = "jj",
+	attach = function(bufnr)
+		local root = buf_jj_root(bufnr)
+		if not root then return false end -- not a jj repo -> fall through to git source
+		local group = vim.api.nvim_create_augroup("mini-diff-jj-" .. bufnr, { clear = true })
+		vim.api.nvim_create_autocmd({ "BufWritePost", "BufEnter", "FocusGained" }, {
+			group = group,
+			buffer = bufnr,
+			callback = function() jj_set_ref(bufnr, root) end,
+		})
+		jj_set_ref(bufnr, root)
+	end,
+	detach = function(bufnr)
+		pcall(vim.api.nvim_del_augroup_by_name, "mini-diff-jj-" .. bufnr)
+	end,
+}
+
+MiniDiff.setup({
+	source = { jj_source, MiniDiff.gen_source.git() },
+	view = {
+		style = "sign",
+		signs = { add = "┃", change = "┃", delete = "▁" },
+	},
+})
 
 -- jj.nvim
 require("jj").setup({
@@ -461,31 +509,10 @@ require("telescope").load_extension("live_grep_args")
 -- no-neck-pain (centered layout)
 require("no-neck-pain").setup({ width = 120 })
 
--- blink.cmp
-require("blink.cmp").setup({
-	keymap = { preset = "default" },
-	appearance = { nerd_font_variant = "mono" },
-	completion = {
-		documentation = { auto_show = false },
-	},
-	sources = {
-		default = { "lsp", "path", "snippets", "buffer" },
-	},
-	fuzzy = { implementation = "prefer_rust" },
-})
-
 -- Treesitter
 require("nvim-treesitter").setup()
 require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css", "python",
 	"ruby", "bash" })
-
--- lazydev (Lua LSP workspace libraries)
-require("lazydev").setup({
-	library = {
-		{ path = "${3rd}/luv/library", words = { "vim%.uv" } },
-		{ path = "blink.cmp" },
-	},
-})
 
 -- =============================================================================
 -- LSP
@@ -508,7 +535,7 @@ function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
 	return orig_open_float(formatted, syntax, opts, ...)
 end
 
-local capabilities = require("blink.cmp").get_lsp_capabilities()
+local capabilities = vim.lsp.protocol.make_client_capabilities()
 
 vim.lsp.config.lua_ls = {
 	cmd = { "lua-language-server" },
@@ -634,6 +661,23 @@ vim.diagnostic.config({
 vim.keymap.set("n", "0", "^")
 vim.keymap.set("n", "9", "$")
 vim.keymap.set("n", "j", "gj")
+vim.keymap.set({ "n", "x" }, ";", ":", { noremap = true })
+
+-- Native completion popup: <Tab>/<S-Tab> cycle items, <CR> accepts the
+-- selected item (plain <CR> otherwise, since completeopt has 'noselect').
+vim.keymap.set("i", "<Tab>", function()
+	return vim.fn.pumvisible() == 1 and "<C-n>" or "<Tab>"
+end, { expr = true, desc = "Next completion item / <Tab>" })
+vim.keymap.set("i", "<S-Tab>", function()
+	return vim.fn.pumvisible() == 1 and "<C-p>" or "<S-Tab>"
+end, { expr = true, desc = "Prev completion item / <S-Tab>" })
+vim.keymap.set("i", "<CR>", function()
+	if vim.fn.pumvisible() == 1 then
+		local selected = vim.fn.complete_info({ "selected" }).selected
+		return selected ~= -1 and "<C-y>" or "<C-e><CR>"
+	end
+	return "<CR>"
+end, { expr = true, desc = "Accept completion / newline" })
 
 -- Treesitter node selection (nvim 0.12.3+):
 --   <up>/<down> expand to parent / shrink to child (normal + visual)
@@ -683,12 +727,33 @@ end
 vim.keymap.set({ "n", "i", "v", "t" }, "<D-[>", "<Cmd>tabprevious<CR>", { desc = "Previous tab" })
 vim.keymap.set({ "n", "i", "v", "t" }, "<D-]>", "<Cmd>tabnext<CR>", { desc = "Next tab" })
 
+-- Terminal buffers: no line numbers, sign column, or listchars.
+local function term_ui()
+	vim.opt_local.number = false
+	vim.opt_local.relativenumber = false
+	vim.opt_local.list = false
+	vim.opt_local.signcolumn = "no"
+end
+vim.api.nvim_create_autocmd("TermOpen", {
+	group = vim.api.nvim_create_augroup("term-ui", { clear = true }),
+	callback = term_ui,
+})
+-- Re-strip terminal windows after (re)sourcing, since :set clobbers the current
+-- window's local options.
+vim.api.nvim_create_autocmd("SourcePost", {
+	group = "term-ui",
+	callback = function()
+		if vim.bo.buftype == "terminal" then
+			term_ui()
+		end
+	end,
+})
+
 -- Terminal — double <Esc> leaves terminal mode (single <Esc> still reaches the program).
 vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
 
--- Git (gitsigns)
-vim.keymap.set("n", "]h", function() require("gitsigns").nav_hunk("next") end)
-vim.keymap.set("n", "[h", function() require("gitsigns").nav_hunk("prev") end)
+-- Git diff hunks (mini.diff): [h / ]h jump to prev/next hunk, [H / ]H first/last;
+-- gh applies a hunk (also a hunk textobject), gH resets one to the @- version.
 
 -- jj.nvim
 vim.keymap.set("n", "<leader>jj", "<cmd>J log<CR>", { desc = "jj log (jj.nvim)" })
@@ -732,6 +797,11 @@ vim.api.nvim_create_autocmd("LspAttach", {
 	group = vim.api.nvim_create_augroup("lsp", { clear = true }),
 	callback = function(args)
 		local client = vim.lsp.get_client_by_id(args.data.client_id)
+
+		-- Native LSP completion (replaces blink.cmp): autotrigger the popup.
+		if client and client:supports_method("textDocument/completion") then
+			vim.lsp.completion.enable(true, client.id, args.buf, { autotrigger = true })
+		end
 
 		if client and client.name == "eslint" then
 			vim.api.nvim_create_autocmd("BufWritePre", {

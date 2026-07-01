@@ -6,7 +6,7 @@
     "globals": ["vim"]
   },
   "workspace": {
-    "library": ["$VIMRUNTIME"],
+    "library": ["$VIMRUNTIME", "${3rd}/luv/library"],
     "checkThirdParty": false
   }
 }
