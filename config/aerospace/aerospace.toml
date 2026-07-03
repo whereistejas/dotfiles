@@ -165,6 +165,9 @@ on-mode-changed = []
     alt-leftSquareBracket = 'workspace prev --wrap-around'
     alt-rightSquareBracket = 'workspace next --wrap-around'
 
+    alt-shift-leftSquareBracket = 'move-node-to-workspace prev --wrap-around'
+    alt-shift-rightSquareBracket = 'move-node-to-workspace next --wrap-around'
+
 # 'service' binding mode declaration.
 # See: https://nikitabobko.github.io/AeroSpace/guide#binding-modes
 [mode.service.binding]

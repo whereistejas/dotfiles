@@ -29,3 +29,9 @@ config/pi/agent/*
 !config/pi/agent/settings.json
 !config/pi/agent/skills
 
+# Exclude Beacon-specific skills
+config/pi/agent/skills/beacon-code-review/
+config/pi/agent/skills/bi-mcp/
+config/pi/agent/skills/gitolite/
+config/pi/agent/skills/jira/
+

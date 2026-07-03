@@ -15,19 +15,31 @@ can't do, stop and tell the user — do not improvise.
 ## Script cheatsheet
 
 ```bash
-subagents --help
-subagents create --surface SURFACE [--model MODEL] [--base REVSET] NAME TASK_FILE
-subagents list
-subagents tail [-n N] [-f] NAME
-subagents log NAME
-subagents merge NAME
-subagents delete NAME
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- --help
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- create --surface SURFACE [--model MODEL] [--base REVSET] NAME TASK_FILE
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- list
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- tail [-n N] [-f] NAME
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- log NAME
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- merge [--onto REVSET] [--bookmark NAME] NAME
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- delete NAME
 ```
 
-The script lives at `~/.pi/agent/skills/subagents/subagents.ts` and is
-not on PATH. Invoke it by absolute path, e.g.
-`~/.pi/agent/skills/subagents/subagents.ts create ...`. The shebang is
-`#!/usr/bin/env bun`, so bun runs it directly — no `bun run` needed.
+The CLI is a Rust binary crate at
+`~/.pi/agent/skills/subagents/scripts/subagents`. Invoke it with `cargo
+run`, pointing `--manifest-path` at that crate so it runs from your
+current directory (the tool shells out to `jj` in your cwd, and `cargo
+run` leaves the cwd unchanged). The first run builds it; later runs are a
+fast freshness check.
+
+```bash
+cargo run -q --offline \
+  --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml \
+  -- <SUBCOMMAND> [ARGS...]
+```
+
+Every example below is that same `cargo run … --` line with the
+subcommand and args after `--`. Runtime deps: `cargo`, `jj`, and `pi` on
+PATH, plus `bun` (used only to launch pi).
 
 `--base REVSET` (artifact only) forks the subagent's workspace from a
 revision other than `@`. Useful when the parent's `@` has
@@ -106,8 +118,8 @@ biggest failure mode.
 ### 3. Spawn (≤ 5)
 
 ```bash
-~/.pi/agent/skills/subagents/subagents.ts create --surface artifact   --model anthropic/claude-sonnet-4-5 port-redaction /tmp/port-redaction.task
-~/.pi/agent/skills/subagents/subagents.ts create --surface properties --model anthropic/claude-haiku-4-5  reword-abc     /tmp/reword-abc.task
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- create --surface artifact   --model anthropic/claude-sonnet-4-5 port-redaction /tmp/port-redaction.task
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- create --surface properties --model anthropic/claude-haiku-4-5  reword-abc     /tmp/reword-abc.task
 ```
 
 Show the user each spawn's output.
@@ -115,9 +127,9 @@ Show the user each spawn's output.
 ### 4. Poll every 30s
 
 ```bash
-subagents list
-subagents tail NAME         # snapshot of recent output
-subagents tail -f NAME      # follow live until the subagent finishes
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- list
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- tail NAME         # snapshot of recent output
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- tail -f NAME      # follow live until the subagent finishes
 ```
 
 Repeat `list` until all show `done`.
@@ -125,8 +137,17 @@ Repeat `list` until all show `done`.
 ### 5. Merge each finished subagent
 
 ```bash
-subagents merge NAME
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- merge NAME                              # rebase onto @ (default)
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- merge --onto REVSET NAME               # land elsewhere; leaves @ put
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- merge --onto REVSET --bookmark BM NAME # ...and name the tip
 ```
+
+By default `merge` rebases the subagent's commit chain onto the parent's
+`@` and advances the working copy onto it. `--onto REVSET` lands the chain
+on another revision instead (e.g. the `dev` bookmark) and leaves the
+parent's `@` untouched — use this when you forked with `--base` and want
+the result to stay off `@`. `--bookmark BM` points a bookmark at the
+landed tip. `merge` requires a single linear chain (one root, one head).
 
 Refuses on non-zero exit. If it refuses: `subagents log NAME`, show
 the tail to the user, then `subagents delete NAME` and re-plan.
@@ -134,7 +155,7 @@ the tail to the user, then `subagents delete NAME` and re-plan.
 ### 6. Clean up
 
 ```bash
-subagents delete NAME    # for every subagent
+cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/subagents/Cargo.toml -- delete NAME    # for every subagent
 ```
 
 When `subagents list` is empty, show the combined result on the

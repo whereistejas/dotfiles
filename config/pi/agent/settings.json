@@ -1,8 +1,8 @@
 {
-  "lastChangelogVersion": "0.80.3",
+  "lastChangelogVersion": "0.80.10",
   "theme": "light",
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-opus-4-8",
+  "defaultModel": "claude-sonnet-4-5",
   "defaultThinkingLevel": "high",
   "npmCommand": [
     "bun"
