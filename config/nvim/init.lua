@@ -89,6 +89,7 @@ vim.pack.add({
 	-- VCS
 	"https://github.com/echasnovski/mini.diff",
 	{ src = "https://github.com/nicolasgb/jj.nvim",             version = "v0.6.0" },
+	"https://github.com/esmuellert/codediff.nvim",
 	"https://github.com/MunifTanjim/nui.nvim",
 
 	-- Telescope
@@ -403,11 +404,19 @@ MiniDiff.setup({
 	},
 })
 
+-- codediff.nvim — VSCode-style side-by-side diff viewer. It is git-based
+-- (shells out to `git rev-parse`/`cat-file`), so it only works in git-colocated
+-- jj repos; in a jj *workspace* (no per-worktree .git) it errors "not a git
+-- repo". The "auto" backend below routes around that.
+require("codediff").setup()
+
 -- jj.nvim
 require("jj").setup({
 	diff = {
-		-- native = Neovim's built-in diff mode (nvim -d); no external diff plugin
-		backend = "native",
+		-- "auto" (registered below): codediff's side-by-side view in git-colocated
+		-- repos, else the jj-native backend (works in workspaces too). `d` in
+		-- :J log dispatches through it.
+		backend = "auto",
 	},
 	cmd = {
 		keymaps = {
@@ -448,6 +457,71 @@ require("jj").setup({
 			},
 		},
 	},
+})
+
+-- "auto" diff backend: prefer codediff's side-by-side view (it's git-based),
+-- falling back to the jj-native backend only when git can't back the diff.
+-- Registered after jj.setup so the built-in codediff/native backends load first.
+--
+-- codediff shells out to git in a working dir. That's fine in a git-colocated
+-- jj repo, but a jj *workspace* has no per-worktree .git, so codediff errors
+-- "not a git repo". Trick: `jj git root` points at the shared colocated git
+-- repo backing the workspace, and every workspace commit already lives in that
+-- shared object store (verified). codediff's revision/explorer paths fall back
+-- to the *cwd* git root (captured synchronously at command entry), so for a
+-- workspace we run codediff with cwd temporarily set to that shared worktree
+-- and its git calls resolve correctly.
+local jjdiff = require("jj.diff")
+
+-- Returns (worktree, colocated). `worktree` is a git working dir whose object
+-- store holds this jj repo's commits, or nil if there's no git backing at all.
+local function jj_git_worktree()
+	local jj = vim.fs.find(".jj", { path = vim.fn.getcwd(), upward = true, type = "directory" })[1]
+	if not jj then return nil, false end
+	local root = vim.fs.dirname(jj)
+	if vim.fn.isdirectory(root .. "/.git") == 1 or vim.fn.filereadable(root .. "/.git") == 1 then
+		return root, true -- colocated: the jj root is itself a git worktree
+	end
+	local out = vim.fn.systemlist({ "jj", "git", "root" })
+	if vim.v.shell_error == 0 and out[1] and out[1] ~= "" then
+		local wt = vim.fn.fnamemodify(out[1], ":h") -- dirname of .../repo/.git => .../repo
+		if vim.fn.isdirectory(wt) == 1 then return wt, false end -- workspace: shared worktree
+	end
+	return nil, false
+end
+
+-- Run fn with cwd temporarily set to `dir`. codediff captures cwd synchronously
+-- at command entry, so restoring immediately after is safe.
+local function with_cwd(dir, fn)
+	local prev = vim.fn.getcwd()
+	pcall(vim.cmd.lcd, vim.fn.fnameescape(dir))
+	local ok, err = pcall(fn)
+	pcall(vim.cmd.lcd, vim.fn.fnameescape(prev))
+	if not ok then vim.notify("jj auto-diff: " .. tostring(err), vim.log.levels.ERROR) end
+end
+
+local function auto(kind)
+	return function(o)
+		o = o or {}
+		local wt, colocated = jj_git_worktree()
+		-- "current" diffs the live working-copy file; codediff can only reach it
+		-- when git backs the worktree in place (colocated). With no git backing at
+		-- all, use the jj-native backend (it does side-by-side via `jj file show`).
+		if not wt or (kind == "current" and not colocated) then
+			o.backend = "native"
+			return jjdiff.open(kind, o)
+		end
+		o.backend = "codediff"
+		if colocated then return jjdiff.open(kind, o) end
+		with_cwd(wt, function() jjdiff.open(kind, o) end)
+	end
+end
+
+jjdiff.register_backend("auto", {
+	diff_current = auto("current"),
+	show_revision = auto("revision"),
+	diff_revisions = auto("revisions"),
+	diff_history_revisions = auto("history"),
 })
 
 -- jj.nvim hardcodes `:J log` to --limit 20; bump it unless the caller overrode.
@@ -758,6 +832,10 @@ vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" }
 -- jj.nvim
 vim.keymap.set("n", "<leader>jj", "<cmd>J log<CR>", { desc = "jj log (jj.nvim)" })
 vim.keymap.set("n", "<leader>js", "<cmd>J status<CR>", { desc = "jj status (jj.nvim)" })
+-- Diff the working copy against @- in codediff (`d` in :J log diffs a change).
+vim.keymap.set("n", "<leader>jd", function()
+	require("jj.diff").diff_current({ rev = "@-" })
+end, { desc = "jj diff working copy vs @- (codediff)" })
 
 -- Telescope
 vim.keymap.set("n", "<space>t", builtin.builtin)
