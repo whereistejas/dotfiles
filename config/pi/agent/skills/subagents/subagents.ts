@@ -47,7 +47,7 @@ import { watch } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 const STATE_ROOT = process.env.PI_SUBAGENTS_STATE_DIR ?? "/tmp/pi-subagents";
-const MAX_SUBAGENTS = 5;
+const MAX_SUBAGENTS = 50;
 const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
 const SCRIPT_PATH = Bun.main;
 

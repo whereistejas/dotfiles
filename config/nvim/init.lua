@@ -24,7 +24,7 @@ if vim.env.SSH_TTY then
 	}
 end
 vim.opt.signcolumn = "yes"
--- vim.opt.cursorline = true
+vim.opt.cursorline = true
 vim.opt.winborder = "single"
 vim.opt.mouse = "n"
 
@@ -556,12 +556,6 @@ end
 require("telescope").setup({
 	defaults = {
 		hidden = true,
-		mappings = {
-			i = {
-				["<C-d>"] = function(bufnr) require("telescope.actions").preview_scrolling_down(bufnr) end,
-				["<C-u>"] = function(bufnr) require("telescope.actions").preview_scrolling_up(bufnr) end,
-			},
-		},
 		vimgrep_arguments = {
 			"rg",
 			"--color=never",
@@ -616,30 +610,24 @@ function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
 	return orig_open_float(formatted, syntax, opts, ...)
 end
 
-local capabilities = vim.lsp.protocol.make_client_capabilities()
-
 vim.lsp.config.lua_ls = {
 	cmd = { "lua-language-server" },
-	capabilities = capabilities,
 	root_markers = { ".luarc.json", ".luarc.jsonc", ".luacheckrc", ".stylua.toml", "stylua.toml", "selene.toml", "selene.yml", ".git" },
 }
 
 vim.lsp.config.ts_ls = {
 	cmd = { "typescript-language-server", "--stdio" },
-	capabilities = capabilities,
 	root_markers = { "tsconfig.json", "jsconfig.json", "package.json", ".git" },
 }
 
 vim.lsp.config.ocamllsp = {
 	cmd = { "ocamllsp" },
-	capabilities = capabilities,
 	root_markers = { "dune-project", "dune-workspace", ".git", "*.opam" },
 	filetypes = { "ocaml", "ocaml.menhir", "ocaml.interface", "ocaml.ocamllex", "reason", "dune" },
 }
 
 vim.lsp.config.eslint = {
 	cmd = { "vscode-eslint-language-server", "--stdio" },
-	capabilities = capabilities,
 	root_markers = { ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml", "eslint.config.js", "eslint.config.mjs", "eslint.config.ts" },
 	settings = {
 		validate = "on",
@@ -649,7 +637,6 @@ vim.lsp.config.eslint = {
 
 vim.lsp.config.ruby_lsp = {
 	cmd = { "ruby-lsp" },
-	capabilities = capabilities,
 	root_markers = { "Gemfile", ".git" },
 	init_options = {
 		formatter = "standard",
@@ -659,7 +646,6 @@ vim.lsp.config.ruby_lsp = {
 
 vim.lsp.config.ruff = {
 	cmd = { "ruff", "server" },
-	capabilities = capabilities,
 	root_markers = { "pyproject.toml", "ruff.toml", ".ruff.toml", ".git" },
 	filetypes = { "python" },
 	init_options = {
@@ -676,14 +662,12 @@ local bun_bashls = vim.env.HOME .. "/.bun/bin/bash-language-server"
 vim.lsp.config.bashls = {
 	cmd = vim.uv.fs_stat(bun_bashls) and { "bun", bun_bashls, "start" }
 		or { "bash-language-server", "start" },
-	capabilities = capabilities,
 	root_markers = { ".git" },
 	filetypes = { "sh", "bash" },
 }
 
 vim.lsp.config.marksman = {
 	cmd = { "marksman", "server" },
-	capabilities = capabilities,
 	root_markers = { ".marksman.toml", ".git" },
 	filetypes = { "markdown", "markdown.mdx" },
 }
@@ -702,7 +686,6 @@ end
 
 vim.lsp.config.ty = {
 	cmd = { "ty", "server" },
-	capabilities = capabilities,
 	root_markers = { "pyproject.toml", "ty.toml", ".git" },
 	filetypes = { "python" },
 	settings = {
@@ -718,7 +701,6 @@ vim.lsp.config.ty = {
 
 vim.lsp.enable("lua_ls")
 vim.lsp.enable("rust_analyzer")
--- vim.lsp.enable("astro")
 vim.lsp.enable("ts_ls")
 vim.lsp.enable("eslint")
 vim.lsp.enable("ocamllsp")
@@ -739,10 +721,15 @@ vim.diagnostic.config({
 -- =============================================================================
 
 -- General
-vim.keymap.set("n", "0", "^")
-vim.keymap.set("n", "9", "$")
-vim.keymap.set("n", "j", "gj")
-vim.keymap.set({ "n", "x" }, ";", ":", { noremap = true })
+-- Go to definition via tag jump: uses vim.lsp.tagfunc when a server is
+-- attached (LSP first, ctags fallback), else a plain tag-file lookup.
+-- Global so it's present regardless of LspAttach timing. Jumplist/tagstack native.
+vim.keymap.set("n", "gd", "<C-]>", { desc = "Go to definition (LSP + ctags fallback)" })
+
+vim.keymap.set("n", "0", "^", { desc = "First non-blank character" })
+vim.keymap.set("n", "9", "$", { desc = "End of line" })
+vim.keymap.set("n", "j", "gj", { desc = "Down (display line)" })
+vim.keymap.set({ "n", "x" }, ";", ":", { noremap = true, desc = "Command-line mode" })
 
 -- Native completion popup: <Tab>/<S-Tab> cycle items, <CR> accepts the
 -- selected item (plain <CR> otherwise, since completeopt has 'noselect').
@@ -763,10 +750,10 @@ end, { expr = true, desc = "Accept completion / newline" })
 -- Treesitter node selection (nvim 0.12.3+):
 --   <up>/<down> expand to parent / shrink to child (normal + visual)
 --   <left>/<right> select prev / next sibling (visual only)
-vim.keymap.set({ "n", "x" }, "<up>", function() vim.treesitter.select("parent", vim.v.count1) end)
-vim.keymap.set({ "n", "x" }, "<down>", function() vim.treesitter.select("child", vim.v.count1) end)
-vim.keymap.set("x", "<left>", function() vim.treesitter.select("prev", vim.v.count1) end)
-vim.keymap.set("x", "<right>", function() vim.treesitter.select("next", vim.v.count1) end)
+vim.keymap.set({ "n", "x" }, "<up>", function() vim.treesitter.select("parent", vim.v.count1) end, { desc = "Expand selection to parent node" })
+vim.keymap.set({ "n", "x" }, "<down>", function() vim.treesitter.select("child", vim.v.count1) end, { desc = "Shrink selection to child node" })
+vim.keymap.set("x", "<left>", function() vim.treesitter.select("prev", vim.v.count1) end, { desc = "Select previous sibling node" })
+vim.keymap.set("x", "<right>", function() vim.treesitter.select("next", vim.v.count1) end, { desc = "Select next sibling node" })
 
 -- Copy selection + context (path:line-range (Symbol.path)) to the clipboard
 vim.keymap.set("x", "Y", copy_selection_with_context,
@@ -845,16 +832,16 @@ vim.keymap.set("n", "<leader>jd", function()
 end, { desc = "jj diff working copy vs @- (codediff)" })
 
 -- Telescope
-vim.keymap.set("n", "<space>t", builtin.builtin)
-vim.keymap.set("n", "<space>b", builtin.buffers)
-vim.keymap.set("n", "<space>f", builtin.find_files)
-vim.keymap.set("n", "<space>fa", find_files_all)
-vim.keymap.set("n", "?", live_grep_args)
-vim.keymap.set("n", "<space><space>", builtin.resume)
-vim.keymap.set("n", "<space>r", builtin.lsp_references)
-vim.keymap.set("n", "<space>i", builtin.lsp_implementations)
-vim.keymap.set("n", "<space>d", builtin.lsp_definitions)
-vim.keymap.set("n", "<space>o", builtin.lsp_document_symbols)
+vim.keymap.set("n", "<space>t", builtin.builtin, { desc = "Telescope pickers" })
+vim.keymap.set("n", "<space>b", builtin.buffers, { desc = "Buffers" })
+vim.keymap.set("n", "<space>f", builtin.find_files, { desc = "Find files" })
+vim.keymap.set("n", "<space>fa", find_files_all, { desc = "Find files (hidden + ignored)" })
+vim.keymap.set("n", "?", live_grep_args, { desc = "Live grep (args)" })
+vim.keymap.set("n", "<space><space>", builtin.resume, { desc = "Resume last picker" })
+vim.keymap.set("n", "<space>r", builtin.lsp_references, { desc = "LSP references" })
+vim.keymap.set("n", "<space>i", builtin.lsp_implementations, { desc = "LSP implementations" })
+vim.keymap.set("n", "<space>d", builtin.lsp_definitions, { desc = "LSP definitions" })
+vim.keymap.set("n", "<space>o", builtin.lsp_document_symbols, { desc = "Document symbols" })
 vim.keymap.set("n", "<space>O", function()
 	vim.lsp.buf.document_symbol({
 		on_list = function(opts)
@@ -863,10 +850,10 @@ vim.keymap.set("n", "<space>O", function()
 		end,
 	})
 end, { desc = "Document symbols (left split)" })
-vim.keymap.set("n", "<space>m", builtin.diagnostics)
-vim.keymap.set("n", "M", vim.diagnostic.open_float)
-vim.keymap.set("n", "<space>k", builtin.keymaps)
-vim.keymap.set("n", "<space>c", file_browser_here)
+vim.keymap.set("n", "<space>m", builtin.diagnostics, { desc = "Diagnostics" })
+vim.keymap.set("n", "M", vim.diagnostic.open_float, { desc = "Line diagnostics (float)" })
+vim.keymap.set("n", "<space>k", builtin.keymaps, { desc = "Keymaps" })
+vim.keymap.set("n", "<space>c", file_browser_here, { desc = "File browser (current file dir)" })
 
 -- Layout
 vim.keymap.set("n", "<space>g", "<cmd>NoNeckPain<CR>", { desc = "Toggle centered layout" })

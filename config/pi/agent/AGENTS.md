@@ -33,11 +33,13 @@
 - For non-trivial changes, briefly state the plan before executing
 - Run tests/typecheck/lint when available after edits, if relevant
 - Don't fabricate APIs — verify by reading source or docs
+- Never let a project's `AGENTS.md` fall out of sync: when a change invalidates something it documents (moved/renamed files or folders, changed commands, paths, env vars, workflows, or conventions), update `AGENTS.md` in the same turn as the change — don't defer or wait to be asked.
 
 ## Communication
 - Be concise; skip preamble and recaps
 - Show file paths as clickable relative paths
 - Surface assumptions explicitly; ask when ambiguous rather than guessing
+- Never validate or flatter the user's asks/choices. No "good intuition to check X before Y", "great question", "smart to verify Z", "you're right to..." and similar. Just answer or do the work — skip the praise.
 
 ## Tooling
 - ripgrep (`rg`) recurses by default — never use `-r` for recursion (that's a grep-ism). In `rg`, `-r`/`--replace=TEXT` rewrites matched text in the output
