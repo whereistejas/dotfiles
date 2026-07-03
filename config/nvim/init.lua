@@ -418,6 +418,13 @@ require("jj").setup({
 		-- :J log dispatches through it.
 		backend = "auto",
 	},
+	-- Open jj terminal windows (log/status) as a vertical split. splitright is
+	-- unset (default off), so the split lands on the left.
+	terminal = {
+		window = {
+			type = "vsplit",
+		},
+	},
 	cmd = {
 		keymaps = {
 			-- Aligned with jjui's `revisions` scope keybindings.
