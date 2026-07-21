@@ -1,18 +1,19 @@
 /**
  * jj-commit-mention extension.
  *
- * Adds `@jj:` autocomplete for Jujutsu (jj) commits, layered on top of pi's
- * built-in `@` file completion. Type `@jj:` in the editor to switch from file
- * completion to commit completion, then filter by:
+ * Adds autocomplete for Jujutsu (jj) bookmarks and commits, merged with pi's built-in
+ * `@` file completion. Type `@` in the editor to see bookmarks, commits, and files,
+ * then filter by:
+ *   - bookmark name
  *   - change id prefix
  *   - commit id prefix
  *   - fuzzy match on the commit description
  *
- * Selecting a commit inserts an `@jj:<change-id>` tag, mirroring how files are
- * tagged with `@<path>`.
+ * Selecting a bookmark or commit inserts an `@<bookmark-name>` or `@<change-id>` tag,
+ * mirroring how files are tagged with `@<path>`.
  *
- * Commits are loaded once per session via `jj log` and cached with a short TTL,
- * so typing stays fast and the list refreshes in the background as you work.
+ * Bookmarks and commits are loaded once per session via `jj bookmark list` and `jj log`,
+ * cached with a short TTL, so typing stays fast and the list refreshes in the background.
  *
  * Environment overrides:
  *   PI_JJ_MENTION_REVSET  revset to source commits from (default: latest(all(), N))
@@ -26,6 +27,11 @@ import {
 	type AutocompleteSuggestions,
 	fuzzyFilter,
 } from "@earendil-works/pi-tui";
+
+type Bookmark = {
+	name: string;
+	changeId: string;
+};
 
 type Commit = {
 	changeId: string;
@@ -47,26 +53,60 @@ function revset(): string {
 	return process.env.PI_JJ_MENTION_REVSET ?? `latest(all(), ${commitLimit()})`;
 }
 
-// Matches `@jj:<query>` at the cursor, anchored on a whitespace/start boundary
+// Matches `@<query>` at the cursor, anchored on a whitespace/start boundary
 // (same boundary rule pi uses for `@` file mentions). Returns the query, which
-// may be an empty string right after `@jj:`.
+// may be an empty string right after `@`. Explicitly excludes the old `@jj:`
+// format to avoid confusion.
 function extractJjToken(textBeforeCursor: string): string | undefined {
-	const match = textBeforeCursor.match(/(?:^|\s)@jj:([^\s]*)$/);
+	const match = textBeforeCursor.match(/(?:^|\s)@(?!jj:)([^\s]*)$/);
 	return match?.[1];
 }
 
-function toItem(commit: Commit): AutocompleteItem {
+function bookmarkToItem(bookmark: Bookmark): AutocompleteItem {
 	return {
-		value: `@jj:${commit.changeId}`,
-		label: `@jj:${commit.changeId}`,
+		value: `@${bookmark.name}`,
+		label: `@${bookmark.name}`,
+		description: `bookmark → ${bookmark.changeId}`,
+	};
+}
+
+function commitToItem(commit: Commit): AutocompleteItem {
+	return {
+		value: `@${commit.changeId}`,
+		label: `@${commit.changeId}`,
 		description: `${commit.commitId} ${commit.description || "(no description)"}`,
 	};
+}
+
+function filterBookmarks(bookmarks: Bookmark[], query: string): AutocompleteItem[] {
+	const q = query.trim();
+	if (!q) {
+		return bookmarks.map(bookmarkToItem);
+	}
+
+	const lower = q.toLowerCase();
+	const matched: Bookmark[] = [];
+
+	// Exact prefix matches on bookmark name
+	for (const bookmark of bookmarks) {
+		if (bookmark.name.toLowerCase().startsWith(lower)) {
+			matched.push(bookmark);
+		}
+	}
+
+	// Then fuzzy match on name
+	if (matched.length === 0) {
+		const fuzzy = fuzzyFilter(bookmarks, q, (b) => b.name);
+		matched.push(...fuzzy);
+	}
+
+	return matched.map(bookmarkToItem);
 }
 
 function filterCommits(commits: Commit[], query: string): AutocompleteItem[] {
 	const q = query.trim();
 	if (!q) {
-		return commits.slice(0, MAX_SUGGESTIONS).map(toItem);
+		return commits.slice(0, MAX_SUGGESTIONS).map(commitToItem);
 	}
 
 	const lower = q.toLowerCase();
@@ -92,7 +132,45 @@ function filterCommits(commits: Commit[], query: string): AutocompleteItem[] {
 		}
 	}
 
-	return ranked.slice(0, MAX_SUGGESTIONS).map(toItem);
+	return ranked.slice(0, MAX_SUGGESTIONS).map(commitToItem);
+}
+
+async function fetchBookmarks(pi: ExtensionAPI, cwd: string): Promise<Bookmark[] | undefined> {
+	const template = `name ++ "\\x1f" ++ change_id.short(8) ++ "\\n"`;
+
+	let result: Awaited<ReturnType<ExtensionAPI["exec"]>>;
+	try {
+		result = await pi.exec(
+			"jj",
+			["bookmark", "list", "--all-remotes", "-T", template],
+			{ cwd, timeout: 3_000 },
+		);
+	} catch {
+		return undefined;
+	}
+
+	if (result.code !== 0) {
+		return undefined;
+	}
+
+	const bookmarks: Bookmark[] = [];
+	const seen = new Set<string>();
+	for (const line of result.stdout.split("\n")) {
+		if (!line) {
+			continue;
+		}
+		const [name, changeId] = line.split(FIELD);
+		if (!name || !changeId) {
+			continue;
+		}
+		// Deduplicate by name (local and remote branches may share names)
+		if (seen.has(name)) {
+			continue;
+		}
+		seen.add(name);
+		bookmarks.push({ name, changeId });
+	}
+	return bookmarks;
 }
 
 async function fetchCommits(pi: ExtensionAPI, cwd: string): Promise<Commit[] | undefined> {
@@ -141,6 +219,7 @@ async function fetchCommits(pi: ExtensionAPI, cwd: string): Promise<Commit[] | u
 
 function createCommitProvider(
 	current: AutocompleteProvider,
+	getBookmarks: () => Promise<Bookmark[] | undefined>,
 	getCommits: () => Promise<Commit[] | undefined>,
 ): AutocompleteProvider {
 	return {
@@ -154,17 +233,23 @@ function createCommitProvider(
 				return current.getSuggestions(lines, cursorLine, cursorCol, options);
 			}
 
-			const commits = await getCommits();
-			if (options.signal.aborted || !commits || commits.length === 0) {
+			const [bookmarks, commits] = await Promise.all([getBookmarks(), getCommits()]);
+			if (options.signal.aborted) {
 				return current.getSuggestions(lines, cursorLine, cursorCol, options);
 			}
 
-			const items = filterCommits(commits, token);
-			if (items.length === 0) {
-				return current.getSuggestions(lines, cursorLine, cursorCol, options);
+			// Merge bookmark, commit, and file suggestions (in that order)
+			const bookmarkItems = (bookmarks && bookmarks.length > 0) ? filterBookmarks(bookmarks, token) : [];
+			const commitItems = (commits && commits.length > 0) ? filterCommits(commits, token) : [];
+			const fileSuggestions = await current.getSuggestions(lines, cursorLine, cursorCol, options);
+			const fileItems = fileSuggestions?.items ?? [];
+
+			const mergedItems = [...bookmarkItems, ...commitItems, ...fileItems];
+			if (mergedItems.length === 0) {
+				return null;
 			}
 
-			return { items, prefix: `@jj:${token}` };
+			return { items: mergedItems, prefix: `@${token}` };
 		},
 
 		applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
@@ -192,34 +277,61 @@ export default function (pi: ExtensionAPI): void {
 			return;
 		}
 
-		let cache: { commits: Commit[]; fetchedAt: number } | undefined;
-		let inflight: Promise<Commit[] | undefined> | undefined;
+		let bookmarkCache: { bookmarks: Bookmark[]; fetchedAt: number } | undefined;
+		let bookmarkInflight: Promise<Bookmark[] | undefined> | undefined;
 
-		const getCommits = async (): Promise<Commit[] | undefined> => {
-			const fresh = cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS;
+		let commitCache: { commits: Commit[]; fetchedAt: number } | undefined;
+		let commitInflight: Promise<Commit[] | undefined> | undefined;
+
+		const getBookmarks = async (): Promise<Bookmark[] | undefined> => {
+			const fresh = bookmarkCache && Date.now() - bookmarkCache.fetchedAt < CACHE_TTL_MS;
 			if (fresh) {
-				return cache!.commits;
+				return bookmarkCache!.bookmarks;
 			}
 
-			inflight ||= fetchCommits(pi, ctx.cwd)
-				.then((commits) => {
-					if (commits) {
-						cache = { commits, fetchedAt: Date.now() };
+			bookmarkInflight ||= fetchBookmarks(pi, ctx.cwd)
+				.then((bookmarks) => {
+					if (bookmarks) {
+						bookmarkCache = { bookmarks, fetchedAt: Date.now() };
 					}
-					inflight = undefined;
-					return cache?.commits;
+					bookmarkInflight = undefined;
+					return bookmarkCache?.bookmarks;
 				})
 				.catch(() => {
-					inflight = undefined;
-					return cache?.commits;
+					bookmarkInflight = undefined;
+					return bookmarkCache?.bookmarks;
 				});
 
 			// Serve stale cache immediately while refreshing in the background.
-			return cache ? cache.commits : inflight;
+			return bookmarkCache ? bookmarkCache.bookmarks : bookmarkInflight;
 		};
 
-		// Warm the cache so the first `@jj:` is instant.
+		const getCommits = async (): Promise<Commit[] | undefined> => {
+			const fresh = commitCache && Date.now() - commitCache.fetchedAt < CACHE_TTL_MS;
+			if (fresh) {
+				return commitCache!.commits;
+			}
+
+			commitInflight ||= fetchCommits(pi, ctx.cwd)
+				.then((commits) => {
+					if (commits) {
+						commitCache = { commits, fetchedAt: Date.now() };
+					}
+					commitInflight = undefined;
+					return commitCache?.commits;
+				})
+				.catch(() => {
+					commitInflight = undefined;
+					return commitCache?.commits;
+				});
+
+			// Serve stale cache immediately while refreshing in the background.
+			return commitCache ? commitCache.commits : commitInflight;
+		};
+
+		// Warm both caches so the first `@` is instant.
+		void getBookmarks();
 		void getCommits();
-		ctx.ui.addAutocompleteProvider((current) => createCommitProvider(current, getCommits));
+		ctx.ui.addAutocompleteProvider((current) => createCommitProvider(current, getBookmarks, getCommits));
 	});
 }
