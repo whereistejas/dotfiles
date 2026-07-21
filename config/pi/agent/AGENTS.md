@@ -9,6 +9,7 @@
 
 ## Version control
 - Always use `jj` instead of `git` for VCS operations (status, diff, log, branches, etc.)
+- **Never use interactive `jj` commands** — always pass non-interactive flags or use `-r` to target specific revisions. Commands that would prompt (like `jj squash`, `jj split`, `jj resolve`) must use explicit revision specifiers (`-r`, `--from`/`--into`, etc.) or will abort when stdin is not a terminal.
 - Don't touch `.git` internals or `.jj` internals without confirmation
 
 ## Secrets / privacy
