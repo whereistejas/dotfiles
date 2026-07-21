@@ -1,18 +1,21 @@
+# Raycast
 **/raycast/extensions
+**/config/raycast-x
 
+# Jujutsu
 **/jj/repos
 .jj/repo
 .jj/working_copy
+**/config/jj/workspaces
 
+# Misc config
 **/config/beacon
 **/config/github-copilot
 **/config/karabiner/automatic_backups
 **/config/cni
 **/config/zed
 **/config/cognition/skills
-**/config/raycast-x
 **/config/dev-container
-**/config/jj/workspaces
 
 **/.claude/
 **/.claude.json
@@ -21,17 +24,22 @@
 
 # Cursor — handled by config/cursor/.gitignore (keeps only skills)
 
-# Pi — ignore everything except agent/{AGENTS.md,settings.json,skills}
+# Pi — ignore everything except agent/
 config/pi/*
-!config/pi/agent
-config/pi/agent/*
-!config/pi/agent/AGENTS.md
-!config/pi/agent/settings.json
-!config/pi/agent/skills
+!config/pi/agent/
+# But ignore these in agent/
+config/pi/agent/sessions/**
+config/pi/agent/bin/**
+config/pi/agent/git/**
+config/pi/agent/npm/**
+config/pi/agent/*.log
 
-# Exclude Beacon-specific skills
+# Beacon-specific skills (keep local, don't commit)
 config/pi/agent/skills/beacon-code-review/
 config/pi/agent/skills/bi-mcp/
 config/pi/agent/skills/gitolite/
 config/pi/agent/skills/jira/
+
+# Rust build artifacts
+**/target/
 
