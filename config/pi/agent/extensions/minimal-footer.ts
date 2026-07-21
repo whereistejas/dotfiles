@@ -1,6 +1,8 @@
 /**
  * Minimal footer: replaces the built-in footer with a single line
- *   <repo-name> • <jj change | git commit> • <session>  …  ↑in ↓out
+ *   <repo-name> • <work-item> • <jj change | git commit> • <session>  …  ↑in ↓out
+ * Work item is fetched from Obsidian daily note property "current_work_item".
+ * Shows "no work item" when not set.
  * Hides model id, thinking level, cost, and context %.
  *
  * Rev info is refreshed event-driven by watching jj/git state files so
@@ -100,6 +102,29 @@ async function getRevInfo(cwd: string): Promise<string | undefined> {
 	return undefined;
 }
 
+async function getCurrentWorkItem(): Promise<string | undefined> {
+	try {
+		// Use daily:path to get the actual daily note path, handles creation/template
+		const pathResult = await exec("obsidian", ["vault=notes", "daily:path"], { timeout: 500 });
+		const dailyPath = pathResult.stdout.trim();
+		if (!dailyPath) return undefined;
+
+		// Read the property from the daily note
+		const result = await exec(
+			"obsidian",
+			["vault=notes", "property:read", "name=current_work_item", `path=${dailyPath}`],
+			{ timeout: 1000 },
+		);
+		// Obsidian CLI writes errors to stdout, not stderr, so check for error messages
+		const value = result.stdout.trim();
+		if (!value || value.startsWith("Error:")) return undefined;
+		return value;
+	} catch {
+		// Daily note may not exist yet, or Obsidian not running
+		return undefined;
+	}
+}
+
 function createWatchers(info: RepoInfo, onChange: () => void): FSWatcher[] {
 	const watchers: FSWatcher[] = [];
 	const safe = (path: string, opts: Parameters<typeof watch>[1] = {}) => {
@@ -120,15 +145,27 @@ function createWatchers(info: RepoInfo, onChange: () => void): FSWatcher[] {
 
 export default function (pi: ExtensionAPI) {
 	let revInfo: string | undefined;
+	let workItem: string | undefined;
 	let repoName: string | undefined;
 	let requestRender: (() => void) | undefined;
 	let watchers: FSWatcher[] = [];
 	let debounceTimer: NodeJS.Timeout | undefined;
 
 	const refresh = async (cwd: string) => {
-		const next = await getRevInfo(cwd);
-		if (next !== revInfo) {
-			revInfo = next;
+		const [nextRev, nextWork] = await Promise.all([
+			getRevInfo(cwd),
+			getCurrentWorkItem(),
+		]);
+		let changed = false;
+		if (nextRev !== revInfo) {
+			revInfo = nextRev;
+			changed = true;
+		}
+		if (nextWork !== workItem) {
+			workItem = nextWork;
+			changed = true;
+		}
+		if (changed) {
 			requestRender?.();
 		}
 	};
@@ -154,7 +191,8 @@ export default function (pi: ExtensionAPI) {
 			return {
 				invalidate() {},
 				render(width: number): string[] {
-					let leftText = repoName ?? basename(ctx.cwd);
+					const workItemText = workItem ?? "no work item";
+					let leftText = `${repoName ?? basename(ctx.cwd)} • ${workItemText}`;
 					if (revInfo) leftText = `${leftText} • ${revInfo}`;
 					const sessionName = pi.getSessionName?.();
 					if (sessionName) leftText = `${leftText} • ${sessionName}`;

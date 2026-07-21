@@ -94,6 +94,13 @@ skill for wikilinks, callouts, properties, etc.) where it helps
 readability, but don't over-format — this is a working log, not a
 polished note.
 
+## Current work item tracking
+
+See the `worklog-item` sub-skill for tracking the current work item in
+the daily note's `current_work_item` property. This is used by status
+bars, footers, and other UI components to display what you're currently
+working on.
+
 ## Rationale
 
 Keeping both tiers in the vault (rather than the detail living in each
