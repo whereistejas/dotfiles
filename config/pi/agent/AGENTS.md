@@ -9,8 +9,67 @@
 
 ## Version control
 - Always use `jj` instead of `git` for VCS operations (status, diff, log, branches, etc.)
-- **Never use interactive `jj` commands** — always pass non-interactive flags or use `-r` to target specific revisions. Commands that would prompt (like `jj squash`, `jj split`, `jj resolve`) must use explicit revision specifiers (`-r`, `--from`/`--into`, etc.) or will abort when stdin is not a terminal.
+- **Never use interactive `jj` commands** — see subsection below for how to detect and avoid them
 - Don't touch `.git` internals or `.jj` internals without confirmation
+
+### Avoiding interactive jj commands
+
+When stdin is not a terminal (like in an AI agent), interactive `jj` commands abort with "Command aborted" instead of prompting. This wastes time and creates confusion.
+
+**Before running any unfamiliar jj command:**
+```bash
+jj <command> --help | head -n 30
+```
+
+Look for:
+- Parameters with "default: @" or "default: working-copy" (means it needs explicit `-r` or `--from`/`--into`)
+- Mentions of "interactive" in the description
+- `-i` / `--interactive` flags
+
+**Commands that are interactive by default:**
+- `jj squash` (without `--from`/`--into`)
+- `jj squash -r <rev>` (still interactive! needs `--from`/`--into`)
+- `jj split` (without using `jj-hunk` skill)
+- `jj resolve` (without `-r <rev> --tool <tool>`)
+
+**Safe patterns:**
+
+```bash
+# Squashing - always use --from and --into
+jj squash --from <source-rev> --into <dest-rev>
+jj squash --from <source-rev> --into <dest-rev> --keep-emptied
+
+# Splitting - use jj-hunk skill (see skills/jj-hunk/SKILL.md)
+jj-hunk split '<spec>' "commit message"
+
+# Resolving conflicts
+jj resolve -r <rev> --tool <tool>
+```
+
+**When you need to combine many commits into one:**
+
+Don't use multiple `jj squash --from` commands in sequence (creates divergence). Instead:
+
+```bash
+# Start fresh on the base commit
+jj new <base-commit>
+
+# Restore final state from the tip
+jj restore --from <tip-commit>
+
+# Describe with combined message
+jj describe -m "Combined commit message"
+```
+
+This creates ONE clean commit with all changes, no divergence.
+
+**If you create divergent commits:**
+```bash
+# Clean them up
+jj abandon 'divergent()'
+
+# Start over with the jj new + jj restore pattern above
+```
 
 ## Secrets / privacy
 - Never read or echo secrets/credentials (`.env`, `~/.ssh`, keychains, tokens)
