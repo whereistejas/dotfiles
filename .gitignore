@@ -33,10 +33,14 @@ config/pi/agent/bin/**
 config/pi/agent/git/**
 config/pi/agent/npm/**
 config/pi/agent/*.log
+# Credentials / machine-local trust state
+config/pi/agent/auth.json
+config/pi/agent/trust.json
 
 # Beacon-specific skills (keep local, don't commit)
 config/pi/agent/skills/beacon-code-review/
 config/pi/agent/skills/bi-mcp/
+config/pi/agent/skills/gitlab/
 config/pi/agent/skills/gitolite/
 config/pi/agent/skills/jira/
 
