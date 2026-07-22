@@ -7,7 +7,10 @@ config-version = 2
 
 # You can use it to add commands that run after AeroSpace startup.
 # Available commands : https://nikitabobko.github.io/AeroSpace/commands
-after-startup-command = []
+after-startup-command = [
+    # JankyBorders detects an already-running instance, so this is safe on config reload
+    'exec-and-forget borders active_color=0xff39ff14 inactive_color=0x00000000 width=5.0'
+]
 
 # Start AeroSpace at login
 start-at-login = true 
@@ -45,7 +48,7 @@ automatically-unhide-macos-hidden-apps = false
 # even when they are invisible.
 # This config version is only available since 'config-version = 2'
 # Fallback value (if you omit the key): persistent-workspaces = []
-persistent-workspaces = ["1", "2", "3", "4"]
+persistent-workspaces = ["1", "2", "3", "4", "5"]
 
 # A callback that runs every time binding mode changes
 # See: https://nikitabobko.github.io/AeroSpace/guide#binding-modes
@@ -62,10 +65,9 @@ on-mode-changed = []
     2 = "secondary"
     3 = "secondary"
     4 = "secondary"
-    5 = "secondary"
-    # put a couple on the laptop if you want
-    6 = "main"
-    7 = "main"
+    # 5 lives on the laptop. It must stay in persistent-workspaces, otherwise it is
+    # garbage collected while empty and AeroSpace invents a stub workspace (8) instead.
+    5 = "main"
 
 # Possible values: (qwerty|dvorak|colemak)
 # See https://nikitabobko.github.io/AeroSpace/guide#key-mapping
@@ -147,12 +149,14 @@ on-mode-changed = []
     alt-2 = 'workspace 2'
     alt-3 = 'workspace 3'
     alt-4 = 'workspace 4'
+    alt-5 = 'workspace 5'
 
     # See: https://nikitabobko.github.io/AeroSpace/commands#move-node-to-workspace
     alt-shift-1 = 'move-node-to-workspace 1'
     alt-shift-2 = 'move-node-to-workspace 2'
     alt-shift-3 = 'move-node-to-workspace 3'
     alt-shift-4 = 'move-node-to-workspace 4'
+    alt-shift-5 = 'move-node-to-workspace 5'
 
     # See: https://nikitabobko.github.io/AeroSpace/commands#workspace-back-and-forth
     alt-tab = 'workspace-back-and-forth'
@@ -167,6 +171,9 @@ on-mode-changed = []
 
     alt-shift-leftSquareBracket = 'move-node-to-workspace prev --wrap-around'
     alt-shift-rightSquareBracket = 'move-node-to-workspace next --wrap-around'
+
+    cmd-h = [] # Disable "hide application"
+    cmd-alt-h = [] # Disable "hide others"
 
 # 'service' binding mode declaration.
 # See: https://nikitabobko.github.io/AeroSpace/guide#binding-modes
