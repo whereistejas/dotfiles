@@ -10,6 +10,12 @@
 //! The dir is owned by this tool; neither parent nor subagent should
 //! touch it directly.
 //!
+//! `list` and `tail` also read each subagent's live pi session transcript
+//! (<agent-dir>/sessions/<encoded-cwd>/*.jsonl) to surface progress the
+//! `-p` log can't: STALLED (no new event for $PI_SUBAGENTS_STALL_SECS,
+//! default 120s) and ERRORED (last model turn failed) statuses, plus a
+//! DETAIL column and a transcript-backed `tail`/`tail -f` fallback.
+//!
 //! Runtime deps: jj and pi on PATH, plus bun (used only to launch pi,
 //! mirroring `pi`'s own `bun run $(which pi)` shebang workaround).
 
@@ -285,6 +291,229 @@ fn change_ids(revset: &str) -> Vec<String> {
         .collect()
 }
 
+// --- transcript monitoring -------------------------------------------
+//
+// pi writes each session's events incrementally to a JSONL transcript at
+//   <agent-dir>/sessions/<encoded-cwd>/<ts>_<session-id>.jsonl
+// The `-p` log we capture only flushes on process exit, so while a
+// subagent runs that log stays empty and the transcript is the only live
+// progress signal. We use it to detect stalls (no new event for a while)
+// and errored model turns, and to give `tail` something to show mid-run.
+
+const DEFAULT_STALL_SECS: u64 = 120;
+
+fn stall_secs() -> u64 {
+    env::var("PI_SUBAGENTS_STALL_SECS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .filter(|&n| n > 0)
+        .unwrap_or(DEFAULT_STALL_SECS)
+}
+
+fn expand_tilde(p: &str) -> PathBuf {
+    if let Some(rest) = p.strip_prefix("~/")
+        && let Some(home) = env::var_os("HOME")
+    {
+        return PathBuf::from(home).join(rest);
+    }
+    PathBuf::from(p)
+}
+
+fn agent_dir() -> PathBuf {
+    if let Some(d) = env::var_os("PI_CODING_AGENT_DIR") {
+        return expand_tilde(&d.to_string_lossy());
+    }
+    env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_default()
+        .join(".pi")
+        .join("agent")
+}
+
+/// Mirror pi's session-dir encoding: strip a leading slash, map `/ \ :`
+/// to `-`, and wrap in `--...--` (see session-manager.ts).
+fn encode_cwd(path: &str) -> String {
+    let stripped = path
+        .strip_prefix('/')
+        .or_else(|| path.strip_prefix('\\'))
+        .unwrap_or(path);
+    let mid: String = stripped
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' => '-',
+            other => other,
+        })
+        .collect();
+    format!("--{mid}--")
+}
+
+fn session_dir_for(workspace: &str) -> PathBuf {
+    agent_dir().join("sessions").join(encode_cwd(workspace))
+}
+
+/// Newest `.jsonl` transcript in the workspace's session dir created at or
+/// after the subagent started. The `since` filter matters for `properties`
+/// subagents, which share the parent's cwd (hence session dir): it skips
+/// the orchestrator's own, older session.
+fn newest_transcript(workspace: &str, since_ms: u64) -> Option<PathBuf> {
+    let since = UNIX_EPOCH + Duration::from_millis(since_ms.saturating_sub(5_000));
+    let mut best: Option<(SystemTime, PathBuf)> = None;
+    for entry in fs::read_dir(session_dir_for(workspace)).ok()?.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("jsonl") {
+            continue;
+        }
+        let Ok(md) = entry.metadata() else { continue };
+        if let Ok(created) = md.created().or_else(|_| md.modified())
+            && created < since
+        {
+            continue;
+        }
+        let Ok(modified) = md.modified() else { continue };
+        if best.as_ref().is_none_or(|(bm, _)| modified > *bm) {
+            best = Some((modified, path));
+        }
+    }
+    best.map(|(_, p)| p)
+}
+
+fn mtime_age_secs(path: &Path) -> u64 {
+    fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|m| SystemTime::now().duration_since(m).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+fn last_json_line(path: &Path) -> Option<serde_json::Value> {
+    let content = fs::read_to_string(path).ok()?;
+    let line = content.lines().rev().find(|l| !l.trim().is_empty())?;
+    serde_json::from_str(line).ok()
+}
+
+fn trunc(s: &str, max: usize) -> String {
+    let s: String = s.split_whitespace().collect::<Vec<_>>().join(" ");
+    if s.chars().count() > max {
+        let cut: String = s.chars().take(max.saturating_sub(1)).collect();
+        format!("{cut}\u{2026}")
+    } else {
+        s
+    }
+}
+
+fn first_line(s: &str) -> String {
+    trunc(s.lines().find(|l| !l.trim().is_empty()).unwrap_or(""), 120)
+}
+
+/// If the last event is an assistant turn that ends on a tool call (no
+/// tool-result written yet), that tool is still in flight; return its name.
+fn inflight_tool(v: &serde_json::Value) -> Option<String> {
+    let msg = &v["message"];
+    if msg["role"].as_str()? != "assistant" {
+        return None;
+    }
+    let names: Vec<&str> = msg["content"]
+        .as_array()?
+        .iter()
+        .filter(|c| c["type"].as_str() == Some("toolCall"))
+        .filter_map(|c| c["name"].as_str())
+        .collect();
+    match names.as_slice() {
+        [] => None,
+        [one] => Some((*one).to_string()),
+        many => Some(format!("{} +{}", many[0], many.len() - 1)),
+    }
+}
+
+enum Health {
+    Errored(String),
+    Stalled(String),
+    Active(String),
+}
+
+fn transcript_health(workspace: &str, since_ms: u64) -> Option<Health> {
+    let path = newest_transcript(workspace, since_ms)?;
+    let last = last_json_line(&path);
+    if let Some(v) = &last
+        && v["message"]["stopReason"].as_str() == Some("error")
+    {
+        let em = v["message"]["errorMessage"].as_str().unwrap_or("error");
+        return Some(Health::Errored(trunc(em, 48)));
+    }
+    let age = mtime_age_secs(&path);
+    let detail = match last.as_ref().and_then(inflight_tool) {
+        Some(name) => format!("{name} {age}s"),
+        None => format!("idle {age}s"),
+    };
+    if age >= stall_secs() {
+        Some(Health::Stalled(detail))
+    } else {
+        Some(Health::Active(detail))
+    }
+}
+
+/// One-line human summary of a transcript event, for `tail`.
+fn render_event(v: &serde_json::Value) -> Option<String> {
+    if v["type"].as_str()? != "message" {
+        return None;
+    }
+    let msg = &v["message"];
+    let ts = v["timestamp"].as_str().unwrap_or("");
+    let hms = ts.get(11..19).unwrap_or(ts);
+    if msg["stopReason"].as_str() == Some("error") {
+        let em = msg["errorMessage"].as_str().unwrap_or("error");
+        return Some(format!("[{hms}] ERROR: {}", trunc(em, 120)));
+    }
+    let content = msg["content"].as_array();
+    match msg["role"].as_str().unwrap_or("") {
+        "assistant" => {
+            let mut parts = Vec::new();
+            for item in content? {
+                match item["type"].as_str().unwrap_or("") {
+                    "thinking" => parts.push(format!(
+                        "thinking: {}",
+                        first_line(item["thinking"].as_str().unwrap_or(""))
+                    )),
+                    "text" => parts.push(first_line(item["text"].as_str().unwrap_or(""))),
+                    "toolCall" => {
+                        let name = item["name"].as_str().unwrap_or("tool");
+                        parts.push(format!("\u{2192} {name} {}", tool_summary(name, &item["arguments"])));
+                    }
+                    _ => {}
+                }
+            }
+            if parts.is_empty() {
+                return None;
+            }
+            Some(format!("[{hms}] assistant: {}", parts.join("  |  ")))
+        }
+        "toolResult" => {
+            let text = content
+                .and_then(|a| a.iter().find_map(|c| c["text"].as_str()))
+                .unwrap_or("");
+            Some(format!("[{hms}]   result: {}", trunc(text, 120)))
+        }
+        "user" => {
+            let text = content
+                .and_then(|a| a.iter().find_map(|c| c["text"].as_str()))
+                .unwrap_or("");
+            Some(format!("[{hms}] user: {}", first_line(text)))
+        }
+        _ => None,
+    }
+}
+
+fn tool_summary(name: &str, args: &serde_json::Value) -> String {
+    let pick = |k: &str| args[k].as_str().map(|s| trunc(s, 100));
+    match name {
+        "bash" => pick("command"),
+        "read" | "write" | "edit" => pick("path"),
+        _ => None,
+    }
+    .unwrap_or_default()
+}
+
 // --- effective status ------------------------------------------------
 
 enum State {
@@ -495,27 +724,41 @@ fn cmd_list() -> Result<()> {
         "SURFACE".into(),
         "STATUS".into(),
         "EXIT".into(),
+        "DETAIL".into(),
         "WORKSPACE".into(),
     ]];
     for name in &names {
         let Ok(m) = read_meta(name) else {
-            rows.push([name.clone(), "?".into(), "corrupt".into(), "-".into(), "-".into()]);
+            rows.push([
+                name.clone(),
+                "?".into(),
+                "corrupt".into(),
+                "-".into(),
+                "-".into(),
+                "-".into(),
+            ]);
             continue;
         };
-        let (status, exit) = match effective_status(name) {
-            State::Running => ("running".to_string(), "-".to_string()),
-            State::Done(c) => ("done".to_string(), c.to_string()),
-            State::Crashed => ("crashed".to_string(), "-1".to_string()),
+        let (status, exit, detail) = match effective_status(name) {
+            State::Running => match transcript_health(&m.workspace_dir, m.started_at) {
+                Some(Health::Errored(msg)) => ("errored".into(), "-".into(), msg),
+                Some(Health::Stalled(d)) => ("stalled".into(), "-".into(), d),
+                Some(Health::Active(d)) => ("running".into(), "-".into(), d),
+                None => ("running".into(), "-".into(), "starting\u{2026}".into()),
+            },
+            State::Done(c) => ("done".into(), c.to_string(), String::new()),
+            State::Crashed => ("crashed".into(), "-1".into(), String::new()),
         };
         rows.push([
             name.clone(),
             m.surface.as_str().to_string(),
             status,
             exit,
+            detail,
             m.workspace_dir,
         ]);
     }
-    let widths: Vec<usize> = (0..5)
+    let widths: Vec<usize> = (0..6)
         .map(|c| rows.iter().map(|r| r[c].len()).max().unwrap_or(0))
         .collect();
     for r in &rows {
@@ -534,11 +777,17 @@ fn cmd_list() -> Result<()> {
 fn cmd_tail(a: TailArgs) -> Result<()> {
     require_exists("tail", &a.name)?;
     let log = log_path(&a.name);
-    if !log.exists() {
-        return bail(format!("tail: no log for '{}' yet", a.name));
+    // The `-p` log only flushes on process exit, so while a subagent runs
+    // it's empty. Prefer it once it has content (final output); otherwise
+    // fall back to the live session transcript so tail shows real progress.
+    if fs::metadata(&log).map(|m| m.len() > 0).unwrap_or(false) {
+        return tail_log(&a, &log);
     }
+    tail_transcript(&a)
+}
 
-    let content = fs::read_to_string(&log).map_err(|e| Error(format!("read log: {e}")))?;
+fn tail_log(a: &TailArgs, log: &Path) -> Result<()> {
+    let content = fs::read_to_string(log).map_err(|e| Error(format!("read log: {e}")))?;
     let lines: Vec<&str> = content.lines().collect();
     let start = lines.len().saturating_sub(a.n);
     for l in &lines[start..] {
@@ -548,15 +797,113 @@ fn cmd_tail(a: TailArgs) -> Result<()> {
         return Ok(());
     }
 
-    let mut pos = fs::metadata(&log).map(|m| m.len()).unwrap_or(0);
+    let mut pos = fs::metadata(log).map(|m| m.len()).unwrap_or(0);
     loop {
         sleep(Duration::from_millis(200));
-        drain(&log, &mut pos);
+        drain(log, &mut pos);
         if read_done(&a.name).is_some() {
-            drain(&log, &mut pos);
+            drain(log, &mut pos);
             return Ok(());
         }
     }
+}
+
+fn tail_transcript(a: &TailArgs) -> Result<()> {
+    let meta = read_meta(&a.name)?;
+    let mut transcript = newest_transcript(&meta.workspace_dir, meta.started_at);
+    if transcript.is_none() {
+        if !a.follow {
+            println!("(no output yet \u{2014} transcript not created)");
+            return Ok(());
+        }
+        loop {
+            if read_done(&a.name).is_some() {
+                return dump_log_tail(a);
+            }
+            sleep(Duration::from_millis(300));
+            transcript = newest_transcript(&meta.workspace_dir, meta.started_at);
+            if transcript.is_some() {
+                break;
+            }
+        }
+    }
+    let path = transcript.unwrap();
+    println!("\u{2500}\u{2500} transcript: {} \u{2500}\u{2500}", path.display());
+
+    let content = fs::read_to_string(&path).unwrap_or_default();
+    let rendered: Vec<String> = content
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+        .filter_map(|v| render_event(&v))
+        .collect();
+    let start = rendered.len().saturating_sub(a.n);
+    for line in &rendered[start..] {
+        println!("{line}");
+    }
+    if !a.follow {
+        return Ok(());
+    }
+
+    let mut pos = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    loop {
+        sleep(Duration::from_millis(300));
+        stream_new_events(&path, &mut pos);
+        if let Some(v) = last_json_line(&path)
+            && v["message"]["stopReason"].as_str() == Some("error")
+        {
+            println!("(subagent turn errored \u{2014} stopping follow)");
+            return Ok(());
+        }
+        if read_done(&a.name).is_some() {
+            stream_new_events(&path, &mut pos);
+            return Ok(());
+        }
+    }
+}
+
+/// After a subagent exits, show whatever the `-p` log captured.
+fn dump_log_tail(a: &TailArgs) -> Result<()> {
+    let log = log_path(&a.name);
+    if fs::metadata(&log).map(|m| m.len() > 0).unwrap_or(false) {
+        return tail_log(a, &log);
+    }
+    println!("(subagent finished with no captured output)");
+    Ok(())
+}
+
+/// Render transcript events appended since byte offset `pos`, advancing it
+/// past the last complete (newline-terminated) line.
+fn stream_new_events(path: &Path, pos: &mut u64) {
+    let size = fs::metadata(path).map(|m| m.len()).unwrap_or(*pos);
+    if size < *pos {
+        *pos = 0;
+    }
+    if size <= *pos {
+        return;
+    }
+    let Ok(mut f) = File::open(path) else { return };
+    if f.seek(SeekFrom::Start(*pos)).is_err() {
+        return;
+    }
+    let mut buf = Vec::new();
+    if f.read_to_end(&mut buf).is_err() {
+        return;
+    }
+    let Some(last_nl) = buf.iter().rposition(|&b| b == b'\n') else {
+        return;
+    };
+    for line in buf[..=last_nl].split(|&b| b == b'\n') {
+        if line.is_empty() {
+            continue;
+        }
+        if let Ok(v) = serde_json::from_slice::<serde_json::Value>(line)
+            && let Some(s) = render_event(&v)
+        {
+            println!("{s}");
+        }
+    }
+    *pos += last_nl as u64 + 1;
 }
 
 fn drain(log: &Path, pos: &mut u64) {

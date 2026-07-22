@@ -134,6 +134,24 @@ cargo run -q --offline --manifest-path ~/.pi/agent/skills/subagents/scripts/suba
 
 Repeat `list` until all show `done`.
 
+`list` derives health from each subagent's live pi transcript (the `-p`
+log only flushes on exit, so it's useless mid-run). The `STATUS` column
+can read:
+
+- `running` — transcript advancing normally; `DETAIL` shows the in-flight
+  tool + how long it's run (e.g. `bash 12s`) or `idle Ns` between turns.
+- `stalled` — no new transcript event for ≥ 120s (override with
+  `PI_SUBAGENTS_STALL_SECS`). A long-running in-flight tool in `DETAIL`
+  (e.g. `bash 900s`) means a runaway command; `idle 900s` means a wedged
+  model turn. Investigate, then `subagents delete` + re-spawn if wedged.
+- `errored` — the last model turn failed (API timeout, auth, etc.);
+  `DETAIL` shows the error. Don't poll forever — delete and re-plan.
+- `done` / `crashed` — as before.
+
+`tail`/`tail -f` fall back to a readable render of the transcript while
+the `-p` log is empty, so they show live progress instead of nothing;
+`tail -f` stops on `done` or an errored turn.
+
 ### 5. Merge each finished subagent
 
 ```bash
@@ -165,7 +183,9 @@ parent's own repo: `jj log -r '@-::@'` (artifact) or
 ## Failure cheatsheet
 
 - **Merge conflict** — stop, show user, don't auto-resolve.
-- **Hang** (10 min no progress in `subagents tail`) — `subagents delete`.
+- **Hang** — `subagents list` shows `stalled` (no transcript event for
+  ≥ 120s) or `errored`. Check `DETAIL`/`subagents tail`, then
+  `subagents delete` and re-spawn.
 - **Non-zero exit** — `subagents log NAME`, show tail, re-plan or delete.
 - **Op-log divergence (properties)** — capture `jj op log -n1` *before*
   spawning properties subagents; inspect after; `jj op restore` if off.

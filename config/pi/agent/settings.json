@@ -1,9 +1,13 @@
 {
-  "lastChangelogVersion": "0.80.10",
+  "lastChangelogVersion": "0.82.1",
   "theme": "light",
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-sonnet-4-5",
+  "defaultModel": "claude-opus-5",
   "defaultThinkingLevel": "high",
+  "enabledModels": [
+    "anthropic/claude-opus-5:high",
+    "anthropic/claude-sonnet-5:high"
+  ],
   "npmCommand": [
     "bun"
   ],
