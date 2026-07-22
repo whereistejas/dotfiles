@@ -66,10 +66,6 @@ end
 vim.api.nvim_create_autocmd("PackChanged", {
 	callback = function(ev)
 		local name, kind = ev.data.spec.name, ev.data.kind
-		if name == "telescope-fzf-native.nvim" and (kind == "install" or kind == "update") then
-			local path = vim.fn.stdpath("data") .. "/site/pack/core/opt/telescope-fzf-native.nvim"
-			vim.fn.system({ "make", "-C", path })
-		end
 		if name == "nvim-treesitter" and kind == "update" then
 			if not ev.data.active then vim.cmd.packadd("nvim-treesitter") end
 			vim.cmd("TSUpdate")
@@ -88,16 +84,12 @@ vim.pack.add({
 
 	-- VCS
 	"https://github.com/echasnovski/mini.diff",
-	{ src = "https://github.com/nicolasgb/jj.nvim",             version = "v0.6.0" },
+	{ src = "https://github.com/whereistejas/jj.nvim",          version = "feat-log-picker" },
 	"https://github.com/esmuellert/codediff.nvim",
 	"https://github.com/MunifTanjim/nui.nvim",
 
-	-- Telescope
-	"https://github.com/nvim-lua/plenary.nvim",
-	"https://github.com/nvim-telescope/telescope-fzf-native.nvim",
-	"https://github.com/nvim-telescope/telescope-file-browser.nvim",
-	"https://github.com/nvim-telescope/telescope-live-grep-args.nvim",
-	{ src = "https://github.com/nvim-telescope/telescope.nvim", version = "v0.2.1" },
+	-- Picker / QoL
+	"https://github.com/folke/snacks.nvim",
 
 	-- Treesitter
 	"https://github.com/nvim-treesitter/nvim-treesitter",
@@ -112,8 +104,6 @@ vim.loader.enable()
 -- =============================================================================
 -- Functions
 -- =============================================================================
-
-local builtin = require("telescope.builtin")
 
 -- Auto-detect jj repo: walk up from buffer path, stopping at cwd.
 local function find_jj_repo()
@@ -141,58 +131,6 @@ local function cd_to_jj_repo(args)
 	end
 	local repo = find_jj_repo()
 	if repo then vim.cmd.cd(repo) end
-end
-
--- Telescope sorter that keeps fuzzy filtering but preserves finder order
--- (rg --sort path), so results stay grouped by folder while you type. Lower
--- score = higher in the list under sorting_strategy = "ascending", and
--- entry.index follows path order.
-local function path_order_sorter()
-	local sorters = require("telescope.sorters")
-	local base = sorters.get_fzy_sorter()
-	return sorters.Sorter:new({
-		discard = true,
-		scoring_function = function(_, prompt, line, entry)
-			local score = base:scoring_function(prompt, line, entry)
-			if score == nil or score == -1 then return -1 end
-			return entry and entry.index or 1
-		end,
-		highlighter = function(_, prompt, display)
-			return base:highlighter(prompt, display)
-		end,
-	})
-end
-
--- Custom telescope pickers
-local function find_files_all()
-	builtin.find_files({
-		find_command = { "rg", "--files", "--hidden", "--no-ignore", "--glob", "!.git/*", "--sort", "path" },
-		sorting_strategy = "ascending",
-		tiebreak = function(current_entry, existing_entry, _)
-			return current_entry.index < existing_entry.index
-		end,
-	})
-end
-
-local function live_grep_args(opts)
-	local prompt_parser = require("telescope-live-grep-args.prompt_parser")
-	local sorters = require("telescope.sorters")
-	local fzy = require("telescope.algos.fzy")
-	opts = vim.tbl_extend("force", opts or {}, {
-		sorter = sorters.Sorter:new({
-			scoring_function = function() return 1 end,
-			highlighter = function(_, prompt, display)
-				local parts = prompt_parser.parse(prompt, true)
-				local term = parts[1] or prompt
-				return fzy.positions(term, display)
-			end,
-		}),
-	})
-	return require("telescope").extensions.live_grep_args.live_grep_args(opts)
-end
-
-local function file_browser_here()
-	vim.cmd("Telescope file_browser path=%:p:h")
 end
 
 -- Split a long signature line (params/fields) one element per line; used by
@@ -412,6 +350,11 @@ require("codediff").setup()
 
 -- jj.nvim
 require("jj").setup({
+	-- Use the snacks picker for jj.nvim's status/file_history/conflict pickers
+	-- (falls back to vim.ui.select when snacks is disabled).
+	picker = {
+		snacks = {},
+	},
 	diff = {
 		-- "auto" (registered below): codediff's side-by-side view in git-colocated
 		-- repos, else the jj-native backend (works in workspaces too). `d` in
@@ -421,6 +364,13 @@ require("jj").setup({
 	-- Open jj terminal windows (log/status) as a vertical split. splitright is
 	-- unset (default off), so the split lands on the left.
 	terminal = {
+		window = {
+			type = "vsplit",
+		},
+	},
+	-- Open the describe/commit message editor as a vertical split too, so the
+	-- whole jj.nvim UI stays vertical (v0.7.0 added configurable editor layouts).
+	editor = {
 		window = {
 			type = "vsplit",
 		},
@@ -491,7 +441,7 @@ local function jj_git_worktree()
 	end
 	local out = vim.fn.systemlist({ "jj", "git", "root" })
 	if vim.v.shell_error == 0 and out[1] and out[1] ~= "" then
-		local wt = vim.fn.fnamemodify(out[1], ":h") -- dirname of .../repo/.git => .../repo
+		local wt = vim.fn.fnamemodify(out[1], ":h")        -- dirname of .../repo/.git => .../repo
 		if vim.fn.isdirectory(wt) == 1 then return wt, false end -- workspace: shared worktree
 	end
 	return nil, false
@@ -552,34 +502,20 @@ jj_cmd.j = function(args)
 	return orig_j(args)
 end
 
--- Telescope
-require("telescope").setup({
-	defaults = {
-		hidden = true,
-		vimgrep_arguments = {
-			"rg",
-			"--color=never",
-			"--no-heading",
-			"--with-filename",
-			"--line-number",
-			"--column",
-			"--smart-case",
-			"--hidden",
+-- snacks (picker + explorer)
+require("snacks").setup({
+	picker = {
+		enabled = true,
+		icons = {
+			files = { enabled = false }, -- hide file-type icons
+		},
+		win = {
+			-- Drop line-number/sign gutter in the preview pane.
+			preview = { minimal = true },
 		},
 	},
-	pickers = {
-		find_files = {
-			find_command = { "rg", "--files", "--hidden", "--glob", "!.git/*", "--sort", "path" },
-			sorting_strategy = "ascending",
-			sorter = path_order_sorter(),
-			tiebreak = function(current_entry, existing_entry, _)
-				return current_entry.index < existing_entry.index
-			end,
-		},
-	},
+	explorer = { enabled = true },
 })
-require("telescope").load_extension("file_browser")
-require("telescope").load_extension("live_grep_args")
 
 -- no-neck-pain (centered layout)
 require("no-neck-pain").setup({ width = 120 })
@@ -750,10 +686,14 @@ end, { expr = true, desc = "Accept completion / newline" })
 -- Treesitter node selection (nvim 0.12.3+):
 --   <up>/<down> expand to parent / shrink to child (normal + visual)
 --   <left>/<right> select prev / next sibling (visual only)
-vim.keymap.set({ "n", "x" }, "<up>", function() vim.treesitter.select("parent", vim.v.count1) end, { desc = "Expand selection to parent node" })
-vim.keymap.set({ "n", "x" }, "<down>", function() vim.treesitter.select("child", vim.v.count1) end, { desc = "Shrink selection to child node" })
-vim.keymap.set("x", "<left>", function() vim.treesitter.select("prev", vim.v.count1) end, { desc = "Select previous sibling node" })
-vim.keymap.set("x", "<right>", function() vim.treesitter.select("next", vim.v.count1) end, { desc = "Select next sibling node" })
+vim.keymap.set({ "n", "x" }, "<up>", function() vim.treesitter.select("parent", vim.v.count1) end,
+	{ desc = "Expand selection to parent node" })
+vim.keymap.set({ "n", "x" }, "<down>", function() vim.treesitter.select("child", vim.v.count1) end,
+	{ desc = "Shrink selection to child node" })
+vim.keymap.set("x", "<left>", function() vim.treesitter.select("prev", vim.v.count1) end,
+	{ desc = "Select previous sibling node" })
+vim.keymap.set("x", "<right>", function() vim.treesitter.select("next", vim.v.count1) end,
+	{ desc = "Select next sibling node" })
 
 -- Copy selection + context (path:line-range (Symbol.path)) to the clipboard
 vim.keymap.set("x", "Y", copy_selection_with_context,
@@ -761,8 +701,8 @@ vim.keymap.set("x", "Y", copy_selection_with_context,
 
 -- Window navigation — move between splits in every mode (insert/visual/terminal too).
 -- <Cmd> runs wincmd without leaving the current mode. Uses ⌘+letters so the
--- keyboard nav sub-layer (D held → cmd+hjkl) drives splits, leaving arrows free
--- for macOS text navigation (opt/cmd+arrow).
+-- base-layer ⌘ home-row mod (hold A → cmd+hjkl) drives splits, leaving arrows
+-- free for macOS text navigation (opt/cmd+arrow).
 for key, desc in pairs({
 	h = "Focus split left",
 	j = "Focus split down",
@@ -779,7 +719,8 @@ for key, desc in pairs({
 	K = "Move split up",
 	L = "Move split right",
 }) do
-	vim.keymap.set({ "n", "i", "v", "t" }, "<D-S-" .. key:lower() .. ">", "<Cmd>wincmd " .. key .. "<CR>", { desc = desc })
+	vim.keymap.set({ "n", "i", "v", "t" }, "<D-S-" .. key:lower() .. ">", "<Cmd>wincmd " .. key .. "<CR>",
+		{ desc = desc })
 end
 
 -- Double-<Tab> cycles to the next window/split.
@@ -788,7 +729,8 @@ vim.keymap.set("n", "<Tab><Tab>", "<C-w>w", { desc = "Cycle to next window" })
 -- Tabs — switch to tab N in every mode (insert/visual/terminal too).
 -- <Cmd> runs the command without leaving the current mode.
 for i = 1, 4 do
-	vim.keymap.set({ "n", "i", "v", "t" }, "<D-" .. i .. ">", "<Cmd>tabnext " .. i .. "<CR>", { desc = "Go to tab " .. i })
+	vim.keymap.set({ "n", "i", "v", "t" }, "<D-" .. i .. ">", "<Cmd>tabnext " .. i .. "<CR>",
+		{ desc = "Go to tab " .. i })
 end
 
 -- Tab prev/next — mirror AeroSpace's alt-[ / alt-] for workspaces.
@@ -824,24 +766,28 @@ vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" }
 -- gh applies a hunk (also a hunk textobject), gH resets one to the @- version.
 
 -- jj.nvim
-vim.keymap.set("n", "<leader>jj", "<cmd>J log<CR>", { desc = "jj log (jj.nvim)" })
-vim.keymap.set("n", "<leader>js", "<cmd>J status<CR>", { desc = "jj status (jj.nvim)" })
+vim.keymap.set("n", "<space>jj", "<cmd>J log<CR>", { desc = "jj log (jj.nvim)" })
 -- Diff the working copy against @- in codediff (`d` in :J log diffs a change).
-vim.keymap.set("n", "<leader>jd", function()
+vim.keymap.set("n", "<space>jd", function()
 	require("jj.diff").diff_current({ rev = "@-" })
 end, { desc = "jj diff working copy vs @- (codediff)" })
+-- jj.nvim pickers (snacks-backed)
+vim.keymap.set("n", "<space>jl", function() require("jj.picker").log({ revset = "all()" }) end, { desc = "jj picker: log (all)" })
+vim.keymap.set("n", "<space>js", function() require("jj.picker").status() end, { desc = "jj picker: status" })
+vim.keymap.set("n", "<space>jh", function() require("jj.picker").file_history() end, { desc = "jj picker: file history" })
+vim.keymap.set("n", "<space>jc", function() require("jj.picker").conflict() end, { desc = "jj picker: conflicts" })
 
--- Telescope
-vim.keymap.set("n", "<space>t", builtin.builtin, { desc = "Telescope pickers" })
-vim.keymap.set("n", "<space>b", builtin.buffers, { desc = "Buffers" })
-vim.keymap.set("n", "<space>f", builtin.find_files, { desc = "Find files" })
-vim.keymap.set("n", "<space>fa", find_files_all, { desc = "Find files (hidden + ignored)" })
-vim.keymap.set("n", "?", live_grep_args, { desc = "Live grep (args)" })
-vim.keymap.set("n", "<space><space>", builtin.resume, { desc = "Resume last picker" })
-vim.keymap.set("n", "<space>r", builtin.lsp_references, { desc = "LSP references" })
-vim.keymap.set("n", "<space>i", builtin.lsp_implementations, { desc = "LSP implementations" })
-vim.keymap.set("n", "<space>d", builtin.lsp_definitions, { desc = "LSP definitions" })
-vim.keymap.set("n", "<space>o", builtin.lsp_document_symbols, { desc = "Document symbols" })
+-- snacks picker
+vim.keymap.set("n", "<space>t", function() Snacks.picker.pickers() end, { desc = "Pickers" })
+vim.keymap.set("n", "<space>b", function() Snacks.picker.buffers() end, { desc = "Buffers" })
+vim.keymap.set("n", "<space>f", function() Snacks.picker.files() end, { desc = "Find files" })
+vim.keymap.set("n", "<space>fa", function() Snacks.picker.files({ hidden = true, ignored = true }) end, { desc = "Find files (hidden + ignored)" })
+vim.keymap.set("n", "?", function() Snacks.picker.grep() end, { desc = "Live grep" })
+vim.keymap.set("n", "<space><space>", function() Snacks.picker.resume() end, { desc = "Resume last picker" })
+vim.keymap.set("n", "<space>r", function() Snacks.picker.lsp_references() end, { desc = "LSP references" })
+vim.keymap.set("n", "<space>i", function() Snacks.picker.lsp_implementations() end, { desc = "LSP implementations" })
+vim.keymap.set("n", "<space>d", function() Snacks.picker.lsp_definitions() end, { desc = "LSP definitions" })
+vim.keymap.set("n", "<space>o", function() Snacks.picker.lsp_symbols() end, { desc = "Document symbols" })
 vim.keymap.set("n", "<space>O", function()
 	vim.lsp.buf.document_symbol({
 		on_list = function(opts)
@@ -850,10 +796,10 @@ vim.keymap.set("n", "<space>O", function()
 		end,
 	})
 end, { desc = "Document symbols (left split)" })
-vim.keymap.set("n", "<space>m", builtin.diagnostics, { desc = "Diagnostics" })
+vim.keymap.set("n", "<space>m", function() Snacks.picker.diagnostics() end, { desc = "Diagnostics" })
 vim.keymap.set("n", "M", vim.diagnostic.open_float, { desc = "Line diagnostics (float)" })
-vim.keymap.set("n", "<space>k", builtin.keymaps, { desc = "Keymaps" })
-vim.keymap.set("n", "<space>c", file_browser_here, { desc = "File browser (current file dir)" })
+vim.keymap.set("n", "<space>k", function() Snacks.picker.keymaps() end, { desc = "Keymaps" })
+vim.keymap.set("n", "<space>c", function() Snacks.explorer({ cwd = vim.fn.expand("%:p:h") }) end, { desc = "File explorer (current file dir)" })
 
 -- Layout
 vim.keymap.set("n", "<space>g", "<cmd>NoNeckPain<CR>", { desc = "Toggle centered layout" })
