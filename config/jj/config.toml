@@ -5,7 +5,7 @@ email = "email@whereistejas.xyz"
 [signing]
 behavior = "own"
 backend = "ssh"
-key = "~/.ssh/github.pub"
+key = "~/.ssh/beacon2.pub"
 backends.ssh.allowed-signers = "~/.ssh/allowed_signers"
 
 [aliases]
@@ -47,7 +47,7 @@ edit-args = ["select", "$left", "$right"]
 
 [ui]
 paginate = "auto"
-pager = ["delta", "--pager", "less -FRX"]
+pager = ["less", "-FRX"]
 # difftastic only emits the 16 ANSI colors, so it picks up Ghostty's "Gruvbox
 # Light" palette. Leave --background at its default (dark): that makes difft use
 # the *bright* ANSI slots, which this palette maps to gruvbox's faded accents
