@@ -13,6 +13,7 @@ Configuration files for macOS, managed with [Jujutsu](https://martinvonz.github.
 ### Window Management
 
 - [AeroSpace](https://nikitabobko.github.io/AeroSpace/) — tiling window manager
+- [JankyBorders](https://github.com/FelixKratz/JankyBorders) — highlights the focused window (started from AeroSpace's `after-startup-command`)
 - [Karabiner-Elements](https://karabiner-elements.pqrs.org/) — keyboard customization
 
 ### Version Control
@@ -72,17 +73,15 @@ The Neovim config expects these external tools to be installed:
 
 ### Build Tools
 
-- `make` — required for building `telescope-fzf-native.nvim`
-- `ripgrep` — used by Telescope for live grep
+- `ripgrep` — used by the snacks picker for live grep
 
 ### Neovim Plugins
 
 Managed via `vim.pack` (Neovim's built-in package manager):
 
-- telescope.nvim (+ fzf-native, file-browser, live-grep-args)
+- snacks.nvim (picker + explorer)
 - nvim-treesitter
-- nvim-lspconfig, lazydev.nvim
-- blink.cmp, friendly-snippets
-- gitsigns.nvim, jj.nvim, hunk.nvim (+ nui.nvim), codediff.nvim
+- nvim-lspconfig (completion via Neovim's built-in LSP client)
+- mini.diff, jj.nvim (+ nui.nvim), codediff.nvim
 - vim-surround, vim-fetch, no-neck-pain.nvim
 - github-nvim-theme, gruvbox.nvim
