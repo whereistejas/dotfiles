@@ -13,7 +13,7 @@
       "src": "https://github.com/ellisonleao/gruvbox.nvim"
     },
     "jj.nvim": {
-      "rev": "fab22b7fe94b84cc480179245115331bcaac0359",
+      "rev": "22a2ba7805be97432431ac0f4aebfd02afc3aa87",
       "src": "https://github.com/whereistejas/jj.nvim",
       "version": "'feat-log-picker'"
     },
