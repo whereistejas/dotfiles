@@ -44,8 +44,10 @@ vim.opt.foldmethod = "expr"
 vim.opt.foldlevelstart = 99
 vim.opt.foldexpr = "v:lua.vim.treesitter.foldexpr()"
 
-vim.wo.relativenumber = true
-vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+vim.opt.relativenumber = true
+-- NOTE: 'indentexpr' is buffer-local, so setting it here (vim.bo == :setlocal)
+-- would only ever apply to the startup buffer. It is set per buffer by the
+-- FileType autocmd that starts treesitter (see "Treesitter" below).
 
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
@@ -530,6 +532,27 @@ require("nvim-treesitter").setup()
 require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css", "python",
 	"ruby", "bash" })
 
+-- nvim-treesitter (main branch) does NOT enable highlighting: Nvim only
+-- auto-starts it via runtime ftplugins for the filetypes whose parser it
+-- bundles (lua, markdown, query, help, diff, ...). Without this, every parser
+-- installed above sits unused and buffers fall back to regex 'syntax'.
+-- Also point 'indentexpr' at treesitter for languages that ship an indents
+-- query; otherwise the runtime ftplugin's indentexpr (e.g. GetRustIndent())
+-- stays in place.
+vim.api.nvim_create_autocmd("FileType", {
+	group = vim.api.nvim_create_augroup("treesitter-start", { clear = true }),
+	callback = function(ev)
+		local lang = vim.treesitter.language.get_lang(ev.match) or ev.match
+		-- Skip if a runtime ftplugin already started a highlighter for this buffer.
+		if not vim.treesitter.highlighter.active[ev.buf] then
+			if not pcall(vim.treesitter.start, ev.buf, lang) then return end
+		end
+		if vim.treesitter.query.get(lang, "indents") then
+			vim.bo[ev.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+		end
+	end,
+})
+
 -- =============================================================================
 -- LSP
 -- =============================================================================
@@ -551,67 +574,37 @@ function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
 	return orig_open_float(formatted, syntax, opts, ...)
 end
 
-vim.lsp.config.lua_ls = {
-	cmd = { "lua-language-server" },
-	root_markers = { ".luarc.json", ".luarc.jsonc", ".luacheckrc", ".stylua.toml", "stylua.toml", "selene.toml", "selene.yml", ".git" },
-}
+-- nvim-lspconfig ships an `lsp/<name>.lua` for every server enabled below.
+-- `vim.lsp.config(name, {...})` MERGES with that config chain, whereas
+-- assigning `vim.lsp.config.name = {...}` REPLACES it — which silently threw
+-- away lspconfig's smarter `cmd` (local node_modules resolution), `root_dir`
+-- (monorepo/deno detection), `handlers`, `commands` and `get_language_id`.
+-- So only the actual deltas live here; lua_ls, ts_ls, ocamllsp, eslint and
+-- marksman need no overrides at all.
 
-vim.lsp.config.ts_ls = {
-	cmd = { "typescript-language-server", "--stdio" },
-	root_markers = { "tsconfig.json", "jsconfig.json", "package.json", ".git" },
-}
-
-vim.lsp.config.ocamllsp = {
-	cmd = { "ocamllsp" },
-	root_markers = { "dune-project", "dune-workspace", ".git", "*.opam" },
-	filetypes = { "ocaml", "ocaml.menhir", "ocaml.interface", "ocaml.ocamllex", "reason", "dune" },
-}
-
-vim.lsp.config.eslint = {
-	cmd = { "vscode-eslint-language-server", "--stdio" },
-	root_markers = { ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml", "eslint.config.js", "eslint.config.mjs", "eslint.config.ts" },
-	settings = {
-		validate = "on",
-		run = "onType",
-	},
-}
-
-vim.lsp.config.ruby_lsp = {
-	cmd = { "ruby-lsp" },
-	root_markers = { "Gemfile", ".git" },
+vim.lsp.config("ruby_lsp", {
 	init_options = {
 		formatter = "standard",
 		linters = { "standard" },
 	},
-}
+})
 
-vim.lsp.config.ruff = {
-	cmd = { "ruff", "server" },
-	root_markers = { "pyproject.toml", "ruff.toml", ".ruff.toml", ".git" },
-	filetypes = { "python" },
+vim.lsp.config("ruff", {
 	init_options = {
 		settings = {
 			fixAll = false,
 			organizeImports = false,
 		},
 	},
-}
+})
 
 -- Host: bun-installed (needs `bun` to run, no system node). Container: the
--- Nix-wrapped binary on PATH bundles its own node.
+-- Nix-wrapped binary on PATH bundles its own node, so lspconfig's default cmd
+-- is already right.
 local bun_bashls = vim.env.HOME .. "/.bun/bin/bash-language-server"
-vim.lsp.config.bashls = {
-	cmd = vim.uv.fs_stat(bun_bashls) and { "bun", bun_bashls, "start" }
-		or { "bash-language-server", "start" },
-	root_markers = { ".git" },
-	filetypes = { "sh", "bash" },
-}
-
-vim.lsp.config.marksman = {
-	cmd = { "marksman", "server" },
-	root_markers = { ".marksman.toml", ".git" },
-	filetypes = { "markdown", "markdown.mdx" },
-}
+if vim.uv.fs_stat(bun_bashls) then
+	vim.lsp.config("bashls", { cmd = { "bun", bun_bashls, "start" } })
+end
 
 local ty_extra_paths = {}
 for _, p in ipairs({
@@ -625,10 +618,7 @@ for _, p in ipairs({
 	if vim.fn.isdirectory(p) == 1 then table.insert(ty_extra_paths, p) end
 end
 
-vim.lsp.config.ty = {
-	cmd = { "ty", "server" },
-	root_markers = { "pyproject.toml", "ty.toml", ".git" },
-	filetypes = { "python" },
+vim.lsp.config("ty", {
 	settings = {
 		ty = {
 			configuration = {
@@ -638,7 +628,7 @@ vim.lsp.config.ty = {
 			},
 		},
 	},
-}
+})
 
 vim.lsp.enable("lua_ls")
 vim.lsp.enable("rust_analyzer")
@@ -837,35 +827,45 @@ vim.api.nvim_create_autocmd("LspAttach", {
 	group = vim.api.nvim_create_augroup("lsp", { clear = true }),
 	callback = function(args)
 		local client = vim.lsp.get_client_by_id(args.data.client_id)
+		if not client then return end
 
 		-- Native LSP completion (replaces blink.cmp): autotrigger the popup.
-		if client and client:supports_method("textDocument/completion") then
+		if client:supports_method("textDocument/completion") then
 			vim.lsp.completion.enable(true, client.id, args.buf, { autotrigger = true })
 		end
 
-		if client and client.name == "eslint" then
+		-- LspAttach fires again on every :edit of the buffer, so an ungrouped
+		-- buffer-local BufWritePre autocmd accumulates one copy per attach and
+		-- formatting then runs several times per write. Keep it in a group keyed
+		-- by buffer+client, cleared on re-attach.
+		local group = vim.api.nvim_create_augroup(
+			("lsp-format-%d-%s"):format(args.buf, client.name), { clear = true })
+
+		if client.name == "eslint" then
 			vim.api.nvim_create_autocmd("BufWritePre", {
+				group = group,
 				buffer = args.buf,
 				callback = function()
-					local bufnr = vim.api.nvim_get_current_buf()
 					client:request_sync("workspace/executeCommand", {
 						command = "eslint.applyAllFixes",
 						arguments = { {
-							uri = vim.uri_from_bufnr(bufnr),
-							version = vim.lsp.util.buf_versions[bufnr],
+							uri = vim.uri_from_bufnr(args.buf),
+							version = vim.lsp.util.buf_versions[args.buf],
 						} },
-					}, 3000)
+					}, 3000, args.buf)
 				end,
 			})
 			-- Only format if the server supports it, and skip LSPs where another tool owns formatting (eslint for TS, ruff/ty for Python)
-		elseif client and client.server_capabilities.documentFormattingProvider
+		elseif client:supports_method("textDocument/formatting")
 			and client.name ~= "ts_ls" and client.name ~= "ruff" and client.name ~= "ty" then
 			vim.api.nvim_create_autocmd("BufWritePre", {
+				group = group,
 				buffer = args.buf,
 				callback = function()
 					vim.lsp.buf.format({
 						async = false,
-						id = args.data.client_id,
+						bufnr = args.buf,
+						id = client.id,
 					})
 				end,
 			})
