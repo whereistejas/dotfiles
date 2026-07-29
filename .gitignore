@@ -47,3 +47,6 @@ config/pi/agent/skills/jira/
 # Rust build artifacts
 **/target/
 
+
+# Work log migration mapping (contains internal ticket/MR data)
+config/pi/agent/skills/worklog/migration/

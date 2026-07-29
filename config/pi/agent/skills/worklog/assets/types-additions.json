@@ -1,0 +1,13 @@
+{
+  "types": {
+    "session_id": "text",
+    "started": "datetime",
+    "summary": "text",
+    "tickets": "multitext",
+    "repos": "multitext",
+    "branches": "multitext",
+    "changes": "multitext",
+    "commits": "multitext",
+    "reviews": "multitext"
+  }
+}

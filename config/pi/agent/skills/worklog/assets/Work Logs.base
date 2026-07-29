@@ -1,0 +1,102 @@
+filters:
+  and:
+    - 'file.ext == "md"'
+    - 'file.inFolder("Work Logs")'
+
+properties:
+  date:
+    displayName: "Date"
+  aliases:
+    displayName: "Worklog"
+  summary:
+    displayName: "Summary"
+  tickets:
+    displayName: "Tickets"
+  repos:
+    displayName: "Repos"
+  branches:
+    displayName: "Branches"
+  session_id:
+    displayName: "Session"
+  file.tags:
+    displayName: "Work items"
+
+views:
+  - type: table
+    name: "All worklogs"
+    filters:
+      not:
+        - 'file.inFolder("Work Logs/Legacy")'
+    order:
+      - date
+      - aliases
+      - summary
+      - tickets
+      - repos
+    sort:
+      - property: date
+        direction: DESC
+
+  - type: table
+    name: "By ticket"
+    filters:
+      not:
+        - 'file.inFolder("Work Logs/Legacy")'
+    groupBy:
+      property: tickets
+      direction: ASC
+    order:
+      - date
+      - aliases
+      - summary
+      - repos
+    sort:
+      - property: date
+        direction: DESC
+
+  - type: table
+    name: "By repo"
+    filters:
+      not:
+        - 'file.inFolder("Work Logs/Legacy")'
+    groupBy:
+      property: repos
+      direction: ASC
+    order:
+      - date
+      - aliases
+      - summary
+      - tickets
+      - branches
+    sort:
+      - property: date
+        direction: DESC
+
+  - type: table
+    name: "Untracked"
+    filters:
+      and:
+        - 'file.hasTag("untracked")'
+        - not:
+            - 'file.inFolder("Work Logs/Legacy")'
+    order:
+      - date
+      - aliases
+      - summary
+      - repos
+      - file.tags
+    sort:
+      - property: date
+        direction: DESC
+
+  - type: table
+    name: "Legacy"
+    filters: 'file.inFolder("Work Logs/Legacy")'
+    order:
+      - file.name
+      - date
+      - summary
+      - file.mtime
+    sort:
+      - property: file.mtime
+        direction: DESC
