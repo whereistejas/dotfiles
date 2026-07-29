@@ -27,7 +27,6 @@ Configuration files for macOS, managed with [Jujutsu](https://martinvonz.github.
 ### Editor
 
 - [Neovim](https://neovim.io/) — primary editor (single `init.lua`, uses built-in `vim.pack`)
-- [Cursor](https://cursor.com/) — only skills tracked
 
 ### CLI Tools
 
@@ -37,7 +36,6 @@ Configuration files for macOS, managed with [Jujutsu](https://martinvonz.github.
 - [bat](https://github.com/sharkdp/bat) — cat replacement
 - [eza](https://eza.rocks/) — ls replacement
 - [autojump](https://github.com/wting/autojump) — directory navigation
-- [vifm](https://vifm.info/) — terminal file manager
 - [fortune](https://formulae.brew.sh/formula/fortune) + [cowsay](https://formulae.brew.sh/formula/cowsay)
 
 ### Languages & Runtimes
