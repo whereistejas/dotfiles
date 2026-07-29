@@ -5,6 +5,29 @@ description: How work is recorded in the Obsidian vault — one worklog note per
 
 # worklog
 
+## Start here: read the current work item FIRST
+
+Whenever a request touches the worklog — "check the worklog", "log this",
+"update the worklog", "what am I working on" — the **first** action is to
+read the current work item. Do not open worklog notes, grep the vault, or
+ask the user what they're working on before doing this.
+
+```bash
+DAILY=$(obsidian vault="notes" daily:path)
+obsidian vault="notes" property:read name="tags" path="$DAILY" | head -n 1
+```
+
+The first line of the daily note's `tags` **is** the current work item —
+see [The `tags` invariant](#the-tags-invariant). It yields, for free:
+
+- the Jira key → `Tickets/<KEY>.md` and `jira-cli read <KEY>`
+- the slug → the `#wi/<KEY>/<slug>` section heading to search for
+- which of the day's sections is the live one
+
+The work item is set deliberately so the agent can reach the current task
+and its context immediately. Treat it as the entry point, not as trivia
+to confirm later.
+
 ## The model
 
 ```
@@ -399,6 +422,13 @@ are the only files written to the vault with filesystem tools.
 `Work Logs.base` provides five views: **All worklogs** (date DESC),
 **By ticket**, **By repo**, **Untracked** (work still needing a ticket),
 and **Legacy**.
+
+The clickable title column is the **`worklog` formula**, not `aliases`:
+Bases renders a raw `aliases` property as plain text, so it cannot be
+clicked. The formula wraps it in a link —
+`file.asLink(if(note.aliases.isEmpty(), file.name, note.aliases.join(", ")))`
+— and every view orders on `formula.worklog`. Do not put bare `aliases`
+back in a view's `order`.
 
 `types-additions.json` registers the new schema's property types
 (`session_id`, `started`, `summary`, `tickets`, `repos`, `branches`,

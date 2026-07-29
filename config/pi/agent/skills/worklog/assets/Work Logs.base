@@ -3,11 +3,16 @@ filters:
     - 'file.ext == "md"'
     - 'file.inFolder("Work Logs")'
 
+formulas:
+  worklog: 'file.asLink(if(note.aliases.isEmpty(), file.name, note.aliases.join(", ")))'
+
 properties:
   date:
     displayName: "Date"
-  aliases:
+  formula.worklog:
     displayName: "Worklog"
+  aliases:
+    displayName: "Alias"
   summary:
     displayName: "Summary"
   tickets:
@@ -29,7 +34,7 @@ views:
         - 'file.inFolder("Work Logs/Legacy")'
     order:
       - date
-      - aliases
+      - formula.worklog
       - summary
       - tickets
       - repos
@@ -47,7 +52,7 @@ views:
       direction: ASC
     order:
       - date
-      - aliases
+      - formula.worklog
       - summary
       - repos
     sort:
@@ -64,7 +69,7 @@ views:
       direction: ASC
     order:
       - date
-      - aliases
+      - formula.worklog
       - summary
       - tickets
       - branches
@@ -81,7 +86,7 @@ views:
             - 'file.inFolder("Work Logs/Legacy")'
     order:
       - date
-      - aliases
+      - formula.worklog
       - summary
       - repos
       - file.tags
@@ -93,7 +98,7 @@ views:
     name: "Legacy"
     filters: 'file.inFolder("Work Logs/Legacy")'
     order:
-      - file.name
+      - formula.worklog
       - date
       - summary
       - file.mtime
