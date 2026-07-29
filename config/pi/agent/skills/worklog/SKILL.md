@@ -70,19 +70,19 @@ not stored** in the note; it is derivable from the transcript.
 | thing | form | example |
 | --- | --- | --- |
 | worklog file | `Work Logs/<session-id>.md`, **flat** | `Work Logs/019fa8ca-c427-7d17-a5ed-e8650281064f.md` |
-| worklog alias | `YYYY-MM-DD <primary-repo> — <short title>` | `2026-07-28 service — rebase bundled-feature MRs` |
-| work item tag | `#wi/<TICKET-KEY>/<kebab-slug>` | `#wi/PROJ-1234/rebase-bundled-mcp-mrs` |
+| worklog alias | `YYYY-MM-DD <primary-repo> — <short title>` | `2026-01-15 widget-lib — add response caching` |
+| work item tag | `#wi/<TICKET-KEY>/<kebab-slug>` | `#wi/ABC-123/add-response-caching` |
 | unticketed section | `#untracked` | `#untracked` |
-| ticket note | `Tickets/<KEY>.md`, alias `<KEY> — <jira summary>` | `Tickets/PROJ-1234.md` |
+| ticket note | `Tickets/<KEY>.md`, alias `<KEY> — <jira summary>` | `Tickets/ABC-123.md` |
 | legacy notes | `Work Logs/Legacy/` | — |
 
 - The filename is the **full UUID**, exactly matching the session id in
   the transcript filename. No subfolders. The old
   `Work Logs/<project>/YYYY-MM-DD.md` layout is **retired**.
-- Wikilinks resolve through aliases, so `[[2026-07-28 service — rebase
-  bundled-feature MRs]]` reads naturally while the file stays a UUID.
+- Wikilinks resolve through aliases, so `[[2026-01-15 widget-lib — rebase
+  caching MRs]]` reads naturally while the file stays a UUID.
 - **The ticket key in a work item tag is MANDATORY.** That is the whole
-  point — it forces work to be ticketed. `#wi/PROJ-1234` then collects
+  point — it forces work to be ticketed. `#wi/ABC-123` then collects
   every work item on that ticket via the tag pane.
 - `#untracked` exists so unticketed work stays greppable and can be
   retro-ticketed later.
@@ -94,7 +94,7 @@ not stored** in the note; it is derivable from the transcript.
 H2, with the tag at the **end of the heading line**:
 
 ```markdown
-## PROJ-1234 — rebase the three bundled-feature MRs #wi/PROJ-1234/rebase-bundled-mcp-mrs
+## ABC-123 — rebase the three caching MRs #wi/ABC-123/add-response-caching
 ## fastmcp reconnaissance #untracked
 ```
 
@@ -105,25 +105,25 @@ One H2 per unit of work. Sub-structure (H3+) inside a section is free-form.
 ```yaml
 ---
 aliases:
-  - 2026-07-28 service — rebase bundled-feature MRs
+  - 2026-01-15 widget-lib — add response caching
 session_id: 019fa8ca-c427-7d17-a5ed-e8650281064f
-date: 2026-07-28
-started: 2026-07-28T12:54:48Z
+date: 2026-01-15
+started: 2026-01-15T09:30:00Z
 summary: One-sentence description of the whole session.
 tickets:
-  - "[[Tickets/PROJ-1234|PROJ-1234]]"
+  - "[[Tickets/ABC-123|ABC-123]]"
 repos:
-  - service-lib
-  - service-agents
+  - widget-lib
+  - widget-app
 branches:
-  - "service-lib:PROJ-1234-bundled-feature"
+  - "widget-lib:ABC-123-add-caching"
 changes:
-  - "service-lib:xlvqlxoq"
+  - "widget-lib:qpvuntsm"
 commits:
-  - "service-lib:e459c60c"
+  - "widget-lib:b2c3d4e5"
 reviews:
-  - "gitlab:example-org/apps/BRE_SDT/agentcore/service-lib!23"
-  - "codereview:15865"
+  - "gitlab:example-org/widgets/widget-lib!23"
+  - "codereview:4242"
 ---
 ```
 
@@ -155,8 +155,8 @@ repo → MR → branch → before/after sha:
 ```markdown
 | repo | MR | bookmark | before → after | main was ahead by |
 | --- | --- | --- | --- | --- |
-| `service-lib` | [!23](https://gitlab.com/.../service-lib/-/merge_requests/23) | `PROJ-1234-bundled-feature` | `473e374b` → `e459c60c` | 16 |
-| `service-agents` | [!69](https://gitlab.com/.../service-agents/-/merge_requests/69) | `PROJ-1234-example-mcp-wiring` | `9b74f960` → `11c728dd` | 39 |
+| `widget-lib` | [!23](https://gitlab.example.com/example-org/widgets/widget-lib/-/merge_requests/23) | `ABC-123-add-caching` | `a1b2c3d4` → `b2c3d4e5` | 16 |
+| `widget-app` | [!69](https://gitlab.example.com/example-org/widgets/widget-app/-/merge_requests/69) | `ABC-123-wire-cache` | `c3d4e5f6` → `d4e5f6a7` | 39 |
 ```
 
 Beyond that, the body carries the real detail: what was tried, what
@@ -179,25 +179,25 @@ the rest afterwards:
 obsidian vault="notes" property:set path="$W" name="session_id" \
   value="$PI_SESSION_ID" type="text"
 obsidian vault="notes" property:set path="$W" name="started" \
-  value="2026-07-28T12:54:48Z" type="datetime"
+  value="2026-01-15T09:30:00Z" type="datetime"
 obsidian vault="notes" property:set path="$W" name="date" \
-  value="2026-07-28" type="date"
+  value="2026-01-15" type="date"
 obsidian vault="notes" property:set path="$W" name="summary" \
-  value="Rebased the three PROJ-1234 bundled-feature MRs onto main." type="text"
+  value="Rebased the three ABC-123 caching MRs onto main." type="text"
 obsidian vault="notes" property:set path="$W" name="aliases" \
-  value="2026-07-28 service — rebase bundled-feature MRs" type="list"
+  value="2026-01-15 widget-lib — add response caching" type="list"
 obsidian vault="notes" property:set path="$W" name="tickets" \
-  value="[[Tickets/PROJ-1234|PROJ-1234]]" type="list"
+  value="[[Tickets/ABC-123|ABC-123]]" type="list"
 obsidian vault="notes" property:set path="$W" name="repos" \
-  value="service-lib,service-agents,service" type="list"
+  value="widget-lib,widget-app,widget-infra" type="list"
 obsidian vault="notes" property:set path="$W" name="branches" \
-  value="service-lib:PROJ-1234-bundled-feature,service-agents:PROJ-1234-example-mcp-wiring" type="list"
+  value="widget-lib:ABC-123-add-caching,widget-app:ABC-123-wire-cache" type="list"
 obsidian vault="notes" property:set path="$W" name="changes" \
-  value="service-lib:xlvqlxoq,service:psupuoqm" type="list"
+  value="widget-lib:qpvuntsm,widget-infra:kkmpptxz" type="list"
 obsidian vault="notes" property:set path="$W" name="commits" \
-  value="service-lib:e459c60c,service-agents:11c728dd" type="list"
+  value="widget-lib:b2c3d4e5,widget-app:d4e5f6a7" type="list"
 obsidian vault="notes" property:set path="$W" name="reviews" \
-  value="gitlab:example-org/apps/BRE_SDT/agentcore/service-lib!23,codereview:15865" type="list"
+  value="gitlab:example-org/widgets/widget-lib!23,codereview:4242" type="list"
 ```
 
 `type="list"` takes a comma-separated `value` and writes a proper YAML
@@ -220,7 +220,7 @@ jj bookmark list
 
 # the commits on a bookmark that are not yet on trunk:
 # change id (stable across rebase) + git sha (what was pushed)
-jj log -r 'trunk()..PROJ-1234-bundled-feature' --no-graph \
+jj log -r 'trunk()..ABC-123-add-caching' --no-graph \
   -T 'change_id.short(8) ++ " " ++ commit_id.short(8) ++ " " ++ description.first_line() ++ "\n"'
 
 # everything authored in this session's working stack, if no bookmark yet
@@ -228,8 +228,8 @@ jj log -r '::@ & ~::trunk()' --no-graph \
   -T 'change_id.short(8) ++ " " ++ commit_id.short(8) ++ " " ++ description.first_line() ++ "\n"'
 
 # before → after shas for the body table, around a rebase/force-push
-jj log -r 'PROJ-1234-bundled-feature@origin' --no-graph -T 'commit_id.short(8)'
-jj log -r 'PROJ-1234-bundled-feature'        --no-graph -T 'commit_id.short(8)'
+jj log -r 'ABC-123-add-caching@origin' --no-graph -T 'commit_id.short(8)'
+jj log -r 'ABC-123-add-caching'        --no-graph -T 'commit_id.short(8)'
 ```
 
 `change_id` values go in `changes:`, `commit_id` values in `commits:`,
@@ -260,7 +260,7 @@ Needed to write or refresh a ticket note:
 ```bash
 cargo run -q --offline \
   --manifest-path ~/.pi/agent/skills/jira/scripts/jira-cli/Cargo.toml \
-  -- read PROJ-1234
+  -- read ABC-123
 ```
 
 ```bash
@@ -276,9 +276,9 @@ cargo run -q --offline \
 `jira-cli read`).
 
 ```bash
-obsidian vault="notes" create path="Tickets/PROJ-1234.md"
-obsidian vault="notes" property:set path="Tickets/PROJ-1234.md" name="aliases" \
-  value="PROJ-1234 — Bundle the plugin server with the host app" type="list"
+obsidian vault="notes" create path="Tickets/ABC-123.md"
+obsidian vault="notes" property:set path="Tickets/ABC-123.md" name="aliases" \
+  value="ABC-123 — Add response caching to the widget service" type="list"
 ```
 
 The note itself only needs the ticket's own context. It does **not** need
@@ -297,7 +297,7 @@ wikilink to `tickets:`.
   section / work item, not one per worklog.** A session with three
   sections produces three daily-note entries.
 - Each entry links to the worklog **by alias**:
-  `[[2026-07-28 service — rebase bundled-feature MRs]]`.
+  `[[2026-01-15 widget-lib — add response caching]]`.
 - Each entry **repeats the work item tag** (or `#untracked`).
 - Every entry must explicitly name **the repository, the Jira ticket, and
   the branch/bookmark**. Do not assume these are obvious in hindsight.
@@ -309,22 +309,22 @@ wikilink to `tickets:`.
 ```markdown
 ## Work Log
 
-### PROJ-1234 — rebased all three bundled-feature MRs onto main #wi/PROJ-1234/rebase-bundled-mcp-mrs
-- **Repos** `service-lib`, `service-agents`, `service`; **branches**
-  `PROJ-1234-bundled-feature`, `PROJ-1234-example-mcp-wiring`,
-  `PROJ-1234-example-adr`; **Jira** [[Tickets/PROJ-1234|PROJ-1234]].
+### ABC-123 — rebased all three caching MRs onto main #wi/ABC-123/add-response-caching
+- **Repos** `widget-lib`, `widget-app`, `widget-infra`; **branches**
+  `ABC-123-add-caching`, `ABC-123-wire-cache`,
+  `ABC-123-example-adr`; **Jira** [[Tickets/ABC-123|ABC-123]].
 - All three force-pushed; jj 0.43 silently drops a gitlink when
   "resolving" a 2-sided submodule conflict — worked around with a carrier
   commit.
-- Still open: `service-lib` pin must move to a merged sha before either
+- Still open: `widget-lib` pin must move to a merged sha before either
   dependent MR merges.
-- Detail: [[2026-07-28 service — rebase bundled-feature MRs]].
+- Detail: [[2026-01-15 widget-lib — add response caching]].
 
 ### fastmcp reconnaissance #untracked
 - **Repo** `other-repo`; **branch** none yet; **Jira** none yet — needs a
   ticket.
 - Reconnaissance only, no code changed.
-- Detail: [[2026-07-28 other-repo — fastmcp reconnaissance]].
+- Detail: [[2026-01-15 other-repo — fastmcp reconnaissance]].
 ```
 
 ```bash
@@ -365,7 +365,7 @@ proper YAML list:
 
 ```bash
 obsidian vault="notes" property:set name="tags" \
-  value="wi/PROJ-1234/rebase-bundled-mcp-mrs,untracked" type="list" path="$DAILY"
+  value="wi/ABC-123/add-response-caching,untracked" type="list" path="$DAILY"
 ```
 
 To switch the current work item, **prepend** and de-duplicate rather than
@@ -373,14 +373,14 @@ overwriting, so the day's history is preserved in order:
 
 ```bash
 DAILY=$(obsidian vault="notes" daily:path)
-NEW="wi/PROJ-1234/rebase-bundled-mcp-mrs"
+NEW="wi/ABC-123/add-response-caching"
 CUR=$(obsidian vault="notes" property:read name="tags" path="$DAILY")
 LIST=$(printf '%s\n%s\n' "$NEW" "$CUR" | awk 'NF && !seen[$0]++' | paste -sd, -)
 obsidian vault="notes" property:set name="tags" value="$LIST" type="list" path="$DAILY"
 ```
 
-Frontmatter tags carry no leading `#` — write `wi/PROJ-1234/slug`, not
-`#wi/PROJ-1234/slug`. Consumers add the `#` for display.
+Frontmatter tags carry no leading `#` — write `wi/ABC-123/slug`, not
+`#wi/ABC-123/slug`. Consumers add the `#` for display.
 
 ## Vault assets
 
@@ -428,7 +428,7 @@ means when several threads run in parallel.
 
 Making work items *tags* rather than notes or folders means a unit of
 work costs nothing to create, can span repos, and is queryable two ways
-at once: `#wi/PROJ-1234` for everything on a ticket, and the full
-`#wi/PROJ-1234/<slug>` for one specific unit. Requiring the ticket key in
+at once: `#wi/ABC-123` for everything on a ticket, and the full
+`#wi/ABC-123/<slug>` for one specific unit. Requiring the ticket key in
 the tag is the forcing function that keeps work ticketed; `#untracked` is
 the escape hatch that stays visible until it's paid off.
