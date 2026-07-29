@@ -1,7 +1,9 @@
 /**
  * Minimal footer: replaces the built-in footer with a single line
  *   <repo-name> • <work-item> • <jj change | git commit> • <session>  …  ↑in ↓out
- * Work item is fetched from Obsidian daily note property "current_work_item".
+ * Work item is the first entry of the Obsidian daily note's "tags" property
+ * (work item tags, most recent first — see the `worklog` skill's `tags`
+ * invariant). The CLI strips the leading "#", so it is re-added for display.
  * Shows "no work item" when not set.
  * Hides model id, thinking level, cost, and context %.
  *
@@ -112,13 +114,16 @@ async function getCurrentWorkItem(): Promise<string | undefined> {
 		// Read the property from the daily note
 		const result = await exec(
 			"obsidian",
-			["vault=notes", "property:read", "name=current_work_item", `path=${dailyPath}`],
+			["vault=notes", "property:read", "name=tags", `path=${dailyPath}`],
 			{ timeout: 1000 },
 		);
 		// Obsidian CLI writes errors to stdout, not stderr, so check for error messages
 		const value = result.stdout.trim();
 		if (!value || value.startsWith("Error:")) return undefined;
-		return value;
+		// One tag per line, in frontmatter order — the first is the current work item.
+		const current = value.split("\n")[0].trim();
+		if (!current) return undefined;
+		return `#${current}`;
 	} catch {
 		// Daily note may not exist yet, or Obsidian not running
 		return undefined;
