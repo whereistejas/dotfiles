@@ -13,9 +13,20 @@ read the current work item. Do not open worklog notes, grep the vault, or
 ask the user what they're working on before doing this.
 
 ```bash
+# MANDATORY filter — see "Reading `tags` safely" for why
+wi_tags() { grep -E '^[A-Za-z0-9][A-Za-z0-9/_.-]*$' || true; }
+
 DAILY=$(obsidian vault="notes" daily:path)
-obsidian vault="notes" property:read name="tags" path="$DAILY" | head -n 1
+obsidian vault="notes" property:read name="tags" path="$DAILY" | wi_tags | head -n 1
 ```
+
+**Never read `tags` without `wi_tags`.** The CLI reports "not found" on *stdout*
+with exit code 0, so an absent property or a not-yet-created daily note yields
+the literal string `Error: Property "tags" not found.` as if it were the work
+item — see [Reading `tags` safely](#reading-tags-safely).
+
+Empty output means **no work item is set yet** (a fresh day) — not that reading
+failed. In that case fall back to the previous day's note before asking the user.
 
 The first line of the daily note's `tags` **is** the current work item —
 see [The `tags` invariant](#the-tags-invariant). It yields, for free:
@@ -57,6 +68,10 @@ direct edits bypass Obsidian's index and daily-note/template handling.
 - Create: `obsidian vault="notes" create path="..." template="Worklog"`.
 - Properties: `obsidian vault="notes" property:read name="..." path="..."`
   and `property:set name="..." value="..." type="..." path="..."`.
+  ⚠️ Both have sharp edges — `property:read` reports errors on **stdout** with
+  exit 0 ([guard](#reading-tags-safely)), and `property:set type="list"` cannot
+  write a list of **wikilinks**
+  ([workaround](#wikilink-list-properties-are-broken-in-propertyset)).
 - Always pass `vault="notes"` — the focused vault is otherwise ambiguous.
 
 Obsidian must be running. If a command reports no running instance, **say
@@ -226,6 +241,63 @@ obsidian vault="notes" property:set path="$W" name="reviews" \
 `type="list"` takes a comma-separated `value` and writes a proper YAML
 list. Body content (sections, tables, prose) goes in with `append`.
 
+### Wikilink list properties are broken in `property:set`
+
+> **`property:set type="list"` cannot write a list of wikilinks.** Any value
+> containing `[[` is written as a single quoted scalar and comma-splitting is
+> silently disabled. `type="multitext"` behaves identically.
+
+Verified 2026-07-30:
+
+| set | written |
+| --- | --- |
+| `name=repos value="one-repo"` | `repos:` / `  - one-repo` — proper list |
+| `name=branches value="a,b"` | `branches:` / `  - a` / `  - b` — proper list |
+| `name=tickets value="[[Tickets/A\|A]]"` | `tickets: "[[Tickets/A\|A]]"` — scalar |
+| `name=tickets value="[[Tickets/A\|A]],[[Tickets/B\|B]]"` | `tickets: "[[Tickets/A\|A]],[[Tickets/B\|B]]"` — **both links in ONE string** |
+
+Why it matters, measured with `obsidian links` / `obsidian backlinks`:
+
+- **One** wikilink in a scalar still resolves — the worklog does appear in the
+  ticket's backlinks pane. So single-ticket worklogs are fine, and that is what
+  existing notes contain. Leave them alone.
+- **Two or more** wikilinks in one scalar **break**: Obsidian parses fragments
+  (`A]], [[B (unresolved)`) and the links do not resolve. The ticket→worklog
+  backlinks index — the entire reason `tickets` holds wikilinks — is lost, and
+  Bases sees one text value instead of a list.
+
+**So: a worklog touching two or more tickets must NOT have its `tickets`
+property written with `property:set`.** Write the frontmatter as raw YAML in a
+single `create ... overwrite` instead — which is also the cleanest way to
+replace the template skeleton with the real body:
+
+```bash
+W="Work Logs/${PI_SESSION_ID}.md"
+cat > /tmp/worklog.md <<'EOF'
+---
+aliases:
+  - 2026-01-15 widget-lib — add response caching
+session_id: 019fa8ca-c427-7d17-a5ed-e8650281064f
+date: 2026-01-15
+started: 2026-01-15T09:30:00
+summary: One sentence.
+tickets:
+  - "[[Tickets/ABC-123|ABC-123]]"
+  - "[[Tickets/ABC-456|ABC-456]]"
+repos:
+  - widget-lib
+---
+# body starts here
+EOF
+obsidian vault="notes" create path="$W" overwrite content="$(cat /tmp/worklog.md)"
+```
+
+Also note `started` takes `YYYY-MM-DDTHH:mm[:ss]` and **rejects a trailing
+`Z`** — use `2026-01-15T09:30:00`, not `2026-01-15T09:30:00Z`.
+
+After any frontmatter write, read the property back — corruption is otherwise
+invisible.
+
 ## Gathering the metadata mechanically
 
 Fill the frontmatter from commands, not from memory.
@@ -383,6 +455,34 @@ obsidian vault="notes" property:read name="tags" path="$DAILY"
 obsidian vault="notes" tags path="$DAILY"
 ```
 
+### Reading `tags` safely
+
+> **`obsidian property:read` writes its errors to STDOUT and always exits 0.**
+
+Verified 2026-07-30:
+
+| case | stdout | exit |
+| --- | --- | --- |
+| property present | `wi/ABC-123/slug` | 0 |
+| property absent | `Error: Property "tags" not found.` | 0 |
+| note absent | `Error: File "..." not found.` | 0 |
+
+So `2>/dev/null` does nothing, and `if ! CUR=$(...)` never fires. The **only**
+reliable guard is to validate the shape of each line. Define this once and pipe
+every `tags` read through it:
+
+```bash
+# Keep only frontmatter-tag-shaped lines: no spaces, no colons, no leading "#".
+# Rejects "Error: ..." regardless of wording. `|| true` so an empty result does
+# not trip `set -e` / abort a command substitution.
+wi_tags() { grep -E '^[A-Za-z0-9][A-Za-z0-9/_.-]*$' || true; }
+```
+
+This bug has already corrupted a daily note once: the prepend idiom below,
+run against a not-yet-created daily note, wrote
+`tags: [wi/ABC-123/slug, 'Error: Property "tags" not found.']`. Always read the
+property back after setting it.
+
 Setting `tags` — comma-separated `value` with `type="list"` writes a
 proper YAML list:
 
@@ -397,10 +497,19 @@ overwriting, so the day's history is preserved in order:
 ```bash
 DAILY=$(obsidian vault="notes" daily:path)
 NEW="wi/ABC-123/add-response-caching"
-CUR=$(obsidian vault="notes" property:read name="tags" path="$DAILY")
+wi_tags() { grep -E '^[A-Za-z0-9][A-Za-z0-9/_.-]*$' || true; }   # see above — MANDATORY
+
+CUR=$(obsidian vault="notes" property:read name="tags" path="$DAILY" | wi_tags)
 LIST=$(printf '%s\n%s\n' "$NEW" "$CUR" | awk 'NF && !seen[$0]++' | paste -sd, -)
 obsidian vault="notes" property:set name="tags" value="$LIST" type="list" path="$DAILY"
+
+# ALWAYS read back — a corrupted list is otherwise invisible
+obsidian vault="notes" property:read name="tags" path="$DAILY"
 ```
+
+Plain (non-wikilink) values always write a proper YAML list, even for a single
+item — so `tags` is unaffected by the wikilink bug described in
+[Wikilink list properties](#wikilink-list-properties-are-broken-in-propertyset).
 
 Frontmatter tags carry no leading `#` — write `wi/ABC-123/slug`, not
 `#wi/ABC-123/slug`. Consumers add the `#` for display.
