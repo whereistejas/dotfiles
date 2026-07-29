@@ -503,19 +503,24 @@ jj_cmd.j = function(args)
 end
 
 -- snacks (picker + explorer)
-require("snacks").setup({
-	picker = {
-		enabled = true,
-		icons = {
-			files = { enabled = false }, -- hide file-type icons
+-- Guarded: snacks.nvim throws "already setup" on a second setup() call, which
+-- would abort `:source $MYVIMRC`.
+if not vim.g.snacks_did_setup then
+	vim.g.snacks_did_setup = true
+	require("snacks").setup({
+		picker = {
+			enabled = true,
+			icons = {
+				files = { enabled = false }, -- hide file-type icons
+			},
+			win = {
+				-- Drop line-number/sign gutter in the preview pane.
+				preview = { minimal = true },
+			},
 		},
-		win = {
-			-- Drop line-number/sign gutter in the preview pane.
-			preview = { minimal = true },
-		},
-	},
-	explorer = { enabled = true },
-})
+		explorer = { enabled = true },
+	})
+end
 
 -- no-neck-pain (centered layout)
 require("no-neck-pain").setup({ width = 120 })
@@ -645,6 +650,7 @@ vim.lsp.enable("ruff")
 vim.lsp.enable("ty")
 vim.lsp.enable("bashls")
 vim.lsp.enable("marksman")
+vim.lsp.enable("zls")
 
 -- Diagnostics
 vim.diagnostic.config({
@@ -736,6 +742,22 @@ end
 -- Tab prev/next — mirror AeroSpace's alt-[ / alt-] for workspaces.
 vim.keymap.set({ "n", "i", "v", "t" }, "<D-[>", "<Cmd>tabprevious<CR>", { desc = "Previous tab" })
 vim.keymap.set({ "n", "i", "v", "t" }, "<D-]>", "<Cmd>tabnext<CR>", { desc = "Next tab" })
+
+-- Quickfix prev/next — wraps at the ends instead of erroring with E553.
+local function qf_step(forward)
+	if vim.fn.getqflist({ size = 0 }).size == 0 then
+		return
+	end
+	if not pcall(vim.cmd, forward and "cnext" or "cprevious") then
+		vim.cmd(forward and "cfirst" or "clast")
+	end
+end
+vim.keymap.set("n", "<C-n>", function()
+	qf_step(true)
+end, { desc = "Next quickfix item" })
+vim.keymap.set("n", "<C-p>", function()
+	qf_step(false)
+end, { desc = "Previous quickfix item" })
 
 -- Terminal buffers: no line numbers, sign column, or listchars.
 local function term_ui()
