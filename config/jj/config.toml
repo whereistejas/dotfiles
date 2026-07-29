@@ -62,6 +62,13 @@ diff-instructions = false
 show-cryptographic-signatures = true
 default-command = "status"
 
+[git]
+# Beacon-internal notes in config/pi/agent/AGENTS.md must never reach a remote.
+# Keep this commit at the *top* of the stack: `private-commits` also blocks
+# pushing any descendant, so if it sinks to the bottom nothing is pushable.
+# Matched by change id (stable across rewrites) and by description as a backstop.
+private-commits = 'present(ktkkytyorwrt) | description(glob:"AGENTS: document Beacon*")'
+
 [remotes.origin]
 auto-track-bookmarks = 'exact:"main" | exact:"master"'
 fetch-tags = "none"
