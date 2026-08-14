@@ -30,7 +30,7 @@ Look for:
 - `jj squash` (without `--from`/`--into`)
 - `jj squash -r <rev>` (still interactive! needs `--from`/`--into`)
 - `jj squash --from <src> --into <dst>` (opens `$EDITOR` when both commits have descriptions; hangs when stdin is not a terminal)
-- `jj split` (without using `jj-hunk` skill)
+- `jj split` (without file paths — use the `jj-surgeon` skill / `jj-hunk-tool`)
 - `jj resolve` (without `-r <rev> --tool <tool>`)
 
 **Safe patterns:**
@@ -41,8 +41,10 @@ Look for:
 jj squash --from <source-rev> --into <dest-rev> -u
 jj squash --from <source-rev> --into <dest-rev> -u --keep-emptied
 
-# Splitting - use jj-hunk skill (see skills/jj-hunk/SKILL.md)
-jj-hunk split '<spec>' "commit message"
+# Splitting - by file, or by hunk via jj-hunk-tool (see the jj-surgeon skill)
+jj split path/to/file -m "commit message"
+jj-hunk-tool hunks                       # list hunk IDs
+jj-hunk-tool split <hunk-id> -m "commit message"
 
 # Resolving conflicts
 jj resolve -r <rev> --tool <tool>

@@ -41,10 +41,6 @@ merge-args = ["-f", "-d", "$output", "-M", "$left", "$base", "$right",
               "-c", "/<<<<<</+2"]
 merge-tool-edits-conflict-markers = true
 
-[merge-tools.jj-hunk]
-program = "jj-hunk"
-edit-args = ["select", "$left", "$right"]
-
 [ui]
 paginate = "auto"
 pager = ["less", "-FRX"]
@@ -64,8 +60,9 @@ default-command = "status"
 
 [git]
 # Beacon-internal notes in config/pi/agent/AGENTS.md must never reach a remote.
-# Keep this commit at the *top* of the stack: `private-commits` also blocks
-# pushing any descendant, so if it sinks to the bottom nothing is pushable.
+# Keep the *matched* commit (not this one) at the top of the stack: private-commits
+# also blocks pushing any descendant, so if it sinks to the bottom nothing is pushable.
+# Rebase it back up with `jj rebase -r ktkkytyorwrt -A @` after landing work beneath it.
 # Matched by change id (stable across rewrites) and by description as a backstop.
 private-commits = 'present(ktkkytyorwrt) | description(glob:"AGENTS: document Beacon*")'
 
