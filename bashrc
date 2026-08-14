@@ -54,8 +54,6 @@ alias pgrep="pgrep -fil "
 alias diff="jj diff"
 alias vim="nvim "
 
-alias pi='bun run $(which pi)'
-
 # Functions
 _jj_each() {
     local cmd="$1"; shift
