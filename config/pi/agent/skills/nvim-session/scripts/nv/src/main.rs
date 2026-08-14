@@ -60,6 +60,7 @@ const USAGE: &str = "\
   nv buffers [--modified]    open buffers, optionally only unsaved ones
   nv qf <title>              populate quickfix from JSON items on stdin
   nv open <file> <line>      open a file at a line
+  nv reload                  re-read buffers whose file changed on disk
   nv cwd                     working directory of every scope
   nv cd <dir> --scope S      set the working directory (S: global|tab|window|buffer)
   nv cd --unset --scope S    drop a local directory (S: tab|window|buffer)
@@ -100,6 +101,21 @@ const USAGE_OPEN: &str = "\
 
   Example:
     nv open src/link/MappedFile.zig 766";
+const USAGE_RELOAD: &str = "\
+  nv reload
+
+  Takes no arguments. Re-reads every open buffer whose file changed on disk
+  (`:checktime`), so the editor stops showing a stale copy after something
+  outside it rewrote the working copy - a `jj edit`/`jj new` checkout, a rebase,
+  a branch switch.
+
+  Refuses, changing nothing, if ANY buffer has unsaved changes: reloading those
+  would either discard the user's edits or leave nvim waiting on a prompt that
+  no one can answer. Save or discard them first, then reload.
+
+  Reports every named buffer with its line count, so a reload that changed
+  nothing is distinguishable from one that did.";
+
 const USAGE_CWD: &str = "\
   nv cwd
 
@@ -202,6 +218,7 @@ enum Command {
     Cwd,
     /// `dir: None` means unset this scope's local directory (`:lcd!` and friends).
     Cd { dir: Option<String>, scope: Scope },
+    Reload,
 }
 
 impl Command {
@@ -216,6 +233,7 @@ impl Command {
             Command::Open { .. } => USAGE_OPEN,
             Command::Cwd => USAGE_CWD,
             Command::Cd { .. } => USAGE_CD,
+            Command::Reload => USAGE_RELOAD,
         }
     }
 }
@@ -405,6 +423,11 @@ fn parse(args: &[String]) -> Result<Invocation, Fail> {
             no_positional(name, rest, USAGE_CWD)?;
             no_flags(name, &flags, &[], USAGE_CWD)?;
             Command::Cwd
+        }
+        "reload" => {
+            no_positional(name, rest, USAGE_RELOAD)?;
+            no_flags(name, &flags, &[], USAGE_RELOAD)?;
+            Command::Reload
         }
         "cd" => {
             no_flags(name, &flags, &["--unset"], USAGE_CD)?;
@@ -713,6 +736,7 @@ fn execute(invocation: Invocation) -> Result<String, Fail> {
         Command::Open { ref file, line } => open(&mut nvim, file, line),
         Command::Cwd => cwd(&mut nvim),
         Command::Cd { ref dir, scope } => cd(&mut nvim, dir.as_deref(), scope),
+        Command::Reload => reload(&mut nvim),
     }
     .map_err(|e| Fail::new(e.to_string(), usage))?;
 
@@ -914,6 +938,90 @@ fn buffers(nvim: &mut Nvim, only_modified: bool) -> Result<serde_json::Value, Er
         }));
     }
     Ok(serde_json::json!({ "buffers": out }))
+}
+
+/// Re-read buffers whose file changed underneath the editor.
+///
+/// Exists for the checkout workflow: `jj edit <rev>` rewrites the working copy,
+/// and every open buffer is then a stale copy of a file that has moved. Without
+/// this the user reviews content that is no longer on disk, and `mini.diff` /
+/// gitsigns compute hunks against the wrong text.
+///
+/// Refuses when any buffer is dirty rather than picking a side: `:checktime` on
+/// a modified buffer either prompts (hanging a headless RPC caller) or discards
+/// work. Naming the offenders and doing nothing is the only honest option.
+fn reload(nvim: &mut Nvim) -> Result<serde_json::Value, Error> {
+    let bufs = nvim.call("nvim_list_bufs", vec![])?;
+    let bufs = bufs.as_array().cloned().unwrap_or_default();
+
+    let mut dirty = Vec::new();
+    for buf in &bufs {
+        if buf_modified(nvim, buf)? {
+            let name = nvim.call("nvim_buf_get_name", vec![buf.clone()])?;
+            let name = name.as_str().unwrap_or_default().to_string();
+            dirty.push(if name.is_empty() {
+                "[No Name]".to_string()
+            } else {
+                name
+            });
+        }
+    }
+    if !dirty.is_empty() {
+        return Err(Error::Protocol(format!(
+            "refusing to reload: {} buffer(s) have unsaved changes: {}. \
+             Save or discard them first - reloading would discard the edits \
+             or block on a prompt.",
+            dirty.len(),
+            dirty.join(", ")
+        )));
+    }
+
+    // autoread is what makes checktime reload silently instead of prompting;
+    // set it for the duration so the caller does not depend on the user's config.
+    let prior = nvim.call("nvim_get_option_value", vec![
+        Value::from("autoread"),
+        Value::Map(vec![]),
+    ])?;
+    let prior = prior.as_bool().unwrap_or(false);
+    if !prior {
+        nvim.call(
+            "nvim_set_option_value",
+            vec![
+                Value::from("autoread"),
+                Value::from(true),
+                Value::Map(vec![]),
+            ],
+        )?;
+    }
+    let result = nvim.call_function("execute", vec![Value::from("checktime")]);
+    if !prior {
+        // Restore even if checktime failed - never leave the session altered.
+        let _ = nvim.call(
+            "nvim_set_option_value",
+            vec![
+                Value::from("autoread"),
+                Value::from(false),
+                Value::Map(vec![]),
+            ],
+        );
+    }
+    result?;
+
+    let mut out = Vec::new();
+    for buf in &bufs {
+        let name = nvim.call("nvim_buf_get_name", vec![buf.clone()])?;
+        let name = name.as_str().unwrap_or_default().to_string();
+        if name.is_empty() {
+            continue;
+        }
+        let lines = nvim.call("nvim_buf_line_count", vec![buf.clone()])?.as_u64();
+        out.push(serde_json::json!({ "file": name, "lines": lines }));
+    }
+    Ok(serde_json::json!({
+        "checked": out.len(),
+        "buffers": out,
+        "autoread_was": prior,
+    }))
 }
 
 fn qf_set(nvim: &mut Nvim, title: &str, items: &[QfItem]) -> Result<serde_json::Value, Error> {
