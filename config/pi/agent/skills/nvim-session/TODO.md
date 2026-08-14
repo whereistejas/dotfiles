@@ -44,6 +44,9 @@ Carried over, still unanswered:
 - **Disambiguation** — 2+ live servers seen in practice. Fail loud, or pick by cwd?
 - **Write access** — read + annotate + quickfix only, or may the agent write
   buffers? (Leaning read-only; buffer writes bypass disk and confuse `jj`.)
+  Partly settled: `nv cd` is allowed to change directory scope, because one
+  long-lived session across many folders is the whole point. Buffer *contents*
+  stay off limits.
 - **Raw `lua` escape hatch** — flexible, but arbitrary code execution in the
   editor. Leaning no.
 - **No-session policy** — hard-fail, or fall back to disk reads? Silent fallback
@@ -59,8 +62,15 @@ Carried over, still unanswered:
 - `nv marks` verb to drain that queue.
 - `nv diagnostics`, `nv sign`, `nv diff` verbs.
 
+Done: `nv cwd` / `nv cd --scope global|tab|window|buffer` / `nv cd --unset`.
+
 ## 4. Hardening
 
 - `nv doctor` self-check (socket present, reachable, API level ≥ 12).
-- Test suite against throwaway headless nvim instances.
+- Test suite against throwaway headless nvim instances. `cwd`/`cd` were verified
+  this way by hand (throwaway socket, torn down after); nothing is automated yet,
+  so a regression in the scope handling would go unnoticed.
+- `nv cd` leaves no audit trail. If a stale `:lcd` from an earlier request
+  confuses a later one, there is no way to see who set it. Consider recording
+  agent-issued directory changes somewhere the user can inspect.
 - Decide vendored/`--offline` cargo (like `bi-mcp`) vs plain crates.io.

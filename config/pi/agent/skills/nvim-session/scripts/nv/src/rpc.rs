@@ -32,6 +32,8 @@ pub enum Error {
     Api { method: String, message: String },
     /// Protocol-level surprise (bad frame shape, unknown message type).
     Protocol(String),
+    /// The session is reachable but too old for what was asked of it.
+    Unsupported { feature: String, hint: String },
 }
 
 impl std::fmt::Display for Error {
@@ -57,6 +59,9 @@ impl std::fmt::Display for Error {
             ),
             Error::Api { method, message } => write!(f, "nvim API error in {method}: {message}"),
             Error::Protocol(e) => write!(f, "msgpack-rpc protocol error: {e}"),
+            Error::Unsupported { feature, hint } => {
+                write!(f, "this nvim session does not support {feature}. {hint}")
+            }
         }
     }
 }
