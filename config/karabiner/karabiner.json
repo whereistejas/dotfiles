@@ -1,7 +1,5 @@
 {
-    "global": {
-        "show_in_menu_bar": false
-    },
+    "global": { "show_in_menu_bar": false },
     "profiles": [
         {
             "complex_modifications": {
@@ -10,22 +8,19 @@
                         "description": "Caps Lock: double-tap toggles home row mod layer (single tap = caps lock)",
                         "manipulators": [
                             {
-                                "type": "basic",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "caps_tapped",
+                                        "type": "variable_if",
                                         "value": 1
                                     },
                                     {
-                                        "type": "variable_if",
                                         "name": "hrm_layer",
+                                        "type": "variable_if",
                                         "value": 0
                                     }
                                 ],
-                                "from": {
-                                    "key_code": "caps_lock"
-                                },
+                                "from": { "key_code": "caps_lock" },
                                 "to": [
                                     {
                                         "set_variable": {
@@ -45,25 +40,23 @@
                                             "text": "🔒 MOD MODE — home row = modifiers (double-tap caps to exit)"
                                         }
                                     }
-                                ]
+                                ],
+                                "type": "basic"
                             },
                             {
-                                "type": "basic",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "caps_tapped",
+                                        "type": "variable_if",
                                         "value": 1
                                     },
                                     {
-                                        "type": "variable_if",
                                         "name": "hrm_layer",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
-                                "from": {
-                                    "key_code": "caps_lock"
-                                },
+                                "from": { "key_code": "caps_lock" },
                                 "to": [
                                     {
                                         "set_variable": {
@@ -83,13 +76,12 @@
                                             "text": ""
                                         }
                                     }
-                                ]
+                                ],
+                                "type": "basic"
                             },
                             {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "caps_lock"
-                                },
+                                "from": { "key_code": "caps_lock" },
+                                "parameters": { "basic.to_delayed_action_delay_milliseconds": 300 },
                                 "to": [
                                     {
                                         "set_variable": {
@@ -99,17 +91,6 @@
                                     }
                                 ],
                                 "to_delayed_action": {
-                                    "to_if_invoked": [
-                                        {
-                                            "set_variable": {
-                                                "name": "caps_tapped",
-                                                "value": 0
-                                            }
-                                        },
-                                        {
-                                            "key_code": "caps_lock"
-                                        }
-                                    ],
                                     "to_if_canceled": [
                                         {
                                             "set_variable": {
@@ -117,11 +98,18 @@
                                                 "value": 0
                                             }
                                         }
+                                    ],
+                                    "to_if_invoked": [
+                                        {
+                                            "set_variable": {
+                                                "name": "caps_tapped",
+                                                "value": 0
+                                            }
+                                        },
+                                        { "key_code": "caps_lock" }
                                     ]
                                 },
-                                "parameters": {
-                                    "basic.to_delayed_action_delay_milliseconds": 300
-                                }
+                                "type": "basic"
                             }
                         ]
                     },
@@ -129,196 +117,124 @@
                         "description": "Home row mods (s/l ctrl, d/k opt, f/j cmd); 200ms hold; only when mod layer on",
                         "manipulators": [
                             {
-                                "type": "basic",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "hrm_layer",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
                                 "from": {
                                     "key_code": "s",
-                                    "modifiers": {
-                                        "optional": [
-                                            "any"
-                                        ]
-                                    }
+                                    "modifiers": { "optional": ["any"] }
                                 },
-                                "to_if_alone": [
-                                    {
-                                        "key_code": "s"
-                                    }
-                                ],
-                                "to_if_held_down": [
-                                    {
-                                        "key_code": "left_control"
-                                    }
-                                ],
                                 "parameters": {
                                     "basic.to_if_alone_timeout_milliseconds": 200,
                                     "basic.to_if_held_down_threshold_milliseconds": 200
-                                }
+                                },
+                                "to_if_alone": [{ "key_code": "s" }],
+                                "to_if_held_down": [{ "key_code": "left_control" }],
+                                "type": "basic"
                             },
                             {
-                                "type": "basic",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "hrm_layer",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
                                 "from": {
                                     "key_code": "d",
-                                    "modifiers": {
-                                        "optional": [
-                                            "any"
-                                        ]
-                                    }
+                                    "modifiers": { "optional": ["any"] }
                                 },
-                                "to_if_alone": [
-                                    {
-                                        "key_code": "d"
-                                    }
-                                ],
-                                "to_if_held_down": [
-                                    {
-                                        "key_code": "left_option"
-                                    }
-                                ],
                                 "parameters": {
                                     "basic.to_if_alone_timeout_milliseconds": 200,
                                     "basic.to_if_held_down_threshold_milliseconds": 200
-                                }
+                                },
+                                "to_if_alone": [{ "key_code": "d" }],
+                                "to_if_held_down": [{ "key_code": "left_option" }],
+                                "type": "basic"
                             },
                             {
-                                "type": "basic",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "hrm_layer",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
                                 "from": {
                                     "key_code": "f",
-                                    "modifiers": {
-                                        "optional": [
-                                            "any"
-                                        ]
-                                    }
+                                    "modifiers": { "optional": ["any"] }
                                 },
-                                "to_if_alone": [
-                                    {
-                                        "key_code": "f"
-                                    }
-                                ],
-                                "to_if_held_down": [
-                                    {
-                                        "key_code": "left_command"
-                                    }
-                                ],
                                 "parameters": {
                                     "basic.to_if_alone_timeout_milliseconds": 200,
                                     "basic.to_if_held_down_threshold_milliseconds": 200
-                                }
+                                },
+                                "to_if_alone": [{ "key_code": "f" }],
+                                "to_if_held_down": [{ "key_code": "left_command" }],
+                                "type": "basic"
                             },
                             {
-                                "type": "basic",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "hrm_layer",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
                                 "from": {
                                     "key_code": "j",
-                                    "modifiers": {
-                                        "optional": [
-                                            "any"
-                                        ]
-                                    }
+                                    "modifiers": { "optional": ["any"] }
                                 },
-                                "to_if_alone": [
-                                    {
-                                        "key_code": "j"
-                                    }
-                                ],
-                                "to_if_held_down": [
-                                    {
-                                        "key_code": "right_command"
-                                    }
-                                ],
                                 "parameters": {
                                     "basic.to_if_alone_timeout_milliseconds": 200,
                                     "basic.to_if_held_down_threshold_milliseconds": 200
-                                }
+                                },
+                                "to_if_alone": [{ "key_code": "j" }],
+                                "to_if_held_down": [{ "key_code": "right_command" }],
+                                "type": "basic"
                             },
                             {
-                                "type": "basic",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "hrm_layer",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
                                 "from": {
                                     "key_code": "k",
-                                    "modifiers": {
-                                        "optional": [
-                                            "any"
-                                        ]
-                                    }
+                                    "modifiers": { "optional": ["any"] }
                                 },
-                                "to_if_alone": [
-                                    {
-                                        "key_code": "k"
-                                    }
-                                ],
-                                "to_if_held_down": [
-                                    {
-                                        "key_code": "right_option"
-                                    }
-                                ],
                                 "parameters": {
                                     "basic.to_if_alone_timeout_milliseconds": 200,
                                     "basic.to_if_held_down_threshold_milliseconds": 200
-                                }
+                                },
+                                "to_if_alone": [{ "key_code": "k" }],
+                                "to_if_held_down": [{ "key_code": "right_option" }],
+                                "type": "basic"
                             },
                             {
-                                "type": "basic",
                                 "conditions": [
                                     {
-                                        "type": "variable_if",
                                         "name": "hrm_layer",
+                                        "type": "variable_if",
                                         "value": 1
                                     }
                                 ],
                                 "from": {
                                     "key_code": "l",
-                                    "modifiers": {
-                                        "optional": [
-                                            "any"
-                                        ]
-                                    }
+                                    "modifiers": { "optional": ["any"] }
                                 },
-                                "to_if_alone": [
-                                    {
-                                        "key_code": "l"
-                                    }
-                                ],
-                                "to_if_held_down": [
-                                    {
-                                        "key_code": "right_control"
-                                    }
-                                ],
                                 "parameters": {
                                     "basic.to_if_alone_timeout_milliseconds": 200,
                                     "basic.to_if_held_down_threshold_milliseconds": 200
-                                }
+                                },
+                                "to_if_alone": [{ "key_code": "l" }],
+                                "to_if_held_down": [{ "key_code": "right_control" }],
+                                "type": "basic"
                             }
                         ]
                     },
@@ -328,27 +244,15 @@
                             {
                                 "conditions": [
                                     {
-                                        "input_sources": [
-                                            {
-                                                "input_source_id": "com\\.apple\\.keylayout\\.British"
-                                            }
-                                        ],
+                                        "input_sources": [{ "input_source_id": "com\\.apple\\.keylayout\\.British" }],
                                         "type": "input_source_if"
                                     }
                                 ],
                                 "from": {
                                     "key_code": "non_us_backslash",
-                                    "modifiers": {
-                                        "optional": [
-                                            "any"
-                                        ]
-                                    }
+                                    "modifiers": { "optional": ["any"] }
                                 },
-                                "to": [
-                                    {
-                                        "key_code": "grave_accent_and_tilde"
-                                    }
-                                ],
+                                "to": [{ "key_code": "grave_accent_and_tilde" }],
                                 "type": "basic"
                             }
                         ]
@@ -359,34 +263,16 @@
                 {
                     "fn_function_keys": [
                         {
-                            "from": {
-                                "key_code": "f10"
-                            },
-                            "to": [
-                                {
-                                    "consumer_key_code": "play_or_pause"
-                                }
-                            ]
+                            "from": { "key_code": "f10" },
+                            "to": [{ "consumer_key_code": "play_or_pause" }]
                         },
                         {
-                            "from": {
-                                "key_code": "f11"
-                            },
-                            "to": [
-                                {
-                                    "consumer_key_code": "mute"
-                                }
-                            ]
+                            "from": { "key_code": "f11" },
+                            "to": [{ "consumer_key_code": "mute" }]
                         },
                         {
-                            "from": {
-                                "key_code": "f12"
-                            },
-                            "to": [
-                                {
-                                    "consumer_key_code": "volume_decrement"
-                                }
-                            ]
+                            "from": { "key_code": "f12" },
+                            "to": [{ "consumer_key_code": "volume_decrement" }]
                         }
                     ],
                     "identifiers": {
@@ -394,32 +280,28 @@
                         "product_id": 45929,
                         "vendor_id": 1133
                     }
+                },
+                {
+                    "disable_built_in_keyboard_if_exists": true,
+                    "identifiers": {
+                        "is_keyboard": true,
+                        "product_id": 1,
+                        "vendor_id": 57624
+                    }
                 }
             ],
             "fn_function_keys": [
                 {
-                    "from": {
-                        "key_code": "f6"
-                    },
-                    "to": [
-                        {
-                            "key_code": "f6"
-                        }
-                    ]
+                    "from": { "key_code": "f6" },
+                    "to": [{ "key_code": "f6" }]
                 }
             ],
             "name": "Default profile",
             "selected": true,
             "simple_modifications": [
                 {
-                    "from": {
-                        "key_code": "grave_accent_and_tilde"
-                    },
-                    "to": [
-                        {
-                            "key_code": "grave_accent_and_tilde"
-                        }
-                    ]
+                    "from": { "key_code": "grave_accent_and_tilde" },
+                    "to": [{ "key_code": "grave_accent_and_tilde" }]
                 }
             ],
             "virtual_hid_keyboard": {
