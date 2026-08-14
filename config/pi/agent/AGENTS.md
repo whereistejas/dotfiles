@@ -112,6 +112,7 @@ jj abandon 'divergent()'
 - If output looks "mangled," suspect flag misuse before blaming the terminal; verify with a tiny known-input test rather than rationalizing the result
 
 ## Environment
+- `pi` is installed globally with npm under the nvm default node (22.21.1): `~/.nvm/versions/node/v22.21.1/bin/pi` -> `.../lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js`, run with a `node` shebang. No bun install, no `~/.local/bin/pi` wrapper. Bare `pi` works in any shell
 - Don't install global packages or modify shell rc files without confirmation
 - Don't start long-running background processes without confirmation
 
