@@ -13,14 +13,11 @@
   ],
   "packages": [
     "https://github.com/kepano/obsidian-skills",
-    "git:github.com/laulauland/jj-hunk",
-    "npm:@diegopetrucci/pi-claude-fast"
-  ],
-  "skills": [
-    "~/.pi/agent/git/github.com/laulauland/jj-hunk"
+    "npm:@diegopetrucci/pi-claude-fast",
+    "git:github.com/mvzink/jj-hunk-tool"
   ],
   "quietStartup": true,
-  "hideThinkingBlock": false,
+  "hideThinkingBlock": true,
   "warnings": {
     "anthropicExtraUsage": false
   }
