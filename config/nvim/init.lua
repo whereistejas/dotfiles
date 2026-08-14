@@ -86,7 +86,9 @@ vim.pack.add({
 
 	-- VCS
 	"https://github.com/echasnovski/mini.diff",
-	{ src = "https://github.com/whereistejas/jj.nvim",          version = "feat-log-picker" },
+	-- Own fork, on the branch that stacks the annotate tooltip fix on top of the
+	-- log picker. Dev checkout lives in ~/build/git/jj.nvim.
+	{ src = "https://github.com/whereistejas/jj.nvim", version = "fix-annotate-tooltip" },
 	"https://github.com/esmuellert/codediff.nvim",
 	"https://github.com/MunifTanjim/nui.nvim",
 
@@ -784,16 +786,20 @@ vim.keymap.set("n", "<space>jd", function()
 	require("jj.diff").diff_current({ rev = "@-" })
 end, { desc = "jj diff working copy vs @- (codediff)" })
 -- jj.nvim pickers (snacks-backed)
-vim.keymap.set("n", "<space>jl", function() require("jj.picker").log({ revset = "all()" }) end, { desc = "jj picker: log (all)" })
+vim.keymap.set("n", "<space>jl", function() require("jj.picker").log({ revset = "all()" }) end,
+	{ desc = "jj picker: log (all)" })
 vim.keymap.set("n", "<space>js", function() require("jj.picker").status() end, { desc = "jj picker: status" })
 vim.keymap.set("n", "<space>jh", function() require("jj.picker").file_history() end, { desc = "jj picker: file history" })
 vim.keymap.set("n", "<space>jc", function() require("jj.picker").conflict() end, { desc = "jj picker: conflicts" })
+-- Takes over the built-in `U` (undo-line); `u`/<C-r> cover undo/redo.
+vim.keymap.set("n", "U", function() require("jj.annotate").line() end, { desc = "jj annotate line (tooltip)" })
 
 -- snacks picker
 vim.keymap.set("n", "<space>t", function() Snacks.picker.pickers() end, { desc = "Pickers" })
-vim.keymap.set("n", "<space>b", function() Snacks.picker.buffers() end, { desc = "Buffers" })
+vim.keymap.set("n", "<space>B", function() Snacks.picker.buffers() end, { desc = "Buffers" })
 vim.keymap.set("n", "<space>f", function() Snacks.picker.files() end, { desc = "Find files" })
-vim.keymap.set("n", "<space>fa", function() Snacks.picker.files({ hidden = true, ignored = true }) end, { desc = "Find files (hidden + ignored)" })
+vim.keymap.set("n", "<space>F", function() Snacks.picker.files({ hidden = true, ignored = true }) end,
+	{ desc = "Find files (hidden + ignored)" })
 vim.keymap.set("n", "?", function() Snacks.picker.grep() end, { desc = "Live grep" })
 vim.keymap.set("n", "<space><space>", function() Snacks.picker.resume() end, { desc = "Resume last picker" })
 vim.keymap.set("n", "<space>r", function() Snacks.picker.lsp_references() end, { desc = "LSP references" })
@@ -811,7 +817,8 @@ end, { desc = "Document symbols (left split)" })
 vim.keymap.set("n", "<space>m", function() Snacks.picker.diagnostics() end, { desc = "Diagnostics" })
 vim.keymap.set("n", "M", vim.diagnostic.open_float, { desc = "Line diagnostics (float)" })
 vim.keymap.set("n", "<space>k", function() Snacks.picker.keymaps() end, { desc = "Keymaps" })
-vim.keymap.set("n", "<space>c", function() Snacks.explorer({ cwd = vim.fn.expand("%:p:h") }) end, { desc = "File explorer (current file dir)" })
+vim.keymap.set("n", "<space>c", function() Snacks.explorer({ cwd = vim.fn.expand("%:p:h") }) end,
+	{ desc = "File explorer (current file dir)" })
 
 -- Layout
 vim.keymap.set("n", "<space>g", "<cmd>NoNeckPain<CR>", { desc = "Toggle centered layout" })
