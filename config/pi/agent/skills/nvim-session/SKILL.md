@@ -100,6 +100,7 @@ nv buffers                 # open buffers with modified flags
 nv buffers --modified      # only unsaved ones
 nv qf <title> < items.json # populate quickfix (title required)
 nv open <file> <line>      # open at a line (line required)
+nv reload                  # re-read buffers whose file changed on disk
 nv cwd                     # working directory of every scope
 nv cd <dir> --scope S      # re-root a scope (S: global|tab|window|buffer)
 nv cd --unset --scope S    # drop a local directory (S: tab|window|buffer)
@@ -127,6 +128,35 @@ echo '[{"filename":"src/foo.zig","lnum":42,"text":"why this line matters"}]' \
 Item fields: `filename` (non-empty string), `lnum` (integer ≥ 1), `text`
 (non-empty string), optional `col` (integer ≥ 1). Unknown fields are rejected.
 Send `[]` to clear the list.
+
+### Reloading after something rewrote the working copy
+
+`nv reload` is `:checktime` with guard rails. It exists for the checkout
+workflow below: a `jj edit`, rebase or branch switch rewrites files underneath
+the editor, and every open buffer becomes a stale copy of a file that has moved.
+Read a stale buffer and you review code that is not on disk; worse, `mini.diff` /
+gitsigns then compute hunks against the wrong text.
+
+```bash
+nv reload
+```
+
+```json
+{"checked": 3, "buffers": [{"file": "/repo/a.py", "lines": 412}], "autoread_was": true}
+```
+
+- **Refuses, changing nothing, if any buffer is dirty**, and names the offenders.
+  `:checktime` on a modified buffer either discards the user's edits or blocks on
+  a prompt no RPC caller can answer. Neither is acceptable, so it does nothing.
+- Sets `autoread` for the duration and restores it afterwards, even on failure,
+  so the result does not depend on the user's config and the session is not left
+  altered.
+- `checked: 0` means nothing was open, not that reloading failed.
+
+`nv open` also re-reads the file it opens (it runs `:edit`) and fires `BufEnter`,
+which is what makes a diff plugin recompute its reference text. So after a
+checkout, `nv open` on the file you are discussing is often enough; `nv reload`
+is for every *other* buffer that is still stale.
 
 ## Working directory: read before you change
 
@@ -212,6 +242,104 @@ nv buffers --modified
 If the file is listed, its buffer differs from disk. Say so, and work from the
 buffer rather than quietly using a stale copy.
 
+## Workflow: walking an MR commit by commit
+
+For reviewing a stack of commits with the user, in their editor, one commit at a
+time. The point is that the **gutter shows exactly one commit's changes** while
+you talk through it.
+
+### Why the gutter looks empty by default
+
+Diff plugins compare the buffer against a reference that is normally the
+working-copy parent — `jj @-`, or git `HEAD`, which in a colocated jj repo *is*
+`@-`. Every commit that is already an ancestor of `@-` is therefore part of the
+baseline, not a diff, and shows **no signs at all**.
+
+So if the work is committed, there is nothing in the gutter. This is the normal
+state, not a broken setup. Confirm it rather than guessing:
+
+```bash
+jj log -r @ -T 'commit_id.short(8)'      # where the working copy is
+git merge-base --is-ancestor <rev> HEAD  # exit 0 => <rev> is behind the baseline
+```
+
+### The lever: move the working copy, not the plugin
+
+`jj edit <commit>` makes `@` *be* that commit, so `@-` is its parent. A jj-aware
+diff source then renders precisely that commit's hunks. **Prefer this to
+reconfiguring the user's plugin** — it needs no plugin-specific verb, works for
+any diff plugin keyed to `@-`/`HEAD`, and is one command to undo.
+
+Do **not** use `jj new <commit>`: that makes `@` a *child*, so `@-` is the commit
+itself and the buffer matches the reference — an empty gutter, the opposite of
+what you want.
+
+### Before you start
+
+```bash
+nv sockets                      # one live session? otherwise ask
+nv cwd                          # read the current root BEFORE changing it
+nv buffers --modified           # dirty buffers block the whole workflow
+jj log -r @ -T 'change_id.short(8)'   # RECORD THIS - where to return to
+```
+
+The session is often rooted somewhere else (a parent folder holding many repos).
+Two options, and they are not equivalent:
+
+- **Absolute paths in `nv qf` / `nv open`, no re-root.** Least intrusive; changes
+  nothing the user did not ask for. Default to this.
+- **`nv cd <repo> --scope global`** when the user should *follow* you into the
+  repo for the whole review, so their own `:find`, `:grep` and pickers resolve
+  there too. Say that you did it, and restore it afterwards.
+
+`jj edit` fails if the working copy is dirty, and `nv reload` refuses on dirty
+buffers — so resolve unsaved work first rather than half-starting.
+
+### Per commit
+
+```bash
+jj edit <commit>                     # @ = commit, so @- = its parent
+nv reload                            # every open buffer is now stale
+nv open <file> <line>                # re-reads + fires BufEnter -> refresh
+cat items.json | nv qf "commit 3/6 - fix: parse ISO 8601 expires"
+```
+
+Then talk through it. One quickfix list **per commit**, titled `commit N/M - <subject>`
+so the user always knows where they are, and one entry per hunk with an
+annotation saying *why*, not what — the diff already says what.
+
+Pause between commits. This is a conversation, not a batch job.
+
+### Cleanup — always
+
+```bash
+jj edit <the change id recorded at the start>
+nv reload
+nv cd <original dir> --scope global   # only if you re-rooted
+```
+
+Leaving the user's working copy parked on some interior commit is a real hazard:
+their next edit lands on it and silently amends a reviewed commit. Restore the
+position even if the review is abandoned half way.
+
+Record the **change id** (stable across rewrites), not the commit id, since
+anything that rewrites the stack invalidates the latter.
+
+### When the diff itself is the artifact
+
+If the plugin story is uncertain, or the commit deletes files (nothing to open),
+skip the gutter: write per-commit patches and open those instead. Neovim
+highlights `.diff` natively, and it works for any history without touching the
+working copy or plugin config.
+
+```bash
+jj diff -r <commit> --git > /tmp/review/N-<commit>-<slug>.diff
+nv open /tmp/review/N-<commit>-<slug>.diff 1
+```
+
+Quickfix entries can point *into* the patch file, so `:cnext` steps hunk to hunk
+with your annotations attached. This is the fallback that always works.
+
 ## Scope
 
 Read, annotate, navigate, and re-root only. There is deliberately no verb to
@@ -219,6 +347,17 @@ write buffer contents and no raw `lua` escape hatch:
 
 - buffer writes bypass disk, so `jj` cannot see them
 - arbitrary lua eval is arbitrary code execution in the user's editor
+
+**This holds even when the user offers.** An `exec`/`lua` verb cannot be granted
+once for one task — it is a permanent, unaudited channel into the editor for
+everything afterwards. When a workflow seems to need one, look for the move that
+makes it unnecessary: the commit-walkthrough above wanted
+`:Gitsigns change_base`, and `jj edit` turned out to give a better result with no
+new capability at all. Prefer changing the *world* the plugin observes over
+reaching into the plugin.
+
+If a narrow verb really is missing, add a **named, validated** one (as `reload`
+is) rather than a general escape hatch, and say so in the Status section.
 
 Make edits with the normal `write`/`edit` tools, then `nv open` the file to show
 the user where to look.
@@ -233,6 +372,11 @@ requiring an explicit `--scope` and reporting every scope before and after.
 Working and tested: `sockets`, `ping`, `cursor`, `selection`, `buffers`, `qf`,
 `open`, `cwd`, `cd` (all four scopes + `--unset`, verified against a throwaway
 headless session, including the shadowing case above).
+
+`reload`: happy path verified against a live session (including flag rejection
+and `autoread` restore). **The dirty-buffer refusal is code-reviewed but not
+exercised** — there is no write verb, so an unsaved buffer cannot be created to
+test it. Treat that branch as unproven.
 
 Not built: `marks`, `diagnostics`, `sign`, `diff`, and the editor-side wiring
 (`serverstart`, `:PiMark`). See [TODO.md](TODO.md). If you need one of these,
