@@ -60,6 +60,9 @@ const USAGE: &str = "\
   nv buffers [--modified]    open buffers, optionally only unsaved ones
   nv qf <title>              populate quickfix from JSON items on stdin
   nv open <file> <line>      open a file at a line
+  nv cwd                     working directory of every scope
+  nv cd <dir> --scope S      set the working directory (S: global|tab|window|buffer)
+  nv cd --unset --scope S    drop a local directory (S: tab|window|buffer)
 
   --socket PATH              unix socket of the nvim session
                              (or set NVIM_AGENT_SOCKET)";
@@ -97,10 +100,95 @@ const USAGE_OPEN: &str = "\
 
   Example:
     nv open src/link/MappedFile.zig 766";
+const USAGE_CWD: &str = "\
+  nv cwd
+
+  Takes no arguments. Reports the directory of every scope, and whether each
+  is set locally:
+
+    effective   what relative paths in the session resolve against right now
+    global      :cd    - the whole session
+    tab         :tcd   - current tabpage
+    window      :lcd   - current window
+    buffer      :bcd   - current buffer (nvim 0.13+)
+
+  Read this before `nv cd` so you never guess what you are changing.";
+const USAGE_CD: &str = "\
+  nv cd <dir> --scope <global|tab|window|buffer>
+
+  dir      existing directory; resolved to an absolute path before being sent,
+           so it is never relative to whatever the editor happens to be in
+  --scope  required. There is no safe default - the scopes are not equivalent:
+
+    global   :cd    moves the user's whole session
+    tab      :tcd   moves every window in the current tabpage
+    window   :lcd   moves the current window; sticky, new windows inherit it
+    buffer   :bcd   moves the current buffer only; not sticky (nvim 0.13+)
+
+  Aliases: cd/tcd/lcd/bcd may be used in place of the scope names.
+  Reports before/after for all scopes, so a re-root is never silent.
+
+  Narrow scopes SHADOW wider ones: with a buffer-local directory set, a later
+  --scope global changes `global` while `effective` does not move. If a re-root
+  appears to do nothing, read `effective` in the report and drop the narrower
+  scope:
+
+    nv cd --unset --scope buffer    :bcd!  (also tab/window; global has no unset)
+
+  Examples:
+    nv cd /Users/you/build/dotfiles --scope global
+    nv cd --unset --scope buffer";
 
 // ---------------------------------------------------------------------------
 // parse, don't validate
 // ---------------------------------------------------------------------------
+
+/// Which `:cd` family command to issue. Kept distinct because they are *not*
+/// interchangeable: global/tab move what the user sees, window/buffer do not.
+#[derive(Clone, Copy)]
+enum Scope {
+    Global,
+    Tab,
+    Window,
+    Buffer,
+}
+
+impl Scope {
+    fn parse(raw: &str) -> Result<Self, Fail> {
+        match raw {
+            "global" | "cd" => Ok(Scope::Global),
+            "tab" | "tcd" => Ok(Scope::Tab),
+            "window" | "lcd" => Ok(Scope::Window),
+            "buffer" | "bcd" => Ok(Scope::Buffer),
+            other => Err(Fail::new(
+                format!(
+                    "unknown scope {other:?}. Expected global, tab, window or buffer \
+                     (or the vim names cd, tcd, lcd, bcd)"
+                ),
+                USAGE_CD,
+            )),
+        }
+    }
+
+    /// The Ex command, which is also the key this scope reports under in `nv cwd`.
+    fn command(self) -> &'static str {
+        match self {
+            Scope::Global => "cd",
+            Scope::Tab => "tcd",
+            Scope::Window => "lcd",
+            Scope::Buffer => "bcd",
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Scope::Global => "global",
+            Scope::Tab => "tab",
+            Scope::Window => "window",
+            Scope::Buffer => "buffer",
+        }
+    }
+}
 
 /// Every variant here is already known-good. Operations below never re-check.
 enum Command {
@@ -111,6 +199,9 @@ enum Command {
     Buffers { only_modified: bool },
     Qf { title: String, items: Vec<QfItem> },
     Open { file: String, line: u64 },
+    Cwd,
+    /// `dir: None` means unset this scope's local directory (`:lcd!` and friends).
+    Cd { dir: Option<String>, scope: Scope },
 }
 
 impl Command {
@@ -123,6 +214,8 @@ impl Command {
             Command::Buffers { .. } => USAGE_BUFFERS,
             Command::Qf { .. } => USAGE_QF,
             Command::Open { .. } => USAGE_OPEN,
+            Command::Cwd => USAGE_CWD,
+            Command::Cd { .. } => USAGE_CD,
         }
     }
 }
@@ -166,6 +259,7 @@ fn die(e: Fail) -> ! {
 
 fn parse(args: &[String]) -> Result<Invocation, Fail> {
     let mut socket = std::env::var("NVIM_AGENT_SOCKET").ok();
+    let mut scope: Option<&str> = None;
     let mut positional: Vec<&str> = Vec::new();
     let mut flags: Vec<&str> = Vec::new();
 
@@ -186,6 +280,22 @@ fn parse(args: &[String]) -> Result<Invocation, Fail> {
                 socket = Some(value.clone());
                 i += 2;
             }
+            "--scope" => {
+                let value = args.get(i + 1).ok_or_else(|| {
+                    Fail::new(
+                        "--scope requires a value: global, tab, window or buffer",
+                        USAGE_CD,
+                    )
+                })?;
+                if value.starts_with('-') {
+                    return Err(Fail::new(
+                        format!("--scope requires a value, but got the flag {value:?}"),
+                        USAGE_CD,
+                    ));
+                }
+                scope = Some(value.as_str());
+                i += 2;
+            }
             flag if flag.starts_with("--") => {
                 flags.push(flag);
                 i += 1;
@@ -199,11 +309,20 @@ fn parse(args: &[String]) -> Result<Invocation, Fail> {
 
     let name = *positional.first().ok_or_else(|| {
         Fail::new(
-            "no command given. Expected one of: sockets, ping, cursor, selection, buffers, qf, open",
+            "no command given. Expected one of: sockets, ping, cursor, selection, buffers, qf, open, cwd, cd",
             USAGE,
         )
     })?;
     let rest = &positional[1..];
+
+    // Reject a misplaced --scope here rather than ignoring it: a silently
+    // dropped scope on the wrong verb looks exactly like a successful no-op.
+    if scope.is_some() && name != "cd" {
+        return Err(Fail::new(
+            format!("--scope applies only to `nv cd`, not to {name:?}"),
+            USAGE,
+        ));
+    }
 
     let command = match name {
         "sockets" => {
@@ -282,10 +401,66 @@ fn parse(args: &[String]) -> Result<Invocation, Fail> {
                 line: parse_line(line, "open", USAGE_OPEN)?,
             }
         }
+        "cwd" => {
+            no_positional(name, rest, USAGE_CWD)?;
+            no_flags(name, &flags, &[], USAGE_CWD)?;
+            Command::Cwd
+        }
+        "cd" => {
+            no_flags(name, &flags, &["--unset"], USAGE_CD)?;
+            let unset = flags.contains(&"--unset");
+            let dir = match (unset, rest) {
+                (true, []) => None,
+                (true, extra) => {
+                    return Err(Fail::new(
+                        format!("cd --unset takes no directory, got {extra:?}"),
+                        USAGE_CD,
+                    ))
+                }
+                (false, [dir]) => Some(*dir),
+                (false, []) => {
+                    return Err(Fail::new(
+                        "cd requires a directory, or --unset to drop a local one",
+                        USAGE_CD,
+                    ))
+                }
+                (false, _) => {
+                    return Err(Fail::new(
+                        format!(
+                            "cd takes exactly one directory, got {}: {:?}. Quote paths containing spaces.",
+                            rest.len(),
+                            rest
+                        ),
+                        USAGE_CD,
+                    ))
+                }
+            };
+            let scope = scope.ok_or_else(|| {
+                Fail::new(
+                    "cd requires --scope. There is no safe default: global and tab move what \
+                     the user sees, window and buffer do not. Run `nv cwd` first if you are \
+                     unsure what the session is currently rooted at.",
+                    USAGE_CD,
+                )
+            })?;
+            let scope = Scope::parse(scope)?;
+            if unset && matches!(scope, Scope::Global) {
+                return Err(Fail::new(
+                    "the global directory cannot be unset - there is nothing wider to fall \
+                     back to. Pass an explicit directory instead, or unset the tab, window \
+                     or buffer scope that is shadowing it.",
+                    USAGE_CD,
+                ));
+            }
+            Command::Cd {
+                dir: dir.map(parse_dir).transpose()?,
+                scope,
+            }
+        }
         other => {
             return Err(Fail::new(
                 format!(
-                    "unknown command {other:?}. Expected one of: sockets, ping, cursor, selection, buffers, qf, open"
+                    "unknown command {other:?}. Expected one of: sockets, ping, cursor, selection, buffers, qf, open, cwd, cd"
                 ),
                 USAGE,
             ))
@@ -335,6 +510,34 @@ fn no_flags(
         }
     }
     Ok(())
+}
+
+/// Resolved to an absolute path up front: a relative `nv cd` would otherwise be
+/// relative to the editor's cwd, which is the very thing being changed.
+fn parse_dir(raw: &str) -> Result<String, Fail> {
+    if raw.starts_with('~') {
+        return Err(Fail::new(
+            format!(
+                "cd: {raw:?} starts with ~, which the shell did not expand. \
+                 Pass an unquoted path or an absolute one."
+            ),
+            USAGE_CD,
+        ));
+    }
+    let path = std::fs::canonicalize(raw)
+        .map_err(|e| Fail::new(format!("cd: cannot resolve {raw:?}: {e}"), USAGE_CD))?;
+    if !path.is_dir() {
+        return Err(Fail::new(
+            format!("cd: {raw:?} is not a directory"),
+            USAGE_CD,
+        ));
+    }
+    path.into_os_string().into_string().map_err(|p| {
+        Fail::new(
+            format!("cd: path is not valid UTF-8: {}", p.to_string_lossy()),
+            USAGE_CD,
+        )
+    })
 }
 
 fn parse_line(raw: &str, name: &str, usage: &'static str) -> Result<u64, Fail> {
@@ -508,6 +711,8 @@ fn execute(invocation: Invocation) -> Result<String, Fail> {
         Command::Buffers { only_modified } => buffers(&mut nvim, only_modified),
         Command::Qf { ref title, ref items } => qf_set(&mut nvim, title, items),
         Command::Open { ref file, line } => open(&mut nvim, file, line),
+        Command::Cwd => cwd(&mut nvim),
+        Command::Cd { ref dir, scope } => cd(&mut nvim, dir.as_deref(), scope),
     }
     .map_err(|e| Fail::new(e.to_string(), usage))?;
 
@@ -759,9 +964,94 @@ fn open(nvim: &mut Nvim, file: &str, line: u64) -> Result<serde_json::Value, Err
     cursor(nvim)
 }
 
+/// Reports every scope, not just the effective one. The scopes shadow each
+/// other (buffer > window > tab > global), so a single number cannot answer
+/// "what will change if I re-root this?".
+fn cwd(nvim: &mut Nvim) -> Result<serde_json::Value, Error> {
+    let effective = getcwd(nvim, vec![])?;
+    let global = getcwd(nvim, vec![Value::from(-1), Value::from(-1)])?;
+    let tab = getcwd(nvim, vec![Value::from(-1)])?;
+    let window = getcwd(nvim, vec![Value::from(0)])?;
+    let tab_local = haslocaldir(nvim, vec![Value::from(-1)])?;
+    let window_local = haslocaldir(nvim, vec![Value::from(0)])?;
+
+    // getcwd()'s bufnr form and :bcd both landed in 0.13; older sessions have
+    // no buffer scope at all, which is different from "buffer scope is unset".
+    let buffer_args = vec![Value::from(-1), Value::from(-1), Value::from(0)];
+    let (buffer, buffer_local, buffer_supported) = if bcd_supported(nvim)? {
+        (
+            Some(getcwd(nvim, buffer_args.clone())?),
+            haslocaldir(nvim, buffer_args)?,
+            true,
+        )
+    } else {
+        (None, false, false)
+    };
+
+    Ok(serde_json::json!({
+        "effective": effective,
+        "global": { "dir": global },
+        "tab": { "dir": tab, "local": tab_local },
+        "window": { "dir": window, "local": window_local },
+        "buffer": { "dir": buffer, "local": buffer_local, "supported": buffer_supported },
+    }))
+}
+
+/// Re-roots one scope (or unsets it, when `dir` is None), reporting before and
+/// after. The report is the point: a directory change is invisible in the
+/// editor, so it must not be invisible here.
+fn cd(nvim: &mut Nvim, dir: Option<&str>, scope: Scope) -> Result<serde_json::Value, Error> {
+    if matches!(scope, Scope::Buffer) && !bcd_supported(nvim)? {
+        return Err(Error::Unsupported {
+            feature: ":bcd (buffer-local directory)".to_string(),
+            hint: "It was added in nvim 0.13. Use --scope window for the narrowest \
+                   alternative this session has, or --scope tab."
+                .to_string(),
+        });
+    }
+
+    let before = cwd(nvim)?;
+    let ex = match dir {
+        // Escape via Neovim itself rather than hand-rolling vim quoting.
+        Some(dir) => {
+            let escaped = nvim.call_function("fnameescape", vec![Value::from(dir)])?;
+            let escaped = escaped.as_str().unwrap_or(dir).to_string();
+            format!("{} {escaped}", scope.command())
+        }
+        None => format!("{}!", scope.command()),
+    };
+    nvim.call_function("execute", vec![Value::from(ex.clone())])?;
+    let after = cwd(nvim)?;
+
+    Ok(serde_json::json!({
+        "scope": scope.name(),
+        "command": format!(":{ex}"),
+        "dir": dir,
+        "unset": dir.is_none(),
+        "before": before,
+        "after": after,
+    }))
+}
+
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
+
+fn getcwd(nvim: &mut Nvim, args: Vec<Value>) -> Result<String, Error> {
+    let v = nvim.call_function("getcwd", args)?;
+    Ok(v.as_str().unwrap_or_default().to_string())
+}
+
+fn haslocaldir(nvim: &mut Nvim, args: Vec<Value>) -> Result<bool, Error> {
+    let v = nvim.call_function("haslocaldir", args)?;
+    Ok(v.as_u64() == Some(1))
+}
+
+/// `exists(':bcd')` returns 2 for a full command match.
+fn bcd_supported(nvim: &mut Nvim) -> Result<bool, Error> {
+    let v = nvim.call_function("exists", vec![Value::from(":bcd")])?;
+    Ok(v.as_u64().unwrap_or(0) >= 2)
+}
 
 fn buf_modified(nvim: &mut Nvim, buf: &Handle) -> Result<bool, Error> {
     let v = nvim.call(
