@@ -29,6 +29,7 @@ Look for:
 **Commands that are interactive by default:**
 - `jj squash` (without `--from`/`--into`)
 - `jj squash -r <rev>` (still interactive! needs `--from`/`--into`)
+- `jj squash --from <src> --into <dst>` (opens `$EDITOR` when both commits have descriptions; hangs when stdin is not a terminal)
 - `jj split` (without using `jj-hunk` skill)
 - `jj resolve` (without `-r <rev> --tool <tool>`)
 
@@ -36,8 +37,9 @@ Look for:
 
 ```bash
 # Squashing - always use --from and --into
-jj squash --from <source-rev> --into <dest-rev>
-jj squash --from <source-rev> --into <dest-rev> --keep-emptied
+# Pass -u (use destination message) or -m "..." to prevent editor from opening
+jj squash --from <source-rev> --into <dest-rev> -u
+jj squash --from <source-rev> --into <dest-rev> -u --keep-emptied
 
 # Splitting - use jj-hunk skill (see skills/jj-hunk/SKILL.md)
 jj-hunk split '<spec>' "commit message"
