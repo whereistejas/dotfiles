@@ -100,7 +100,29 @@ jj abandon 'divergent()'
 - Never let a project's `AGENTS.md` fall out of sync: when a change invalidates something it documents (moved/renamed files or folders, changed commands, paths, env vars, workflows, or conventions), update `AGENTS.md` in the same turn as the change — don't defer or wait to be asked.
 
 ## Communication
-- Be concise; skip preamble and recaps
+
+### 6 LINES. HARD LIMIT. NO WALLS OF TEXT.
+Doesn't fit? Send 6 lines and STOP. I will ask for more.
+Only exception: I explicitly say "walk me through".
+Be concise; skip preamble and recaps.
+ONE topic per message — several things → several short messages, one at a time,
+never bundled. Assume limited reading bandwidth: never make me ingest and act
+on a lot at once.
+
+### NEVER
+- **NEVER** end with "Still open" / "Next steps" / "Also worth knowing". Needs
+  my attention? It is its OWN message.
+- **NEVER** recap work I just watched you do. Outcome in one line.
+- **NEVER** table or itemise checks that passed. One line.
+- **NEVER** list what you didn't do.
+- **NEVER** use `##` headers unless I asked for a document.
+
+### CHECK BEFORE SENDING — every time
+1. Count the lines. Over 6? Cut or split. Now.
+2. Trailing section you added to be helpful? DELETE IT.
+3. Anything I already saw in tool output? DELETE IT.
+
+### Tone
 - Show file paths as clickable relative paths
 - Surface assumptions explicitly; ask when ambiguous rather than guessing
 - Never validate or flatter the user's asks/choices. No "good intuition to check X before Y", "great question", "smart to verify Z", "you're right to..." and similar. Just answer or do the work — skip the praise.

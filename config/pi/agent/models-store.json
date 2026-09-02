@@ -53,6 +53,36 @@
         }
       },
       {
+        "id": "claude-fable-5-1",
+        "name": "Claude Fable 5.1",
+        "api": "anthropic-messages",
+        "provider": "anthropic",
+        "baseUrl": "https://api.anthropic.com",
+        "reasoning": true,
+        "input": [
+          "text",
+          "image"
+        ],
+        "cost": {
+          "input": 10,
+          "output": 50,
+          "cacheRead": 0.25,
+          "cacheWrite": 12.5
+        },
+        "contextWindow": 1000000,
+        "maxTokens": 128000,
+        "compat": {
+          "supportsMidConvoEffort": true,
+          "forceAdaptiveThinking": true,
+          "supportsStrictTools": true
+        },
+        "thinkingLevelMap": {
+          "off": null,
+          "xhigh": "xhigh",
+          "max": "max"
+        }
+      },
+      {
         "id": "claude-haiku-4-5",
         "name": "Claude Haiku 4.5 (latest)",
         "api": "anthropic-messages",
@@ -248,26 +278,16 @@
         },
         "contextWindow": 1000000,
         "maxTokens": 128000,
-        "thinkingLevelMap": {
-          "xhigh": "xhigh",
-          "max": "max"
-        },
         "compat": {
+          "supportsMidConvoEffort": true,
           "forceAdaptiveThinking": true,
           "supportsTemperature": false,
-          "supportsStrictTools": true,
-          "allowedFallbackModels": [
-            {
-              "provider": "anthropic",
-              "model": "claude-opus-4-8",
-              "cost": {
-                "input": 5,
-                "output": 25,
-                "cacheRead": 0.5,
-                "cacheWrite": 6.25
-              }
-            }
-          ]
+          "supportsStrictTools": true
+        },
+        "thinkingLevelMap": {
+          "off": null,
+          "xhigh": "xhigh",
+          "max": "max"
         }
       },
       {
@@ -372,8 +392,8 @@
         }
       }
     ],
-    "checkedAt": 1788259071499,
-    "lastModified": 1787141921000,
-    "etag": "W/\"f6c149c048a0e6e85e35ce0a72c1d4ec\""
+    "checkedAt": 1788426632846,
+    "lastModified": 1788424037000,
+    "etag": "W/\"5fdc170fdb3eb24c0e164a059918e474\""
   }
 }
