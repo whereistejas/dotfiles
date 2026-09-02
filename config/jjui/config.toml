@@ -1,5 +1,11 @@
 [ui]
-theme = "gruvbox-light"
+theme = "gruvbox-dark"
+
+[diff]
+wrap = true
+
+[preview]
+wrap = true
 
 [[bindings]]
 action = "revisions.refresh"

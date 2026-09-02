@@ -291,7 +291,7 @@ require("github-theme").setup({
 		},
 	},
 })
-vim.o.background = "light"
+vim.o.background = "dark"
 vim.cmd("colorscheme gruvbox")
 
 -- mini.diff — gutter change markers. Uses a jj-aware source that diffs the
