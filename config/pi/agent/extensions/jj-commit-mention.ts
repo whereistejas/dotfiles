@@ -2,23 +2,38 @@
  * jj-commit-mention extension.
  *
  * Adds autocomplete for Jujutsu (jj) bookmarks and commits, merged with pi's built-in
- * `@` file completion. Type `@` in the editor to see bookmarks, commits, and files,
- * then filter by:
- *   - bookmark name
- *   - change id prefix
- *   - commit id prefix
- *   - fuzzy match on the commit description
+ * `@` file completion.
  *
- * Selecting a bookmark or commit inserts an `@<bookmark-name>` or `@<change-id>` tag,
- * mirroring how files are tagged with `@<path>`.
+ * Two forms are supported:
  *
- * Bookmarks and commits are loaded once per session via `jj bookmark list` and `jj log`,
- * cached with a short TTL, so typing stays fast and the list refreshes in the background.
+ *   @<query>              bookmarks/commits of the repo containing the session cwd,
+ *                         merged with file suggestions. Filter by bookmark name,
+ *                         change id prefix, commit id prefix, or fuzzy description.
+ *
+ *   @<path>:<query>       bookmarks/commits of *another* repo. `<path>` is a directory
+ *                         (absolute, `~`-relative, or relative to the session cwd) that
+ *                         lives inside a jj repo. Selecting an item inserts
+ *                         `@<path>:<change-id>`.
+ *
+ * Cost control (repos with a lot of changes):
+ *   - jj is only run for a path once the token contains `:` and the path resolves to an
+ *     existing directory inside a jj repo. Plain `@foo/bar` never shells out to jj beyond
+ *     a cached `jj root` probe.
+ *   - `jj log` uses `-n <limit>` over a lazy revset instead of sorting the whole history.
+ *   - Per-repo results are cached with a short TTL and served stale while refreshing in the
+ *     background, so a slow repo only ever costs one background fetch.
+ *   - Lookups never block the autocomplete popup for longer than the soft deadline; if data
+ *     isn't ready a "loading" placeholder is shown and the next keystroke picks up the cache.
  *
  * Environment overrides:
- *   PI_JJ_MENTION_REVSET  revset to source commits from (default: latest(all(), N))
- *   PI_JJ_MENTION_LIMIT   max commits to load when no revset override (default: 300)
+ *   PI_JJ_MENTION_REVSET      revset to source commits from (default: `::`)
+ *   PI_JJ_MENTION_LIMIT       max commits to load per repo (default: 300)
+ *   PI_JJ_MENTION_DEADLINE_MS max ms to wait for a cold repo fetch (default: 250)
  */
+
+import { homedir } from "node:os";
+import { isAbsolute, resolve } from "node:path";
+import { stat } from "node:fs/promises";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
@@ -39,9 +54,15 @@ type Commit = {
 	description: string;
 };
 
+type RepoData = {
+	bookmarks: Bookmark[];
+	commits: Commit[];
+};
+
 const FIELD = "\x1f"; // unit separator between fields in the jj template output
 const MAX_SUGGESTIONS = 20;
 const CACHE_TTL_MS = 5_000;
+const ROOT_CACHE_TTL_MS = 30_000;
 
 function commitLimit(): number {
 	const raw = process.env.PI_JJ_MENTION_LIMIT;
@@ -49,39 +70,93 @@ function commitLimit(): number {
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : 300;
 }
 
+// `::` is evaluated lazily in reverse topological order, so `-n <limit>` stops early
+// instead of walking (and date-sorting) the entire history like `latest(all(), N)` does.
 function revset(): string {
-	return process.env.PI_JJ_MENTION_REVSET ?? `latest(all(), ${commitLimit()})`;
+	return process.env.PI_JJ_MENTION_REVSET ?? "::";
 }
 
-// Matches `@<query>` at the cursor, anchored on a whitespace/start boundary
-// (same boundary rule pi uses for `@` file mentions). Returns the query, which
-// may be an empty string right after `@`. Explicitly excludes the old `@jj:`
-// format to avoid confusion.
-function extractJjToken(textBeforeCursor: string): string | undefined {
+function deadlineMs(): number {
+	const raw = process.env.PI_JJ_MENTION_DEADLINE_MS;
+	const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+	return Number.isFinite(parsed) && parsed >= 0 ? parsed : 250;
+}
+
+type JjToken = {
+	/** Everything after `@`, verbatim. */
+	raw: string;
+	/** Path part as typed, when the token contains `:`. */
+	pathText?: string;
+	/** Text to filter bookmarks/commits with. */
+	query: string;
+};
+
+// Matches `@<token>` at the cursor, anchored on a whitespace/start boundary
+// (same boundary rule pi uses for `@` file mentions). Explicitly excludes the old
+// `@jj:` format to avoid confusion.
+function extractJjToken(textBeforeCursor: string): JjToken | undefined {
 	const match = textBeforeCursor.match(/(?:^|\s)@(?!jj:)([^\s]*)$/);
-	return match?.[1];
+	const raw = match?.[1];
+	if (raw === undefined) {
+		return undefined;
+	}
+
+	// Change ids, commit ids and bookmark names never contain `:`, so the last `:`
+	// separates the repo path from the query.
+	const sep = raw.lastIndexOf(":");
+	if (sep === -1) {
+		return { raw, query: raw };
+	}
+	return { raw, pathText: raw.slice(0, sep), query: raw.slice(sep + 1) };
 }
 
-function bookmarkToItem(bookmark: Bookmark): AutocompleteItem {
+// Cheap heuristic: only probe the filesystem for tokens that actually look like a path,
+// so ordinary change-id typing never hits `stat`/`jj root`.
+function looksLikePath(text: string): boolean {
+	return text.length > 0 && (text.includes("/") || text.startsWith("~") || text === "." || text === "..");
+}
+
+function expandPath(pathText: string, cwd: string): string {
+	if (pathText === "~") {
+		return homedir();
+	}
+	if (pathText.startsWith("~/")) {
+		return resolve(homedir(), pathText.slice(2));
+	}
+	return isAbsolute(pathText) ? resolve(pathText) : resolve(cwd, pathText);
+}
+
+/** Tag prefix for a repo-scoped item: `@<path>:` (empty for the cwd repo). */
+function tagPrefix(pathText: string | undefined): string {
+	return pathText ? `@${pathText}:` : "@";
+}
+
+function bookmarkToItem(bookmark: Bookmark, pathText: string | undefined): AutocompleteItem {
+	const tag = `${tagPrefix(pathText)}${bookmark.name}`;
 	return {
-		value: `@${bookmark.name}`,
-		label: `@${bookmark.name}`,
+		value: tag,
+		label: tag,
 		description: `bookmark → ${bookmark.changeId}`,
 	};
 }
 
-function commitToItem(commit: Commit): AutocompleteItem {
+function commitToItem(commit: Commit, pathText: string | undefined): AutocompleteItem {
+	const tag = `${tagPrefix(pathText)}${commit.changeId}`;
 	return {
-		value: `@${commit.changeId}`,
-		label: `@${commit.changeId}`,
+		value: tag,
+		label: tag,
 		description: `${commit.commitId} ${commit.description || "(no description)"}`,
 	};
 }
 
-function filterBookmarks(bookmarks: Bookmark[], query: string): AutocompleteItem[] {
+function filterBookmarks(
+	bookmarks: Bookmark[],
+	query: string,
+	pathText: string | undefined,
+): AutocompleteItem[] {
 	const q = query.trim();
 	if (!q) {
-		return bookmarks.map(bookmarkToItem);
+		return bookmarks.map((b) => bookmarkToItem(b, pathText));
 	}
 
 	const lower = q.toLowerCase();
@@ -100,13 +175,13 @@ function filterBookmarks(bookmarks: Bookmark[], query: string): AutocompleteItem
 		matched.push(...fuzzy);
 	}
 
-	return matched.map(bookmarkToItem);
+	return matched.map((b) => bookmarkToItem(b, pathText));
 }
 
-function filterCommits(commits: Commit[], query: string): AutocompleteItem[] {
+function filterCommits(commits: Commit[], query: string, pathText: string | undefined): AutocompleteItem[] {
 	const q = query.trim();
 	if (!q) {
-		return commits.slice(0, MAX_SUGGESTIONS).map(commitToItem);
+		return commits.slice(0, MAX_SUGGESTIONS).map((c) => commitToItem(c, pathText));
 	}
 
 	const lower = q.toLowerCase();
@@ -132,25 +207,26 @@ function filterCommits(commits: Commit[], query: string): AutocompleteItem[] {
 		}
 	}
 
-	return ranked.slice(0, MAX_SUGGESTIONS).map(commitToItem);
+	return ranked.slice(0, MAX_SUGGESTIONS).map((c) => commitToItem(c, pathText));
 }
 
-async function fetchBookmarks(pi: ExtensionAPI, cwd: string): Promise<Bookmark[] | undefined> {
-	const template = `name ++ "\\x1f" ++ change_id.short(8) ++ "\\n"`;
+async function fetchBookmarks(pi: ExtensionAPI, cwd: string): Promise<Bookmark[]> {
+	// `jj bookmark list` templates run in a RefName context: the target commit is reached
+	// through `normal_target` (absent for conflicted bookmarks).
+	const template = `name ++ "\\x1f" ++ if(normal_target, normal_target.change_id().short(8)) ++ "\\n"`;
 
 	let result: Awaited<ReturnType<ExtensionAPI["exec"]>>;
 	try {
-		result = await pi.exec(
-			"jj",
-			["bookmark", "list", "--all-remotes", "-T", template],
-			{ cwd, timeout: 3_000 },
-		);
+		result = await pi.exec("jj", ["bookmark", "list", "--all-remotes", "-T", template], {
+			cwd,
+			timeout: 5_000,
+		});
 	} catch {
-		return undefined;
+		return [];
 	}
 
 	if (result.code !== 0) {
-		return undefined;
+		return [];
 	}
 
 	const bookmarks: Bookmark[] = [];
@@ -173,7 +249,7 @@ async function fetchBookmarks(pi: ExtensionAPI, cwd: string): Promise<Bookmark[]
 	return bookmarks;
 }
 
-async function fetchCommits(pi: ExtensionAPI, cwd: string): Promise<Commit[] | undefined> {
+async function fetchCommits(pi: ExtensionAPI, cwd: string): Promise<Commit[]> {
 	const template =
 		`change_id.short(8) ++ "\\x1f" ++ commit_id.short(8) ++ "\\x1f" ++ ` +
 		`description.first_line() ++ "\\n"`;
@@ -188,19 +264,21 @@ async function fetchCommits(pi: ExtensionAPI, cwd: string): Promise<Commit[] | u
 				"--color",
 				"never",
 				"--ignore-working-copy",
+				"-n",
+				String(commitLimit()),
 				"-r",
 				revset(),
 				"-T",
 				template,
 			],
-			{ cwd, timeout: 5_000 },
+			{ cwd, timeout: 15_000 },
 		);
 	} catch {
-		return undefined;
+		return [];
 	}
 
 	if (result.code !== 0) {
-		return undefined;
+		return [];
 	}
 
 	const commits: Commit[] = [];
@@ -217,10 +295,131 @@ async function fetchCommits(pi: ExtensionAPI, cwd: string): Promise<Commit[] | u
 	return commits;
 }
 
+/** Resolves directories to their jj repo root, caching hits and misses. */
+function createRootResolver(pi: ExtensionAPI) {
+	const cache = new Map<string, { root: string | undefined; checkedAt: number }>();
+	const inflight = new Map<string, Promise<string | undefined>>();
+
+	const probe = async (dir: string): Promise<string | undefined> => {
+		try {
+			const info = await stat(dir);
+			if (!info.isDirectory()) {
+				return undefined;
+			}
+		} catch {
+			return undefined;
+		}
+
+		const result = await pi
+			.exec("jj", ["root", "--ignore-working-copy"], { cwd: dir, timeout: 5_000 })
+			.catch(() => undefined);
+		if (!result || result.code !== 0) {
+			return undefined;
+		}
+		const root = result.stdout.trim();
+		return root || undefined;
+	};
+
+	return async function resolveRoot(dir: string): Promise<string | undefined> {
+		const cached = cache.get(dir);
+		if (cached && Date.now() - cached.checkedAt < ROOT_CACHE_TTL_MS) {
+			return cached.root;
+		}
+
+		let pending = inflight.get(dir);
+		if (!pending) {
+			pending = probe(dir)
+				.then((root) => {
+					cache.set(dir, { root, checkedAt: Date.now() });
+					inflight.delete(dir);
+					return root;
+				})
+				.catch(() => {
+					inflight.delete(dir);
+					return undefined;
+				});
+			inflight.set(dir, pending);
+		}
+		return pending;
+	};
+}
+
+/** Per-repo bookmark/commit cache with stale-while-revalidate semantics. */
+function createRepoStore(pi: ExtensionAPI) {
+	const cache = new Map<string, { data: RepoData; fetchedAt: number }>();
+	const inflight = new Map<string, Promise<RepoData | undefined>>();
+
+	const refresh = (root: string): Promise<RepoData | undefined> => {
+		let pending = inflight.get(root);
+		if (pending) {
+			return pending;
+		}
+
+		pending = Promise.all([fetchBookmarks(pi, root), fetchCommits(pi, root)])
+			.then(([bookmarks, commits]) => {
+				const data: RepoData = { bookmarks, commits };
+				cache.set(root, { data, fetchedAt: Date.now() });
+				inflight.delete(root);
+				return data;
+			})
+			.catch(() => {
+				inflight.delete(root);
+				return cache.get(root)?.data;
+			});
+		inflight.set(root, pending);
+		return pending;
+	};
+
+	return {
+		/** Returns cached data (refreshing in the background when stale), else undefined. */
+		peek(root: string): RepoData | undefined {
+			const entry = cache.get(root);
+			if (!entry) {
+				return undefined;
+			}
+			if (Date.now() - entry.fetchedAt >= CACHE_TTL_MS) {
+				void refresh(root);
+			}
+			return entry.data;
+		},
+		/** Waits at most `timeout` ms for a cold repo, leaving the fetch running afterwards. */
+		async get(root: string, timeout: number): Promise<RepoData | undefined> {
+			const cached = this.peek(root);
+			if (cached) {
+				return cached;
+			}
+
+			const pending = refresh(root);
+			if (timeout <= 0) {
+				return undefined;
+			}
+			return await Promise.race([
+				pending,
+				new Promise<undefined>((res) => {
+					const timer = setTimeout(() => res(undefined), timeout);
+					timer.unref?.();
+				}),
+			]);
+		},
+		warm(root: string): void {
+			void refresh(root);
+		},
+	};
+}
+
+function loadingItem(token: JjToken, root: string): AutocompleteItem {
+	return {
+		value: `@${token.raw}`,
+		label: `@${token.raw}`,
+		description: `loading changes from ${root}… keep typing or press Tab`,
+	};
+}
+
 function createCommitProvider(
 	current: AutocompleteProvider,
-	getBookmarks: () => Promise<Bookmark[] | undefined>,
-	getCommits: () => Promise<Commit[] | undefined>,
+	cwd: string,
+	resolveRoot: (dir: string) => Promise<string | undefined>,
+	repos: ReturnType<typeof createRepoStore>,
 ): AutocompleteProvider {
 	return {
 		triggerCharacters: ["@"],
@@ -233,26 +432,75 @@ function createCommitProvider(
 				return current.getSuggestions(lines, cursorLine, cursorCol, options);
 			}
 
-			const [bookmarks, commits] = await Promise.all([getBookmarks(), getCommits()]);
+			const delegate = () => current.getSuggestions(lines, cursorLine, cursorCol, options);
+			const finish = (items: AutocompleteItem[]): AutocompleteSuggestions | null =>
+				items.length > 0 ? { items, prefix: `@${token.raw}` } : null;
+
+			// `@<path>:<query>` — repo-scoped. jj only runs once the path is a real
+			// directory inside a jj repo.
+			if (token.pathText !== undefined) {
+				const dir = expandPath(token.pathText, cwd);
+				const root = await resolveRoot(dir);
+				if (options.signal.aborted) {
+					return delegate();
+				}
+				if (!root) {
+					return delegate();
+				}
+
+				// `@:<query>` (empty path) means "this repo", so emit plain `@<change-id>` tags.
+				const pathText = token.pathText || undefined;
+				const data = await repos.get(root, deadlineMs());
+				if (options.signal.aborted) {
+					return delegate();
+				}
+				if (!data) {
+					return finish([loadingItem(token, root)]);
+				}
+
+				return finish([
+					...filterBookmarks(data.bookmarks, token.query, pathText),
+					...filterCommits(data.commits, token.query, pathText),
+				]);
+			}
+
+			// `@<query>` — bookmarks/commits of the cwd repo merged with file suggestions.
+			const cwdRoot = await resolveRoot(cwd);
+			const data = cwdRoot ? repos.peek(cwdRoot) : undefined;
+			const bookmarkItems = data ? filterBookmarks(data.bookmarks, token.query, undefined) : [];
+			const commitItems = data ? filterCommits(data.commits, token.query, undefined) : [];
+
+			// Offer `@<dir>:` as a hint when the typed path is another jj repo.
+			const repoHint: AutocompleteItem[] = [];
+			if (looksLikePath(token.query)) {
+				const otherRoot = await resolveRoot(expandPath(token.query, cwd));
+				if (otherRoot && otherRoot !== cwdRoot) {
+					repoHint.push({
+						value: `@${token.query}:`,
+						label: `@${token.query}:`,
+						description: `jj repo ${otherRoot} → type a change id or bookmark`,
+					});
+					repos.warm(otherRoot);
+				}
+			}
+
+			const fileSuggestions = await delegate();
 			if (options.signal.aborted) {
-				return current.getSuggestions(lines, cursorLine, cursorCol, options);
+				return fileSuggestions;
 			}
-
-			// Merge bookmark, commit, and file suggestions (in that order)
-			const bookmarkItems = (bookmarks && bookmarks.length > 0) ? filterBookmarks(bookmarks, token) : [];
-			const commitItems = (commits && commits.length > 0) ? filterCommits(commits, token) : [];
-			const fileSuggestions = await current.getSuggestions(lines, cursorLine, cursorCol, options);
-			const fileItems = fileSuggestions?.items ?? [];
-
-			const mergedItems = [...bookmarkItems, ...commitItems, ...fileItems];
-			if (mergedItems.length === 0) {
-				return null;
-			}
-
-			return { items: mergedItems, prefix: `@${token}` };
+			return finish([...repoHint, ...bookmarkItems, ...commitItems, ...(fileSuggestions?.items ?? [])]);
 		},
 
 		applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
+			// `@<path>:` hints must not get a trailing space; the user keeps typing the id.
+			if (item.value.endsWith(":")) {
+				const line = lines[cursorLine] ?? "";
+				const before = line.slice(0, cursorCol - prefix.length);
+				const after = line.slice(cursorCol);
+				const nextLines = [...lines];
+				nextLines[cursorLine] = `${before}${item.value}${after}`;
+				return { lines: nextLines, cursorLine, cursorCol: before.length + item.value.length };
+			}
 			return current.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
 		},
 
@@ -269,69 +517,23 @@ export default function (pi: ExtensionAPI): void {
 			return;
 		}
 
-		// Only activate inside a jj repo (and only when jj is installed).
-		const root = await pi
-			.exec("jj", ["root", "--ignore-working-copy"], { cwd: ctx.cwd, timeout: 5_000 })
-			.catch(() => undefined);
-		if (!root || root.code !== 0) {
+		// Only activate when jj is installed; otherwise every path probe would shell out in vain.
+		const version = await pi.exec("jj", ["--version"], { timeout: 5_000 }).catch(() => undefined);
+		if (!version || version.code !== 0) {
 			return;
 		}
 
-		let bookmarkCache: { bookmarks: Bookmark[]; fetchedAt: number } | undefined;
-		let bookmarkInflight: Promise<Bookmark[] | undefined> | undefined;
+		const resolveRoot = createRootResolver(pi);
+		const repos = createRepoStore(pi);
 
-		let commitCache: { commits: Commit[]; fetchedAt: number } | undefined;
-		let commitInflight: Promise<Commit[] | undefined> | undefined;
+		// Warm the cwd repo so the first `@` is instant. Other repos are fetched on demand.
+		const cwdRoot = await resolveRoot(ctx.cwd);
+		if (cwdRoot) {
+			repos.warm(cwdRoot);
+		}
 
-		const getBookmarks = async (): Promise<Bookmark[] | undefined> => {
-			const fresh = bookmarkCache && Date.now() - bookmarkCache.fetchedAt < CACHE_TTL_MS;
-			if (fresh) {
-				return bookmarkCache!.bookmarks;
-			}
-
-			bookmarkInflight ||= fetchBookmarks(pi, ctx.cwd)
-				.then((bookmarks) => {
-					if (bookmarks) {
-						bookmarkCache = { bookmarks, fetchedAt: Date.now() };
-					}
-					bookmarkInflight = undefined;
-					return bookmarkCache?.bookmarks;
-				})
-				.catch(() => {
-					bookmarkInflight = undefined;
-					return bookmarkCache?.bookmarks;
-				});
-
-			// Serve stale cache immediately while refreshing in the background.
-			return bookmarkCache ? bookmarkCache.bookmarks : bookmarkInflight;
-		};
-
-		const getCommits = async (): Promise<Commit[] | undefined> => {
-			const fresh = commitCache && Date.now() - commitCache.fetchedAt < CACHE_TTL_MS;
-			if (fresh) {
-				return commitCache!.commits;
-			}
-
-			commitInflight ||= fetchCommits(pi, ctx.cwd)
-				.then((commits) => {
-					if (commits) {
-						commitCache = { commits, fetchedAt: Date.now() };
-					}
-					commitInflight = undefined;
-					return commitCache?.commits;
-				})
-				.catch(() => {
-					commitInflight = undefined;
-					return commitCache?.commits;
-				});
-
-			// Serve stale cache immediately while refreshing in the background.
-			return commitCache ? commitCache.commits : commitInflight;
-		};
-
-		// Warm both caches so the first `@` is instant.
-		void getBookmarks();
-		void getCommits();
-		ctx.ui.addAutocompleteProvider((current) => createCommitProvider(current, getBookmarks, getCommits));
+		ctx.ui.addAutocompleteProvider((current) =>
+			createCommitProvider(current, ctx.cwd, resolveRoot, repos),
+		);
 	});
 }
