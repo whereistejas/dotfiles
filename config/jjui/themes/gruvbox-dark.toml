@@ -1,0 +1,197 @@
+# Gruvbox Dark for jjui
+#
+# Colors are lifted verbatim from ellisonleao/gruvbox.nvim (`background = "dark"`,
+# normal contrast), so jjui matches Neovim. Palette slots used below:
+#
+#   bg0 #282828  bg1 #3c3836  bg2 #504945  bg3 #665c54  bg4 #7c6f64
+#   fg1 #ebdbb2  fg2 #d5c4a1  fg3 #bdae93  fg4 #a89984  gray #928374
+#   red #fb4934  green #b8bb26  yellow #fabd2f  blue #83a598
+#   purple #d3869b  aqua #8ec07c  orange #fe8019
+#
+# Highlight-group anchors: Normal (fg1/bg0), NormalFloat (fg1/bg1),
+# Pmenu (fg1/bg2), PmenuSel (bg2 on blue), StatusLine (fg1/bg2),
+# WinSeparator (bg3), Comment (gray), Title (green bold), Search (yellow).
+#
+# Row cursors use bg2 rather than nvim's Visual (bg3 #665c54): rows are painted
+# with jj's own ANSI colors and bg2 keeps them legible while still reading as a
+# distinct highlight against bg0. Swap to bg1 #3c3836 for a fainter row.
+#
+# This file is the palette-slot mirror of gruvbox-light.toml: every selector is
+# identical, only the slot values differ. A custom theme is self-contained --
+# jjui does not fall back to its built-in theme for unset selectors.
+
+[colors]
+
+# --- Global roles -----------------------------------------------------------
+"text"          = { fg = "#ebdbb2", bg = "#282828" }   # Normal
+"dimmed"        = { fg = "#928374" }                   # Comment
+":selected"     = { bg = "#504945", bold = true }      # between CursorLine/Visual
+"border"        = { fg = "#665c54" }                   # WinSeparator
+"title"         = { fg = "#b8bb26", bold = true }      # Title / Directory
+"shortcut"      = { fg = "#fe8019" }                   # Special
+"matched"       = { fg = "#fabd2f", bold = true }      # Search
+"success"       = { fg = "#b8bb26", bold = true }
+"error"         = { fg = "#fb4934", bold = true }      # WarningMsg
+"source_marker" = { fg = "#282828", bg = "#8ec07c", bold = true }
+"target_marker" = { fg = "#282828", bg = "#fb4934", bold = true }
+
+# --- jj value roles (mirror jj's own colors.* defaults) ---------------------
+"change_id"     = { fg = "#d3869b" }   # jj: magenta
+"commit_id"     = { fg = "#83a598" }   # jj: blue
+"bookmark"      = { fg = "#d3869b" }   # jj: magenta
+"conflict"      = { fg = "#fb4934", bold = true }
+# these also define the `added` / `modified` / `deleted` / `renamed` / `copied`
+# roles used by the Details file list
+"diff added"    = { fg = "#b8bb26" }
+"diff modified" = { fg = "#fabd2f" }
+"diff removed"  = { fg = "#fb4934" }
+"diff renamed"  = { fg = "#83a598" }
+"diff copied"   = { fg = "#8ec07c" }
+
+# --- Revset bar and completion popup (Pmenu / PmenuSel) ---------------------
+"revset title"                         = { fg = "#83a598", bg = "#3c3836", bold = true }
+"revset text"                          = { fg = "#ebdbb2", bold = true }
+"revset completion"                    = { fg = "#ebdbb2", bg = "#504945" }
+"revset completion text"               = { fg = "#ebdbb2" }
+"revset completion dimmed"             = { fg = "#a89984" }
+"revset completion matched"            = { fg = "#fabd2f", bold = true, underline = true }
+"revset completion:selected"           = { fg = "#504945", bg = "#83a598", bold = true }
+"revset completion text:selected"      = { fg = "#504945" }
+"revset completion dimmed:selected"    = { fg = "#665c54" }
+"revset completion matched:selected"   = { fg = "#282828", bold = true, underline = true }
+
+# --- Revisions list and Details ---------------------------------------------
+"revisions"                           = { fg = "#ebdbb2" }
+"revisions text"                      = { fg = "#ebdbb2" }
+"revisions dimmed"                    = { fg = "#928374" }
+"revisions matched"                   = { fg = "#fabd2f", bold = true }
+"revisions:selected"                  = { bg = "#504945", bold = true }
+"revisions details"                   = { fg = "#ebdbb2" }
+"revisions details text"              = { fg = "#ebdbb2" }
+"revisions details dimmed"            = { fg = "#a89984" }
+"revisions details conflict"          = { fg = "#fb4934", bold = true }
+"revisions details:selected"          = { bg = "#504945", bold = true }
+"revisions details dimmed:selected"   = { fg = "#bdae93" }
+"revisions rebase source_marker"      = { bold = true }
+"revisions rebase target_marker"      = { bold = true }
+
+# --- Oplog / Evolog ----------------------------------------------------------
+"oplog"            = { fg = "#ebdbb2" }
+"oplog text"       = { fg = "#ebdbb2" }
+"oplog matched"    = { fg = "#fabd2f", bold = true }
+"oplog:selected"   = { bg = "#504945", bold = true }
+"evolog"           = { fg = "#ebdbb2" }
+"evolog text"      = { fg = "#ebdbb2" }
+"evolog dimmed"    = { fg = "#928374" }
+"evolog change_id" = { fg = "#d3869b" }
+"evolog commit_id" = { fg = "#83a598" }
+"evolog:selected"  = { bg = "#504945", bold = true }
+
+# --- Status bar (StatusLine) -------------------------------------------------
+"status"          = { fg = "#ebdbb2", bg = "#504945" }
+"status text"     = { fg = "#ebdbb2" }
+"status title"    = { fg = "#504945", bg = "#83a598", bold = true }
+"status shortcut" = { fg = "#fe8019" }
+"status dimmed"   = { fg = "#bdae93" }
+
+# --- Diff viewer and preview pane -------------------------------------------
+"diff"           = { fg = "#ebdbb2", bg = "#282828" }
+"preview"        = { fg = "#ebdbb2", bg = "#282828" }
+"preview border" = { fg = "#665c54", bg = "#282828" }
+
+# --- Help window (NormalFloat) -----------------------------------------------
+"help"          = { fg = "#ebdbb2", bg = "#3c3836" }
+"help title"    = { fg = "#b8bb26", bold = true, underline = true }
+"help border"   = { fg = "#665c54", bg = "#3c3836" }
+"help shortcut" = { fg = "#fe8019" }
+"help desc"     = { fg = "#d5c4a1" }
+"help dimmed"   = { fg = "#bdae93" }
+
+# --- Git menu ----------------------------------------------------------------
+"git"                    = { fg = "#ebdbb2", bg = "#3c3836" }
+"git title"              = { fg = "#3c3836", bg = "#d3869b", bold = true }
+"git border"             = { fg = "#665c54", bg = "#3c3836" }
+"git text"               = { fg = "#ebdbb2" }
+"git dimmed"             = { fg = "#bdae93" }
+"git shortcut"           = { fg = "#fe8019" }
+"git matched"            = { fg = "#fabd2f", bold = true }
+"git:selected"           = { fg = "#504945", bg = "#83a598", bold = true }
+"git text:selected"      = { fg = "#504945" }
+"git dimmed:selected"    = { fg = "#665c54" }
+"git shortcut:selected"  = { fg = "#504945", bold = true }
+"git input text"         = { fg = "#ebdbb2" }
+"git input matched"      = { fg = "#fabd2f", bold = true }
+"git remote"             = { fg = "#ebdbb2" }
+"git remote title"       = { fg = "#d3869b", bold = true }
+"git remote text"        = { fg = "#ebdbb2" }
+"git remote dimmed"      = { fg = "#bdae93" }
+"git remote error"       = { fg = "#fb4934", bold = true }
+"git remote:selected"    = { fg = "#504945", bg = "#83a598", bold = true }
+
+# --- Bookmarks menu ----------------------------------------------------------
+"bookmarks"                   = { fg = "#ebdbb2", bg = "#3c3836" }
+"bookmarks title"             = { fg = "#3c3836", bg = "#d3869b", bold = true }
+"bookmarks border"            = { fg = "#665c54", bg = "#3c3836" }
+"bookmarks text"              = { fg = "#ebdbb2" }
+"bookmarks dimmed"            = { fg = "#bdae93" }
+"bookmarks shortcut"          = { fg = "#fe8019" }
+"bookmarks matched"           = { fg = "#fabd2f", bold = true }
+"bookmarks:selected"          = { fg = "#504945", bg = "#83a598", bold = true }
+"bookmarks text:selected"     = { fg = "#504945" }
+"bookmarks dimmed:selected"   = { fg = "#665c54" }
+"bookmarks shortcut:selected" = { fg = "#504945", bold = true }
+"bookmarks input text"        = { fg = "#ebdbb2" }
+"bookmarks input matched"     = { fg = "#fabd2f", bold = true }
+"bookmarks remote"            = { fg = "#ebdbb2" }
+"bookmarks remote title"      = { fg = "#d3869b", bold = true }
+"bookmarks remote text"       = { fg = "#ebdbb2" }
+"bookmarks remote dimmed"     = { fg = "#bdae93" }
+"bookmarks remote error"      = { fg = "#fb4934", bold = true }
+"bookmarks remote:selected"   = { fg = "#504945", bg = "#83a598", bold = true }
+
+# --- Target picker, choose dialog, inputs ------------------------------------
+"picker"                  = { fg = "#ebdbb2", bg = "#3c3836" }
+"picker border"           = { fg = "#665c54", bg = "#3c3836" }
+"picker text"             = { fg = "#ebdbb2" }
+"picker dimmed"           = { fg = "#bdae93" }
+"picker matched"          = { fg = "#fabd2f", underline = true }
+"picker bookmark"         = { fg = "#d3869b" }
+"picker:selected"         = { fg = "#504945", bg = "#83a598", bold = true }
+"picker text:selected"    = { fg = "#504945" }
+"picker dimmed:selected"  = { fg = "#665c54" }
+"picker matched:selected" = { fg = "#282828", bold = true, underline = true }
+"choose"                  = { fg = "#ebdbb2", bg = "#3c3836" }
+"choose title"            = { fg = "#b8bb26", bold = true }
+"choose border"           = { fg = "#665c54", bg = "#3c3836" }
+"choose text"             = { fg = "#ebdbb2" }
+"choose input"            = { fg = "#ebdbb2" }
+"choose:selected"         = { fg = "#504945", bg = "#83a598", bold = true }
+"input"                   = { fg = "#ebdbb2", bg = "#3c3836" }
+"input title"             = { fg = "#83a598", bold = true }
+"input text"              = { fg = "#ebdbb2" }
+"input border"            = { fg = "#665c54", bg = "#3c3836" }
+"password"                = { fg = "#ebdbb2", bg = "#3c3836" }
+"password title"          = { fg = "#83a598", bold = true }
+"password border"         = { fg = "#665c54", bg = "#3c3836" }
+
+# --- Confirmation / undo / redo ----------------------------------------------
+"confirmation"                 = { fg = "#ebdbb2", bg = "#3c3836" }
+"confirmation text"            = { fg = "#83a598", bold = true }
+"confirmation dimmed"          = { fg = "#bdae93" }
+"confirmation border"          = { fg = "#fb4934", bg = "#3c3836", bold = true }
+"confirmation:selected"        = { fg = "#504945", bg = "#83a598", bold = true }
+"undo"                         = { fg = "#ebdbb2", bg = "#3c3836" }
+"undo border"                  = { fg = "#fe8019", bg = "#3c3836" }
+"undo confirmation dimmed"     = { fg = "#bdae93" }
+"undo confirmation:selected"   = { fg = "#504945", bg = "#83a598", bold = true }
+"redo"                         = { fg = "#ebdbb2", bg = "#3c3836" }
+"redo border"                  = { fg = "#fe8019", bg = "#3c3836" }
+"redo confirmation dimmed"     = { fg = "#bdae93" }
+"redo confirmation:selected"   = { fg = "#504945", bg = "#83a598", bold = true }
+
+# --- Flash messages ------------------------------------------------------------
+"flash text"     = { fg = "#ebdbb2" }
+"flash success"  = { fg = "#b8bb26", bold = true }
+"flash error"    = { fg = "#fb4934", bold = true }
+"flash matched"  = { fg = "#fabd2f", bold = true }
+"flash:selected" = { fg = "#8ec07c", bold = true }
