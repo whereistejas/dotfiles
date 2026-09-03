@@ -8,12 +8,8 @@
     "anthropic/claude-opus-5:high",
     "anthropic/claude-sonnet-5:high"
   ],
-  "npmCommand": [
-    "bun"
-  ],
   "packages": [
     "https://github.com/kepano/obsidian-skills",
-    "npm:@diegopetrucci/pi-claude-fast",
     "git:github.com/mvzink/jj-hunk-tool"
   ],
   "quietStartup": true,
