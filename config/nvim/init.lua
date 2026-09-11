@@ -628,8 +628,14 @@ vim.api.nvim_create_autocmd("FileType", {
 -- Reformat long param/field lists in hover: put each element on its own line.
 -- In 0.12, vim.lsp.buf.hover() calls open_floating_preview directly (not via
 -- handlers), so this monkey-patch is the correct interception point.
+-- Gated on focus_id: vim.lsp.buf.hover() (and the hover handler) set it to
+-- "textDocument/hover", while signature help uses its own method id and
+-- diagnostic floats set none — so those floats pass through untouched.
 local orig_open_float = vim.lsp.util.open_floating_preview
 function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
+	if not (opts and opts.focus_id == "textDocument/hover") then
+		return orig_open_float(contents, syntax, opts, ...)
+	end
 	local formatted = {}
 	for _, ln in ipairs(contents) do
 		local split = #ln > 80 and split_params(ln)
