@@ -301,7 +301,7 @@ end
 -- =============================================================================
 
 -- Theme
-vim.o.background = "dark"
+vim.o.background = "light"
 vim.cmd("colorscheme gruvbox")
 
 -- mini.diff — gutter change markers. Uses a jj-aware source that diffs the
