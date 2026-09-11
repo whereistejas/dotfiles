@@ -735,6 +735,7 @@ vim.keymap.set("n", "gd", "<C-]>", { desc = "Go to definition (LSP + ctags fallb
 vim.keymap.set("n", "0", "^", { desc = "First non-blank character" })
 vim.keymap.set("n", "9", "$", { desc = "End of line" })
 vim.keymap.set("n", "j", "gj", { desc = "Down (display line)" })
+vim.keymap.set("n", "k", "gk", { desc = "Up (display line)" })
 vim.keymap.set({ "n", "x" }, ";", ":", { noremap = true, desc = "Command-line mode" })
 
 -- Native completion popup: <Tab>/<S-Tab> cycle items, <CR> accepts the
