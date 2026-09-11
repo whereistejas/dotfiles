@@ -442,19 +442,36 @@ local jjdiff = require("jj.diff")
 
 -- Returns (worktree, colocated). `worktree` is a git working dir whose object
 -- store holds this jj repo's commits, or nil if there's no git backing at all.
+-- Memoized per jj root: the git backing of a given root can't change while
+-- nvim is running, and the `jj git root` call is on a keypress path.
+local jj_worktree_cache = {}
+
 local function jj_git_worktree()
 	local jj = vim.fs.find(".jj", { path = vim.fn.getcwd(), upward = true, type = "directory" })[1]
 	if not jj then return nil, false end
 	local root = vim.fs.dirname(jj)
+	local cached = jj_worktree_cache[root]
+	if cached then return cached[1], cached[2] end
+
+	local function remember(wt, colocated)
+		jj_worktree_cache[root] = { wt, colocated }
+		return wt, colocated
+	end
+
 	if vim.fn.isdirectory(root .. "/.git") == 1 or vim.fn.filereadable(root .. "/.git") == 1 then
-		return root, true -- colocated: the jj root is itself a git worktree
+		return remember(root, true) -- colocated: the jj root is itself a git worktree
 	end
-	local out = vim.fn.systemlist({ "jj", "git", "root" })
-	if vim.v.shell_error == 0 and out[1] and out[1] ~= "" then
-		local wt = vim.fn.fnamemodify(out[1], ":h")        -- dirname of .../repo/.git => .../repo
-		if vim.fn.isdirectory(wt) == 1 then return wt, false end -- workspace: shared worktree
+	local ok, obj = pcall(function()
+		return vim.system({ "jj", "git", "root" }, { cwd = root, text = true }):wait(2000)
+	end)
+	if ok and obj.code == 0 then
+		local out = vim.trim(obj.stdout or "")
+		if out ~= "" then
+			local wt = vim.fn.fnamemodify(out, ":h")                     -- dirname of .../repo/.git => .../repo
+			if vim.fn.isdirectory(wt) == 1 then return remember(wt, false) end -- workspace: shared worktree
+		end
 	end
-	return nil, false
+	return remember(nil, false)
 end
 
 -- Run fn with cwd temporarily set to `dir`. codediff captures cwd synchronously
