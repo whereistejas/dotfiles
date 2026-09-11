@@ -96,7 +96,6 @@ vim.api.nvim_create_autocmd("PackChanged", {
 
 vim.pack.add({
 	-- Theme (loaded first so colorscheme is set before other plugins)
-	"https://github.com/projekt0n/github-nvim-theme",
 	"https://github.com/ellisonleao/gruvbox.nvim",
 	"https://github.com/shortcuts/no-neck-pain.nvim",
 
@@ -298,15 +297,6 @@ end
 -- =============================================================================
 
 -- Theme
-require("github-theme").setup({
-	options = {
-		transparent = false,
-		styles = {
-			comments = "italic",
-			keywords = "bold",
-		},
-	},
-})
 vim.o.background = "dark"
 vim.cmd("colorscheme gruvbox")
 
