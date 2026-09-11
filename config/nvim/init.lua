@@ -115,6 +115,8 @@ vim.pack.add({
 
 	-- Treesitter
 	"https://github.com/nvim-treesitter/nvim-treesitter",
+	-- Markdown
+	"https://github.com/MeanderingProgrammer/render-markdown.nvim",
 
 	-- LSP
 	"https://github.com/neovim/nvim-lspconfig",
@@ -580,6 +582,9 @@ end
 
 -- no-neck-pain (centered layout)
 require("no-neck-pain").setup({ width = 120 })
+
+-- render-markdown (in-buffer markdown rendering)
+require("render-markdown").setup({})
 
 -- Treesitter
 require("nvim-treesitter").setup()
