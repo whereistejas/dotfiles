@@ -529,7 +529,22 @@ jj_cmd.j = function(args)
 	return orig_j(args)
 end
 
--- snacks (picker + explorer)
+-- mermaid-cli (mmdc) drives a headless Chrome via puppeteer, but Homebrew's
+-- mmdc pins a chrome-headless-shell version that is usually absent from
+-- ~/.cache/puppeteer. Point it at whatever build IS cached, via a generated
+-- puppeteer config file. Returns nil if none is cached (then mmdc's own
+-- version resolution applies, and mermaid rendering just fails silently).
+local function mermaid_puppeteer_config()
+	local bins = vim.fn.glob(vim.fn.expand("~/.cache/puppeteer/chrome-headless-shell/*/*/chrome-headless-shell"),
+		false, true)
+	if #bins == 0 then return nil end
+	table.sort(bins)
+	local cfg = vim.fs.joinpath(vim.fn.stdpath("cache"), "mermaid-puppeteer.json")
+	vim.fn.writefile({ vim.json.encode({ executablePath = bins[#bins] }) }, cfg)
+	return cfg
+end
+
+-- snacks (picker + explorer + image)
 -- Guarded: snacks.nvim throws "already setup" on a second setup() call, which
 -- would abort `:source $MYVIMRC`.
 if not vim.g.snacks_did_setup then
@@ -546,6 +561,20 @@ if not vim.g.snacks_did_setup then
 			},
 		},
 		explorer = { enabled = true },
+		-- Inline images / mermaid diagrams via the kitty graphics protocol.
+		-- Mermaid fences need `mmdc` (npm: @mermaid-js/mermaid-cli).
+		image = {
+			enabled = true,
+			convert = {
+				mermaid = function()
+					local theme = vim.o.background == "light" and "neutral" or "dark"
+					local args = { "-i", "{src}", "-o", "{file}", "-b", "transparent", "-t", theme, "-s", "{scale}" }
+					local cfg = mermaid_puppeteer_config()
+					if cfg then vim.list_extend(args, { "-p", cfg }) end
+					return args
+				end,
+			},
+		},
 	})
 end
 
