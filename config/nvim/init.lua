@@ -115,6 +115,8 @@ vim.pack.add({
 
 	-- Treesitter
 	"https://github.com/nvim-treesitter/nvim-treesitter",
+	"https://github.com/nvim-treesitter/nvim-treesitter-textobjects",
+
 	-- Markdown
 	"https://github.com/MeanderingProgrammer/render-markdown.nvim",
 
@@ -591,6 +593,13 @@ require("nvim-treesitter").setup()
 require("nvim-treesitter.install").install({ "typescript", "tsx", "lua", "rust", "ocaml", "json", "html", "css", "python",
 	"ruby", "bash" })
 
+-- Treesitter text objects: language-aware af/if (function) and ac/ic (class,
+-- which also covers Rust struct/enum/trait/impl). Mappings live with the other
+-- treesitter keymaps below.
+require("nvim-treesitter-textobjects").setup({
+	select = { lookahead = true },
+})
+
 -- nvim-treesitter (main branch) does NOT enable highlighting: Nvim only
 -- auto-starts it via runtime ftplugins for the filetypes whose parser it
 -- bundles (lua, markdown, query, help, diff, ...). Without this, every parser
@@ -749,6 +758,35 @@ vim.keymap.set("x", "<left>", function() vim.treesitter.select("prev", vim.v.cou
 	{ desc = "Select previous sibling node" })
 vim.keymap.set("x", "<right>", function() vim.treesitter.select("next", vim.v.count1) end,
 	{ desc = "Select next sibling node" })
+vim.keymap.set("x", "<S-right>", function() vim.treesitter.select("extend_next", vim.v.count1) end,
+	{ desc = "Extend selection over next sibling node" })
+vim.keymap.set("x", "<S-left>", function() vim.treesitter.select("extend_prev", vim.v.count1) end,
+	{ desc = "Extend selection over previous sibling node" })
+
+-- Treesitter text objects (nvim-treesitter-textobjects):
+--   af/if function, ac/ic class (Rust: struct/enum/trait/impl)
+--   ]f/[f, ]c/[c jump to next/previous function or class start
+local ts_select = require("nvim-treesitter-textobjects.select")
+local ts_move = require("nvim-treesitter-textobjects.move")
+for lhs, query in pairs({
+	["af"] = "@function.outer",
+	["if"] = "@function.inner",
+	["ac"] = "@class.outer",
+	["ic"] = "@class.inner",
+}) do
+	vim.keymap.set({ "x", "o" }, lhs, function() ts_select.select_textobject(query, "textobjects") end,
+		{ desc = "Select " .. query })
+end
+for lhs, spec in pairs({
+	["]f"] = { ts_move.goto_next_start, "@function.outer" },
+	["[f"] = { ts_move.goto_previous_start, "@function.outer" },
+	["]c"] = { ts_move.goto_next_start, "@class.outer" },
+	["[c"] = { ts_move.goto_previous_start, "@class.outer" },
+}) do
+	local fn, query = spec[1], spec[2]
+	vim.keymap.set({ "n", "x", "o" }, lhs, function() fn(query, "textobjects") end,
+		{ desc = "Jump to " .. query })
+end
 
 -- Copy selection + context (path:line-range (Symbol.path)) to the clipboard
 vim.keymap.set("x", "Y", copy_selection_with_context,
