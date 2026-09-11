@@ -32,9 +32,24 @@ vim.opt.cursorline = true
 vim.opt.winborder = "single"
 vim.opt.mouse = "n"
 
+-- Where jumps land. The vim.lsp.buf.definition() family honours this as of
+-- 0.13: reuse an existing window showing the target, else open a vsplit.
+vim.opt.switchbuf = { "useopen", "vsplit" }
+
 -- Native LSP completion (replaces blink.cmp). 'fuzzy' enables fuzzy matching,
--- 'popup' shows the item's info in a floating window.
-vim.opt.completeopt = { "menuone", "noselect", "popup", "fuzzy" }
+-- 'popup' shows the item's info in a floating window, 'preselect' honours the
+-- server's CompletionItem.preselect hint.
+vim.opt.completeopt = { "menuone", "preselect", "popup", "fuzzy" }
+-- Pop the completion menu up as you type, no <C-x><C-o> needed. It is
+-- buffer-local, so turn it back off in prompt buffers (snacks pickers etc.)
+-- where an unprompted popup just fights with the picker's own list.
+vim.opt.autocomplete = true
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = { "snacks_picker_input", "snacks_input" },
+	callback = function(args)
+		vim.bo[args.buf].autocomplete = false
+	end,
+})
 
 vim.opt.tabstop = 4
 vim.opt.shiftwidth = 4
