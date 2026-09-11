@@ -1,3 +1,7 @@
+-- Enable the bytecode cache before anything else, so the Lua modules sourced
+-- by vim.pack.add() (plugin/ files) are cached too.
+vim.loader.enable()
+
 if vim.fn.has("nvim-0.12.3") ~= 1 then
 	vim.notify("init.lua requires nvim >= 0.12.3 (vim.treesitter.select)", vim.log.levels.ERROR)
 	return
@@ -101,9 +105,6 @@ vim.pack.add({
 	-- LSP
 	"https://github.com/neovim/nvim-lspconfig",
 })
-
--- Enable loader now that all plugins are in runtimepath
-vim.loader.enable()
 
 -- =============================================================================
 -- Functions
