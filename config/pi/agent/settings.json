@@ -10,7 +10,8 @@
   ],
   "packages": [
     "https://github.com/kepano/obsidian-skills",
-    "git:github.com/mvzink/jj-hunk-tool"
+    "git:github.com/mvzink/jj-hunk-tool",
+    "npm:@ff-labs/pi-fff"
   ],
   "quietStartup": true,
   "hideThinkingBlock": false,
