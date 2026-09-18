@@ -716,6 +716,31 @@ vim.lsp.enable("bashls")
 vim.lsp.enable("marksman")
 vim.lsp.enable("zls")
 
+-- rust-analyzer's macro expansion is a custom request
+-- (`rust-analyzer/expandMacro`), not part of the LSP spec, so nothing calls it
+-- by default. Register it as a client-side command: nvim resolves Command-style
+-- code actions against client.commands / vim.lsp.commands before falling back
+-- to workspace/executeCommand, so the `gra` menu can offer it as a pseudo code
+-- action (see the gra mapping in Keymaps).
+vim.lsp.commands["rust-analyzer.expandMacro"] = function(cmd, ctx)
+	local client = assert(vim.lsp.get_client_by_id(ctx.client_id))
+	client:request("rust-analyzer/expandMacro", cmd.arguments[1], function(err, result)
+		if err or not result then
+			vim.notify("expandMacro: " .. (err and err.message or "no macro under the cursor"),
+				vim.log.levels.WARN)
+			return
+		end
+		vim.cmd("vnew")
+		local buf = vim.api.nvim_get_current_buf()
+		vim.bo[buf].buftype = "nofile"
+		vim.bo[buf].bufhidden = "wipe"
+		vim.bo[buf].filetype = "rust"
+		vim.api.nvim_buf_set_name(buf, "macro-expansion://" .. result.name)
+		vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(result.expansion, "\n"))
+		vim.bo[buf].modifiable = false
+	end, ctx.bufnr)
+end
+
 -- Diagnostics
 vim.diagnostic.config({
 	virtual_text = true,
@@ -731,6 +756,39 @@ vim.diagnostic.config({
 -- attached (LSP first, ctags fallback), else a plain tag-file lookup.
 -- Global so it's present regardless of LspAttach timing. Jumplist/tagstack native.
 vim.keymap.set("n", "gd", "<C-]>", { desc = "Go to definition (LSP + ctags fallback)" })
+
+-- Default LSP code-action map, plus an "Expand macro recursively" entry in
+-- buffers with rust_analyzer attached. vim.lsp.buf.code_action() offers no hook
+-- for extra items, so wrap vim.ui.select for the duration of the call and
+-- append one; the position is captured now, when the cursor is still on the
+-- macro call.
+vim.keymap.set({ "n", "x" }, "gra", function()
+	local client = vim.lsp.get_clients({ bufnr = 0, name = "rust_analyzer" })[1]
+	if not client then return vim.lsp.buf.code_action() end
+
+	local extra = {
+		action = {
+			title = "Expand macro recursively",
+			command = "rust-analyzer.expandMacro",
+			arguments = { vim.lsp.util.make_position_params(0, client.offset_encoding) },
+		},
+		ctx = { bufnr = vim.api.nvim_get_current_buf(), client_id = client.id },
+	}
+	local orig_select = vim.ui.select
+	local function restore()
+		if vim.ui.select ~= orig_select then vim.ui.select = orig_select end
+	end
+	vim.ui.select = function(items, opts, on_choice)
+		restore()
+		if opts and opts.kind == "codeaction" then table.insert(items, extra) end
+		return orig_select(items, opts, on_choice)
+	end
+	-- code_action() returns early, before vim.ui.select, when every server
+	-- reports no actions — that would leave the wrapper installed.
+	vim.defer_fn(restore, 2000)
+
+	vim.lsp.buf.code_action()
+end, { desc = "Code actions (+ Rust macro expansion)" })
 
 vim.keymap.set("n", "0", "^", { desc = "First non-blank character" })
 vim.keymap.set("n", "9", "$", { desc = "End of line" })
