@@ -41,11 +41,11 @@ vim.opt.switchbuf = { "useopen" }
 -- server's CompletionItem.preselect hint.
 vim.opt.completeopt = { "menuone", "preselect", "popup", "fuzzy" }
 -- Pop the completion menu up as you type, no <C-x><C-o> needed. It is
--- buffer-local, so turn it back off in prompt buffers (snacks pickers etc.)
+-- buffer-local, so turn it back off in prompt buffers (snacks/fff pickers etc.)
 -- where an unprompted popup just fights with the picker's own list.
 vim.opt.autocomplete = true
 vim.api.nvim_create_autocmd("FileType", {
-	pattern = { "snacks_picker_input", "snacks_input" },
+	pattern = { "snacks_picker_input", "snacks_input", "fff_input" },
 	callback = function(args)
 		vim.bo[args.buf].autocomplete = false
 	end,
@@ -91,6 +91,11 @@ vim.api.nvim_create_autocmd("PackChanged", {
 			if not ev.data.active then vim.cmd.packadd("nvim-treesitter") end
 			vim.cmd("TSUpdate")
 		end
+		-- fff ships a Rust core: pull the prebuilt binary (falls back to cargo).
+		if name == "fff" and (kind == "install" or kind == "update") then
+			if not ev.data.active then vim.cmd.packadd("fff") end
+			require("fff.download").download_or_build_binary()
+		end
 	end,
 })
 
@@ -112,6 +117,11 @@ vim.pack.add({
 
 	-- Picker / QoL
 	"https://github.com/folke/snacks.nvim",
+	-- File/grep picker with its own UI (no snacks.picker integration by design).
+	-- Pinned to a release tag: the build hook downloads a prebuilt Lua module
+	-- (libfff_nvim.dylib) keyed on the tag. Untagged HEAD 404s and falls back to
+	-- a full `cargo build --release`.
+	{ src = "https://github.com/dmtrKovalenko/fff", version = "v0.10.6" },
 
 	-- Treesitter
 	"https://github.com/nvim-treesitter/nvim-treesitter",
@@ -582,6 +592,52 @@ if not vim.g.snacks_did_setup then
 	})
 end
 
+-- fff (file + live grep picker, own UI)
+-- Read at first use; the plugin lazy-initialises itself, so no setup() call.
+-- Styled to match the snacks picker: prompt on top, 0.8x0.8 centered float,
+-- preview right at 50%, snacks' prompt icon, and snacks' own highlight groups
+-- so both pickers track the colorscheme identically.
+-- Snacks generates its per-window groups (SnacksPickerList, SnacksPickerInput,
+-- ...) lazily, the first time its own picker opens, so fff cannot reference
+-- them. Use the parents those groups link to; they exist as soon as
+-- snacks.picker is loaded and give the same colors.
+local fff_winhl = table.concat({
+	"Normal:SnacksPicker",
+	"NormalFloat:SnacksPicker",
+	"FloatBorder:SnacksPickerBorder",
+	"FloatTitle:SnacksPickerTitle",
+	"CursorLine:SnacksPickerListCursorLine",
+}, ",")
+
+vim.g.fff = {
+	lazy_sync = true,
+	title = "Files", -- snacks names its file picker "Files", grep "Grep"
+	prompt = " ", -- snacks' picker.icons.prompt
+	layout = {
+		height = 0.8,
+		width = 0.8,
+		prompt_position = "top",
+		preview_position = "right",
+		preview_size = 0.5,
+		-- snacks' default layout has min_width = 120 before it flexes vertical.
+		flex = { size = 120, wrap = "top" },
+		show_scrollbar = false, -- snacks' list has no scrollbar
+		show_path_first = false, -- `file path/to`, like snacks
+	},
+	preview = {
+		enabled = true,
+		line_numbers = false, -- snacks preview runs with minimal = true
+	},
+	hl = {
+		matched = "SnacksPickerMatch",
+		prompt = "SnacksPickerPrompt",
+		directory_path = "SnacksPickerDir",
+		title = "SnacksPickerTitle",
+		cursor = "SnacksPickerListCursorLine",
+		winhl = fff_winhl,
+	},
+}
+
 -- no-neck-pain (centered layout)
 require("no-neck-pain").setup({ width = 120 })
 
@@ -957,10 +1013,8 @@ vim.keymap.set("n", "T", function() require("jj.annotate").line() end, { desc = 
 -- snacks picker
 vim.keymap.set("n", "<space>t", function() Snacks.picker.pickers() end, { desc = "Pickers" })
 vim.keymap.set("n", "<space>B", function() Snacks.picker.buffers() end, { desc = "Buffers" })
-vim.keymap.set("n", "<space>f", function() Snacks.picker.files() end, { desc = "Find files" })
 vim.keymap.set("n", "<space>F", function() Snacks.picker.files({ hidden = true, ignored = true }) end,
 	{ desc = "Find files (hidden + ignored)" })
-vim.keymap.set("n", "?", function() Snacks.picker.grep() end, { desc = "Live grep" })
 vim.keymap.set("n", "<space><space>", function() Snacks.picker.resume() end, { desc = "Resume last picker" })
 vim.keymap.set("n", "<space>r", function() Snacks.picker.lsp_references() end, { desc = "LSP references" })
 vim.keymap.set("n", "<space>i", function() Snacks.picker.lsp_implementations() end, { desc = "LSP implementations" })
@@ -979,6 +1033,12 @@ vim.keymap.set("n", "M", vim.diagnostic.open_float, { desc = "Line diagnostics (
 vim.keymap.set("n", "<space>k", function() Snacks.picker.keymaps() end, { desc = "Keymaps" })
 vim.keymap.set("n", "<space>c", function() Snacks.explorer({ cwd = vim.fn.expand("%:p:h") }) end,
 	{ desc = "File explorer (current file dir)" })
+
+-- fff picker (takes over file find + live grep from snacks)
+vim.keymap.set("n", "<space>f", function() require("fff").find_files() end, { desc = "Find files (fff)" })
+vim.keymap.set("n", "?", function() require("fff").live_grep({ title = "Grep" }) end, { desc = "Live grep (fff)" })
+vim.keymap.set({ "n", "x" }, "<space>w", function() require("fff").live_grep_under_cursor({ title = "Grep" }) end,
+	{ desc = "Grep word / selection (fff)" })
 
 -- Layout
 vim.keymap.set("n", "<space>g", "<cmd>NoNeckPain<CR>", { desc = "Toggle centered layout" })
