@@ -33,8 +33,8 @@ vim.opt.winborder = "single"
 vim.opt.mouse = "n"
 
 -- Where jumps land. The vim.lsp.buf.definition() family honours this as of
--- 0.13: reuse an existing window showing the target, else open a vsplit.
-vim.opt.switchbuf = { "useopen", "vsplit" }
+-- 0.13: reuse an existing window showing the target, else use the current one.
+vim.opt.switchbuf = { "useopen" }
 
 -- Native LSP completion (replaces blink.cmp). 'fuzzy' enables fuzzy matching,
 -- 'popup' shows the item's info in a floating window, 'preselect' honours the
@@ -586,7 +586,7 @@ end
 require("no-neck-pain").setup({ width = 120 })
 
 -- render-markdown (in-buffer markdown rendering)
-require("render-markdown").setup({})
+require("render-markdown").setup({ enabled = false })
 
 -- Treesitter
 require("nvim-treesitter").setup()
@@ -893,8 +893,8 @@ vim.keymap.set("n", "<space>jl", function() require("jj.picker").log({ revset = 
 vim.keymap.set("n", "<space>js", function() require("jj.picker").status() end, { desc = "jj picker: status" })
 vim.keymap.set("n", "<space>jh", function() require("jj.picker").file_history() end, { desc = "jj picker: file history" })
 vim.keymap.set("n", "<space>jc", function() require("jj.picker").conflict() end, { desc = "jj picker: conflicts" })
--- Takes over the built-in `U` (undo-line); `u`/<C-r> cover undo/redo.
-vim.keymap.set("n", "U", function() require("jj.annotate").line() end, { desc = "jj annotate line (tooltip)" })
+-- Takes over the built-in `T` (till-backwards); `F`/`,`/`;` cover backwards search.
+vim.keymap.set("n", "T", function() require("jj.annotate").line() end, { desc = "jj annotate line (tooltip)" })
 
 -- snacks picker
 vim.keymap.set("n", "<space>t", function() Snacks.picker.pickers() end, { desc = "Pickers" })
