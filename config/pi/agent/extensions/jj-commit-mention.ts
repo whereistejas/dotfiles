@@ -15,6 +15,9 @@
  *                         lives inside a jj repo. Selecting an item inserts
  *                         `@<path>:<change-id>`.
  *
+ *   @[<path>/]bb:<query>  bookmarks only (of the repo at `<path>`, else the cwd repo).
+ *   @[<path>/]ff:<query>  files only, as if `@[<path>/]<query>` had been typed.
+ *
  * Cost control (repos with a lot of changes):
  *   - jj is only run for a path once the token contains `:` and the path resolves to an
  *     existing directory inside a jj repo. Plain `@foo/bar` never shells out to jj beyond
@@ -41,6 +44,7 @@ import {
 	type AutocompleteProvider,
 	type AutocompleteSuggestions,
 	fuzzyFilter,
+	visibleWidth,
 } from "@earendil-works/pi-tui";
 
 type Bookmark = {
@@ -63,6 +67,17 @@ const FIELD = "\x1f"; // unit separator between fields in the jj template output
 const MAX_SUGGESTIONS = 20;
 const CACHE_TTL_MS = 5_000;
 const ROOT_CACHE_TTL_MS = 30_000;
+// Keeps details aligned with pi's file suggestions (32-col primary column incl. 2-col gap).
+const MIN_TAG_COLUMN = 30;
+const DIM = "\x1b[2m";
+const UNDIM = "\x1b[22m";
+
+/** One suggestion row: `tag` is inserted on selection unless `value` overrides it. */
+type Row = {
+	tag: string;
+	detail: string;
+	value?: string;
+};
 
 function commitLimit(): number {
 	const raw = process.env.PI_JJ_MENTION_LIMIT;
@@ -89,6 +104,8 @@ type JjToken = {
 	pathText?: string;
 	/** Text to filter bookmarks/commits with. */
 	query: string;
+	/** Set by a `bb:`/`ff:` marker; `scope` is the raw text before the marker. */
+	filter?: { kind: "bookmarks" | "files"; scope: string };
 };
 
 // Matches `@<token>` at the cursor, anchored on a whitespace/start boundary
@@ -99,6 +116,17 @@ function extractJjToken(textBeforeCursor: string): JjToken | undefined {
 	const raw = match?.[1];
 	if (raw === undefined) {
 		return undefined;
+	}
+
+	const filtered = raw.match(/^([^:]*\/)?(bb|ff):([^:]*)$/);
+	if (filtered) {
+		const scope = filtered[1] ?? "";
+		return {
+			raw,
+			pathText: scope ? scope.replace(/\/+$/, "") || "/" : undefined,
+			query: filtered[3] ?? "",
+			filter: { kind: filtered[2] === "bb" ? "bookmarks" : "files", scope },
+		};
 	}
 
 	// Change ids, commit ids and bookmark names never contain `:`, so the last `:`
@@ -131,32 +159,41 @@ function tagPrefix(pathText: string | undefined): string {
 	return pathText ? `@${pathText}:` : "@";
 }
 
-function bookmarkToItem(bookmark: Bookmark, pathText: string | undefined): AutocompleteItem {
-	const tag = `${tagPrefix(pathText)}${bookmark.name}`;
+function bookmarkToRow(bookmark: Bookmark, pathText: string | undefined): Row {
 	return {
-		value: tag,
-		label: tag,
-		description: `bookmark → ${bookmark.changeId}`,
+		tag: `${tagPrefix(pathText)}${bookmark.name}`,
+		detail: `bookmark → ${bookmark.changeId}`,
 	};
 }
 
-function commitToItem(commit: Commit, pathText: string | undefined): AutocompleteItem {
-	const tag = `${tagPrefix(pathText)}${commit.changeId}`;
+function commitToRow(commit: Commit, pathText: string | undefined): Row {
 	return {
-		value: tag,
-		label: tag,
-		description: `${commit.commitId} ${commit.description || "(no description)"}`,
+		tag: `${tagPrefix(pathText)}${commit.changeId}`,
+		detail: `${commit.commitId} ${commit.description || "(no description)"}`,
 	};
+}
+
+// pi's SelectList clips labels to a fixed 32-col column when an item has a description,
+// so tag and detail go into the label, which is only clipped at the terminal edge.
+function rowsToItems(rows: Row[]): AutocompleteItem[] {
+	const column = rows.reduce((widest, row) => Math.max(widest, visibleWidth(row.tag)), MIN_TAG_COLUMN);
+	return rows.map((row) => {
+		const padding = " ".repeat(column - visibleWidth(row.tag) + 2);
+		return {
+			value: row.value ?? row.tag,
+			label: `${row.tag}${padding}${DIM}${row.detail}${UNDIM}`,
+		};
+	});
 }
 
 function filterBookmarks(
 	bookmarks: Bookmark[],
 	query: string,
 	pathText: string | undefined,
-): AutocompleteItem[] {
+): Row[] {
 	const q = query.trim();
 	if (!q) {
-		return bookmarks.map((b) => bookmarkToItem(b, pathText));
+		return bookmarks.map((b) => bookmarkToRow(b, pathText));
 	}
 
 	const lower = q.toLowerCase();
@@ -175,13 +212,13 @@ function filterBookmarks(
 		matched.push(...fuzzy);
 	}
 
-	return matched.map((b) => bookmarkToItem(b, pathText));
+	return matched.map((b) => bookmarkToRow(b, pathText));
 }
 
-function filterCommits(commits: Commit[], query: string, pathText: string | undefined): AutocompleteItem[] {
+function filterCommits(commits: Commit[], query: string, pathText: string | undefined): Row[] {
 	const q = query.trim();
 	if (!q) {
-		return commits.slice(0, MAX_SUGGESTIONS).map((c) => commitToItem(c, pathText));
+		return commits.slice(0, MAX_SUGGESTIONS).map((c) => commitToRow(c, pathText));
 	}
 
 	const lower = q.toLowerCase();
@@ -207,7 +244,7 @@ function filterCommits(commits: Commit[], query: string, pathText: string | unde
 		}
 	}
 
-	return ranked.slice(0, MAX_SUGGESTIONS).map((c) => commitToItem(c, pathText));
+	return ranked.slice(0, MAX_SUGGESTIONS).map((c) => commitToRow(c, pathText));
 }
 
 async function fetchBookmarks(pi: ExtensionAPI, cwd: string): Promise<Bookmark[]> {
@@ -407,11 +444,10 @@ function createRepoStore(pi: ExtensionAPI) {
 	};
 }
 
-function loadingItem(token: JjToken, root: string): AutocompleteItem {
+function loadingRow(token: JjToken, root: string): Row {
 	return {
-		value: `@${token.raw}`,
-		label: `@${token.raw}`,
-		description: `loading changes from ${root}… keep typing or press Tab`,
+		tag: `@${token.raw}`,
+		detail: `loading changes from ${root}… keep typing or press Tab`,
 	};
 }
 
@@ -436,6 +472,33 @@ function createCommitProvider(
 			const finish = (items: AutocompleteItem[]): AutocompleteSuggestions | null =>
 				items.length > 0 ? { items, prefix: `@${token.raw}` } : null;
 
+			// `@[<path>/]ff:<query>` — files only: ask the built-in provider about the token
+			// with the marker removed, then replace the whole original token on selection.
+			if (token.filter?.kind === "files") {
+				const stripped = `${token.filter.scope}${token.query}`;
+				const start = cursorCol - token.raw.length;
+				const rewritten = [...lines];
+				rewritten[cursorLine] = currentLine.slice(0, start) + stripped + currentLine.slice(cursorCol);
+				const files = await current.getSuggestions(rewritten, cursorLine, start + stripped.length, options);
+				return finish(files?.items ?? []);
+			}
+
+			// `@[<path>/]bb:<query>` — bookmarks only, of `<path>`'s repo or the cwd repo.
+			if (token.filter?.kind === "bookmarks") {
+				const root = await resolveRoot(token.pathText !== undefined ? expandPath(token.pathText, cwd) : cwd);
+				if (!root || options.signal.aborted) {
+					return null;
+				}
+				const data = await repos.get(root, deadlineMs());
+				if (options.signal.aborted) {
+					return null;
+				}
+				if (!data) {
+					return finish(rowsToItems([loadingRow(token, root)]));
+				}
+				return finish(rowsToItems(filterBookmarks(data.bookmarks, token.query, token.pathText)));
+			}
+
 			// `@<path>:<query>` — repo-scoped. jj only runs once the path is a real
 			// directory inside a jj repo.
 			if (token.pathText !== undefined) {
@@ -455,30 +518,31 @@ function createCommitProvider(
 					return delegate();
 				}
 				if (!data) {
-					return finish([loadingItem(token, root)]);
+					return finish(rowsToItems([loadingRow(token, root)]));
 				}
 
-				return finish([
-					...filterBookmarks(data.bookmarks, token.query, pathText),
-					...filterCommits(data.commits, token.query, pathText),
-				]);
+				return finish(
+					rowsToItems([
+						...filterBookmarks(data.bookmarks, token.query, pathText),
+						...filterCommits(data.commits, token.query, pathText),
+					]),
+				);
 			}
 
 			// `@<query>` — bookmarks/commits of the cwd repo merged with file suggestions.
 			const cwdRoot = await resolveRoot(cwd);
 			const data = cwdRoot ? repos.peek(cwdRoot) : undefined;
-			const bookmarkItems = data ? filterBookmarks(data.bookmarks, token.query, undefined) : [];
-			const commitItems = data ? filterCommits(data.commits, token.query, undefined) : [];
+			const bookmarkRows = data ? filterBookmarks(data.bookmarks, token.query, undefined) : [];
+			const commitRows = data ? filterCommits(data.commits, token.query, undefined) : [];
 
 			// Offer `@<dir>:` as a hint when the typed path is another jj repo.
-			const repoHint: AutocompleteItem[] = [];
+			const repoHint: Row[] = [];
 			if (looksLikePath(token.query)) {
 				const otherRoot = await resolveRoot(expandPath(token.query, cwd));
 				if (otherRoot && otherRoot !== cwdRoot) {
 					repoHint.push({
-						value: `@${token.query}:`,
-						label: `@${token.query}:`,
-						description: `jj repo ${otherRoot} → type a change id or bookmark`,
+						tag: `@${token.query}:`,
+						detail: `jj repo ${otherRoot} → type a change id or bookmark`,
 					});
 					repos.warm(otherRoot);
 				}
@@ -488,7 +552,10 @@ function createCommitProvider(
 			if (options.signal.aborted) {
 				return fileSuggestions;
 			}
-			return finish([...repoHint, ...bookmarkItems, ...commitItems, ...(fileSuggestions?.items ?? [])]);
+			return finish([
+				...rowsToItems([...repoHint, ...bookmarkRows, ...commitRows]),
+				...(fileSuggestions?.items ?? []),
+			]);
 		},
 
 		applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
