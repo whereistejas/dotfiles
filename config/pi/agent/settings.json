@@ -1,11 +1,11 @@
 {
-  "lastChangelogVersion": "0.86.1",
+  "lastChangelogVersion": "0.87.1",
   "theme": "light",
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-opus-5",
+  "defaultModel": "claude-opus-5-5",
   "defaultThinkingLevel": "high",
   "enabledModels": [
-    "anthropic/claude-opus-5:high",
+    "anthropic/claude-opus-5-5:high",
     "anthropic/claude-sonnet-5:high"
   ],
   "packages": [
