@@ -122,6 +122,7 @@ vim.pack.add({
 	-- (libfff_nvim.dylib) keyed on the tag. Untagged HEAD 404s and falls back to
 	-- a full `cargo build --release`.
 	{ src = "https://github.com/dmtrKovalenko/fff", version = "v0.10.6" },
+	{ src = "https://github.com/whereistejas/servery.nvim", version = "session-titles" },
 
 	-- Treesitter
 	"https://github.com/nvim-treesitter/nvim-treesitter",
@@ -592,6 +593,117 @@ if not vim.g.snacks_did_setup then
 	})
 end
 
+-- servery (jump between per-directory nvim sessions)
+require("servery").setup({
+	dirs = function()
+		local out = {}
+		for _, root in ipairs({ "~/build", "~/build/git" }) do
+			root = vim.fs.normalize(root)
+			for name, type in vim.fs.dir(root) do
+				if type == "directory" then table.insert(out, vim.fs.joinpath(root, name)) end
+			end
+		end
+		return out
+	end,
+	ui = { provider = "snacks" },
+})
+
+-- :[N]SvClose — close the Nth most recent other session (same as :{N}Sv), or the current one: switch to the most recent other session first,
+-- then quit the one we left once its UI has gone.
+-- Refuses if the session has unsaved file buffers; terminal jobs are killed.
+local sv_unsaved = [[
+	local names = {}
+	for _, b in ipairs(vim.fn.getbufinfo({ bufmodified = 1 })) do
+		if vim.bo[b.bufnr].buftype == "" then names[#names + 1] = vim.fn.fnamemodify(b.name, ":~:.") end
+	end
+	return table.concat(names, ", ")
+]]
+vim.api.nvim_create_user_command("SvClose", function(args)
+	local servery = require("servery")
+	local others = vim.tbl_filter(function(s) return s.server.socket ~= vim.v.servername end, servery.list_servers())
+	table.sort(others, function(a, b) return a.server.useractive > b.server.useractive end)
+	local n = args.count
+	if n == 0 then
+		local unsaved = loadstring(sv_unsaved)()
+		if unsaved ~= "" then return vim.notify("SvClose: unsaved changes in " .. unsaved, vim.log.levels.ERROR) end
+		if not others[1] then return vim.cmd("qall!") end
+		others[1]:switch()
+		if vim.wait(2000, function() return #vim.api.nvim_list_uis() == 0 end) then vim.cmd("qall!") end
+		return
+	end
+	local target = others[n]
+	if not target then
+		return vim.notify(string.format("SvClose: no session %d (%d other sessions running)", n, #others),
+			vim.log.levels.ERROR)
+	end
+	local chan = vim.fn.sockconnect("pipe", target.server.socket, { rpc = true })
+	local unsaved = vim.rpcrequest(chan, "nvim_exec_lua", sv_unsaved, {})
+	if unsaved == "" then vim.rpcrequest(chan, "nvim_exec_lua", "vim.defer_fn(function() vim.cmd('qall!') end, 200)", {}) end
+	vim.fn.chanclose(chan)
+	if unsaved ~= "" then
+		return vim.notify("SvClose: unsaved changes in " .. unsaved, vim.log.levels.ERROR)
+	end
+	vim.notify("SvClose: closed " .. target:display_name())
+end, { count = true, desc = "Close a servery session (default: current)" })
+
+-- Session switcher: servery sessions/dirs first, then every folder under
+-- ~/build streamed in from fd (gitignore-aware). Snacks fuzzy-ranks as you
+-- type (score, then shortest path) and only renders the visible rows.
+local function servery_pick()
+	local servery = require("servery")
+	local icons = servery.get_cfg().ui.icons
+	local root = vim.fs.normalize("~/build")
+	local seen = {}
+	Snacks.picker.pick({
+		title = "Switch Nvim Session",
+		layout = { preview = false },
+		finder = {
+			function()
+				seen = {}
+				local items = {}
+				for _, sv in ipairs(servery.get_picker_items()) do
+					if not seen[sv.cwd] then
+						seen[sv.cwd] = true
+						local dir, title = vim.fn.fnamemodify(sv.cwd, ":~"), sv:title()
+						items[#items + 1] = { text = title and (dir .. " " .. title) or dir, dir = dir, title = title, path = sv.cwd, sv = sv }
+					end
+				end
+				return items
+			end,
+			function(_, ctx)
+				return require("snacks.picker.source.proc").proc(ctx:opts({
+					cmd = vim.fn.exepath("fd") ~= "" and "fd" or vim.fs.normalize("~/.pi/agent/bin/fd"),
+					args = { "--type", "d", "--absolute-path", "--color", "never", ".", root },
+					transform = function(item)
+						local dir = item.text:gsub("/$", "")
+						if seen[dir] then return false end
+						item.path = dir
+						item.text = vim.fn.fnamemodify(dir, ":~")
+					end,
+				}), ctx)
+			end,
+		},
+		format = function(item)
+			local sv = item.sv
+			if not sv then return { { icons.inactive, "ServeryIconInactive" }, { "  " }, { item.text } } end
+			local status = sv:status()
+			return {
+				{ sv:icon(), "ServeryIcon" .. status },
+				{ "  " },
+				{ item.dir, "ServeryLine" .. status },
+				{ item.title and ("  " .. item.title) or "", "ServeryTitle" },
+				{ "  " },
+				{ sv:time_since_active() or "", "ServeryTime" },
+			}
+		end,
+		confirm = function(picker, item)
+			if not item then return end
+			if item.sv then item.sv:switch() else servery.switch({ dir = item.path }) end
+			picker:close()
+		end,
+	})
+end
+
 -- fff (file + live grep picker, own UI)
 -- Read at first use; the plugin lazy-initialises itself, so no setup() call.
 -- Styled to match the snacks picker: prompt on top, 0.8x0.8 centered float,
@@ -1009,6 +1121,10 @@ vim.keymap.set("n", "<space>jh", function() require("jj.picker").file_history() 
 vim.keymap.set("n", "<space>jc", function() require("jj.picker").conflict() end, { desc = "jj picker: conflicts" })
 -- Takes over the built-in `T` (till-backwards); `F`/`,`/`;` cover backwards search.
 vim.keymap.set("n", "T", function() require("jj.annotate").line() end, { desc = "jj annotate line (tooltip)" })
+
+-- servery
+vim.keymap.set("n", "<space>s", servery_pick, { desc = "Switch nvim sessions" })
+vim.keymap.set("n", "ZV", "<cmd>1Sv<cr>", { desc = "Go to previous session" })
 
 -- snacks picker
 vim.keymap.set("n", "<space>t", function() Snacks.picker.pickers() end, { desc = "Pickers" })
