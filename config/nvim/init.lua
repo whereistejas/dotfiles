@@ -967,10 +967,10 @@ vim.keymap.set("n", "<C-p>", function()
 	qf_step(false)
 end, { desc = "Previous quickfix item" })
 
--- Terminal buffers: no line numbers, sign column, or listchars.
+-- Terminal buffers: relative line numbers only; no sign column or listchars.
 local function term_ui()
 	vim.opt_local.number = false
-	vim.opt_local.relativenumber = false
+	vim.opt_local.relativenumber = true
 	vim.opt_local.list = false
 	vim.opt_local.signcolumn = "no"
 end
