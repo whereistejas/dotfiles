@@ -120,6 +120,7 @@ M.select = function()
 
 		for _, part in ipairs({
 			{ session:display_name(), "ServeryLine" .. status },
+			{ session:title() and ("  " .. session:title()) or "", "ServeryTitle" },
 			{ spacer },
 			{ run_time, "ServeryTime" },
 		}) do

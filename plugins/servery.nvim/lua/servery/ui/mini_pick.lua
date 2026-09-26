@@ -21,7 +21,7 @@ M.select = function()
 		sessions = servery.list_sessions() --[[@as table[] ]]
 		time = os.time()
 		for _, session in ipairs(sessions) do
-			session.text = session:display_name()
+			session.text = session:search_text()
 		end
 		return sessions
 	end
@@ -35,15 +35,20 @@ M.select = function()
 			local icon = session:icon()
 			local status = session:status()
 			local name = session:display_name()
+			local title = session:title() and ("  " .. session:title()) or ""
 			local active_time = session:time_since_start(time) or ""
 			local suffix = active_time ~= "" and ("  " .. active_time) or ""
-			lines[i] = icon .. "  " .. name .. suffix
+			lines[i] = icon .. "  " .. name .. title .. suffix
 
 			local name_col = #icon + 2
 			table.insert(hl_data, { i - 1, 0, #icon, "ServeryIcon" .. status })
 			table.insert(hl_data, { i - 1, name_col, name_col + #name, "ServeryLine" .. status })
+			if title ~= "" then
+				local title_col = name_col + #name
+				table.insert(hl_data, { i - 1, title_col, title_col + #title, "ServeryTitle" })
+			end
 			if active_time ~= "" then
-				local t_col = name_col + #name + 2
+				local t_col = name_col + #name + #title + 2
 				table.insert(hl_data, { i - 1, t_col, t_col + #active_time, "ServeryTime" })
 			end
 		end

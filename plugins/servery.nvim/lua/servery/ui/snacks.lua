@@ -35,7 +35,7 @@ M.select = function()
 		finder = function()
 			local new_items = servery.list_sessions() --[[@as snacks.picker.finder.result]]
 			for i, item in ipairs(new_items) do
-				item.text = item:display_name()
+				item.text = item:search_text()
 				item.has_server = item.server ~= nil
 				item.idx = i
 			end
@@ -49,6 +49,7 @@ M.select = function()
 				{ icon, "ServeryIcon" .. status },
 				{ "  ", "Normal" },
 				{ session:display_name(), "ServeryLine" .. status },
+				{ session:title() and ("  " .. session:title()) or "", "ServeryTitle" },
 				{ "  ", "Normal" },
 				{ session:time_since_start(), "ServeryTime" },
 			}

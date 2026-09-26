@@ -26,6 +26,7 @@ local format_session = function(session, hl)
 		{ icon, "ServeryIcon" .. status },
 		{ "  " },
 		{ session:display_name(), "ServeryLine" .. status },
+		{ session:title() and ("  " .. session:title()) or "", "ServeryTitle" },
 		active_time and { "  " },
 		active_time and { active_time, "ServeryTime" },
 	}

@@ -27,6 +27,7 @@ M.select = function()
 			{ width = 2 },
 			{ remaining = true },
 			{ remaining = true },
+			{ remaining = true },
 		},
 	})
 
@@ -37,6 +38,7 @@ M.select = function()
 		return displayer({
 			{ session:icon(), "ServeryIcon" .. status },
 			{ session:display_name(), "ServeryLine" .. status },
+			{ session:title() or "", "ServeryTitle" },
 			{ session:time_since_start(time) or "", "ServeryTime" },
 		})
 	end
@@ -46,7 +48,7 @@ M.select = function()
 		return {
 			value = session,
 			display = make_display,
-			ordinal = session:display_name(),
+			ordinal = session:search_text(),
 		}
 	end
 

@@ -68,6 +68,29 @@ function Session:display_name()
 	end
 end
 
+---A short description of what the session is doing: the name set with
+---`:SvName`, or the title of a terminal in the session, or the focused file.
+---A trailing " - <dir>" is dropped since the directory is already shown.
+---@return string?
+function Session:title()
+	local title = self.server and self.server.title
+	if not title then
+		return
+	end
+	local dir = vim.pesc(vim.fs.basename(self.cwd))
+	for _, sep in ipairs({ "-", "–", "—", "|", ":" }) do
+		title = title:gsub("%s+" .. vim.pesc(sep) .. "%s+" .. dir .. "$", "")
+	end
+	return title
+end
+
+---Text for pickers to match against: the display name plus the title
+---@return string
+function Session:search_text()
+	local title = self:title()
+	return self:display_name() .. (title and (" " .. title) or "")
+end
+
 function Session:detach()
 	if not self.server then
 		return

@@ -91,6 +91,10 @@ local setup_cmds = function()
 			return vim.tbl_map(function(session) return session:display_name() end, M.list_sessions("active"))
 		end,
 	})
+
+	vim.api.nvim_create_user_command("SvName", function(args)
+		vim.g.servery_name = args.args ~= "" and args.args or nil
+	end, { nargs = "?" })
 end
 
 cfg_defaults = function()
@@ -147,6 +151,7 @@ local highlights = {
 	ServeryIconActive = { link = "@label" },
 	ServeryIconInactive = { link = "ComplHint" },
 	ServeryTime = { link = "Comment" },
+	ServeryTitle = { link = "Comment" },
 }
 
 local set_highlights = function()
@@ -182,6 +187,7 @@ end
 ---@field socket string
 ---@field pid integer
 ---@field original_cwd string?
+---@field title string?
 ---@field useractive integer?
 ---@field starttime integer?
 
@@ -194,6 +200,53 @@ end
 ---
 ---@return string
 M.cwd = function() return vim.g.servery_original_cwd or vim.fn.getcwd() end
+
+-- Runs in each server to work out its title; see Session:title()
+local title_code = [[
+	local name = vim.g.servery_name
+	if type(name) == "string" and name ~= "" then
+		return name
+	end
+
+	local is_float = function(win) return vim.api.nvim_win_get_config(win).relative ~= "" end
+	local term_title = function(win)
+		local buf = vim.api.nvim_win_get_buf(win)
+		local title = vim.bo[buf].buftype == "terminal" and vim.b[buf].term_title
+		if type(title) == "string" and title ~= "" and not vim.startswith(title, "term://") then
+			return title
+		end
+	end
+
+	-- The picker itself may be focused, so look past floating windows
+	local wins = vim.tbl_filter(function(w) return not is_float(w) end, vim.api.nvim_tabpage_list_wins(0))
+	local cur = vim.api.nvim_get_current_win()
+	if is_float(cur) then
+		local prev = vim.fn.win_getid(vim.fn.winnr("#"))
+		cur = prev ~= 0 and not is_float(prev) and prev or wins[1]
+	end
+	if not cur then
+		return nil
+	end
+
+	local title = term_title(cur)
+	if title then
+		return title
+	end
+	for _, win in ipairs(wins) do
+		title = term_title(win)
+		if title then
+			return title
+		end
+	end
+
+	for _, win in ipairs({ cur, unpack(wins) }) do
+		local buf = vim.api.nvim_win_get_buf(win)
+		local file = vim.api.nvim_buf_get_name(buf)
+		if vim.bo[buf].buftype == "" and file ~= "" then
+			return vim.fn.fnamemodify(file, ":~:.")
+		end
+	end
+]]
 
 ---@return servery.SessionActive
 local get_server_info = function(server)
@@ -215,6 +268,8 @@ local get_server_info = function(server)
 			{}
 		)) --[[@as string?]],
 	})
+	local title = vim.rpcrequest(chan, "nvim_exec_lua", title_code, {})
+	out.server.title = type(title) == "string" and title or nil
 	vim.fn.chanclose(chan)
 	return out
 end
