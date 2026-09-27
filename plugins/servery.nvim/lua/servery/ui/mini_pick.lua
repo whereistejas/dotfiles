@@ -34,7 +34,7 @@ M.select = function()
 			local icon = item:icon()
 			local status = item:status()
 			local name = item:display_name()
-			local active_time = item:time_since_active(time) or ""
+			local active_time = item:time_since_start(time) or ""
 			local suffix = active_time ~= "" and ("  " .. active_time) or ""
 			lines[i] = icon .. "  " .. name .. suffix
 
