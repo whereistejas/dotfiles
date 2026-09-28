@@ -11,7 +11,8 @@ M.cfg_defaults = function()
 
 	---@class servery.Cfg
 	local out = {
-		dirs = { "~" }, ---@type string[] | fun(): string[]
+		---@type string[] | fun(): string[]
+		dirs = function() return vim.fs.glob("~/*", true, true) end,
 		session_dir = vim.fs.joinpath(cache_dir, "servery.nvim"),
 		ui = {
 			provider = "builtin", ---@type servery.ui_provider
