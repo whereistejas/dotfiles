@@ -45,8 +45,10 @@ vim.pack.add({ "https://github.com/wurli/servery.nvim" })
 -- but you probably should at least set `dirs` and `ui.provider`.
 require("servery").setup({
 	-- Either supply the directories as an array of strings, or a function
-	-- which returns an array. Shorthands like `~` are expanded.
-	dirs = { "~" }, ---@type string[] | fun(): string[]
+	-- which returns an array. Shorthands like `~` are expanded. The default
+	-- lists the non-hidden dirs in your home directory.
+	---@type string[] | fun(): string[]
+	dirs = function() return vim.fs.glob("~/*", true, true) end,
 	session_dir = vim.fs.joinpath(vim.fn.stdpath("cache"), "servery.nvim"),
 	ui = {
 		-- Options: "builtin" | "snacks" | "fzf" | "telescope" | "mini_pick"
