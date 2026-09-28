@@ -32,7 +32,6 @@
 	ui = auto
 
 [core]
-	excludesfile = "~/.gitignore"
 	ignorecase = false
 
 [diff]
