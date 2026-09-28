@@ -907,7 +907,7 @@ vim.keymap.set("n", "k", "gk", { desc = "Up (display line)" })
 vim.keymap.set({ "n", "x" }, ";", ":", { noremap = true, desc = "Command-line mode" })
 
 -- Native completion popup: <Tab>/<S-Tab> cycle items, <CR> accepts the
--- selected item (plain <CR> otherwise, since completeopt has 'noselect').
+-- selected item (plain <CR> when nothing is selected).
 vim.keymap.set("i", "<Tab>", function()
 	return vim.fn.pumvisible() == 1 and "<C-n>" or "<Tab>"
 end, { expr = true, desc = "Next completion item / <Tab>" })
