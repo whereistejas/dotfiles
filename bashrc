@@ -20,7 +20,6 @@ fi
 
 # Environment variables (non-PATH)
 export EDITOR="nvim"
-export LS_OPTIONS="--color=auto"
 export GPG_TTY=$(tty)
 export PS1='\W \$ '
 export BUN_INSTALL="$HOME/.bun"
