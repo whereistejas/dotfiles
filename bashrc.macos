@@ -10,12 +10,10 @@ export PATH="/opt/homebrew/bin:$PATH"
 export PATH="$HOME/build/toolkit/ai/bin:$PATH"
 export PATH="$DOTFILES/scripts:$PATH"
 
-# nvm + cargo
+# nvm
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-nvm use default --silent 2>/dev/null
-[ -s "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 # Completions
 [[ -r "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh" ]] && . "/opt/vagrant/embedded/gems/gems/vagrant-2.4.9/contrib/bash/completion.sh"
