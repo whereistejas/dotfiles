@@ -1101,9 +1101,6 @@ vim.keymap.set({ "n", "x" }, "<space>w", function() require("fff").live_grep_und
 -- Layout
 vim.keymap.set("n", "<space>g", "<cmd>NoNeckPain<CR>", { desc = "Toggle centered layout" })
 
--- Terminal
-vim.keymap.set("t", "<S-Esc>", [[<C-\><C-n>]], { desc = "Exit terminal mode" })
-
 -- =============================================================================
 -- Autocommands
 -- =============================================================================
