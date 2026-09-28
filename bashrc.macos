@@ -8,7 +8,7 @@ fi
 # PATH — platform tools (lowest priority; .bashrc prepends user tools after)
 export PATH="/opt/homebrew/bin:$PATH"
 export PATH="$HOME/build/toolkit/ai/bin:$PATH"
-export PATH="$HOME/build/dotfiles/scripts:$PATH"
+export PATH="$DOTFILES/scripts:$PATH"
 
 # nvm + cargo
 export NVM_DIR="$HOME/.nvm"
