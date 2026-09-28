@@ -43,7 +43,7 @@ Configuration files for macOS, managed with [Jujutsu](https://martinvonz.github.
 - [Rust](https://www.rust-lang.org/) (via cargo)
 - [Node.js](https://nodejs.org/) (via [nvm](https://github.com/nvm-sh/nvm))
 - [Bun](https://bun.sh/)
-- [Ruby 3.2](https://www.ruby-lang.org/) (via Homebrew)
+- [Ruby](https://www.ruby-lang.org/) (via Homebrew)
 
 ### Apps
 
@@ -68,18 +68,24 @@ The Neovim config expects these external tools to be installed:
 | Bash | `bash-language-server` | `bun install -g bash-language-server` |
 | Markdown | `marksman` | `brew install marksman` |
 | Rust | `rust-analyzer` | `rustup component add rust-analyzer` |
+| Zig | `zls` | `brew install zls` |
 
-### Build Tools
+### External Tools
 
-- `ripgrep` — used by the snacks picker for live grep
+- `fd` — lists directories for the session switcher (`<space>s`)
+- `cargo` — fallback build for fff when no prebuilt binary matches its tag
+- `mmdc` (optional) — renders mermaid fences (`npm install -g @mermaid-js/mermaid-cli`)
 
 ### Neovim Plugins
 
 Managed via `vim.pack` (Neovim's built-in package manager):
 
-- snacks.nvim (picker + explorer)
-- nvim-treesitter
+- snacks.nvim (pickers, explorer, images)
+- fff (file + live grep picker)
+- servery.nvim (switch between per-directory nvim sessions)
+- nvim-treesitter, nvim-treesitter-textobjects
 - nvim-lspconfig (completion via Neovim's built-in LSP client)
 - mini.diff, jj.nvim (+ nui.nvim), codediff.nvim
+- render-markdown.nvim
 - vim-surround, vim-fetch, no-neck-pain.nvim
-- github-nvim-theme, gruvbox.nvim
+- gruvbox.nvim
