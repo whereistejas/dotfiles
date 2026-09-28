@@ -7,7 +7,6 @@ fi
 
 # PATH — platform tools (lowest priority; .bashrc prepends user tools after)
 export PATH="/opt/homebrew/bin:$PATH"
-export PATH="/opt/homebrew/opt/ruby@3.2/bin:$PATH"
 export PATH="$HOME/build/toolkit/ai/bin:$PATH"
 export PATH="$HOME/build/dotfiles/scripts:$PATH"
 
