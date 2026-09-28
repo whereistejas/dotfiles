@@ -236,11 +236,12 @@ pub fn load(path: &Path) -> Result<LoadedSession, Error> {
         if line.is_empty() {
             continue;
         }
-        if header.is_none() && line.contains("\"type\":\"session\"") {
-            if let Ok(h) = serde_json::from_str::<Header>(line) {
-                header = Some(h);
-                continue;
-            }
+        if header.is_none()
+            && line.contains("\"type\":\"session\"")
+            && let Ok(h) = serde_json::from_str::<Header>(line)
+        {
+            header = Some(h);
+            continue;
         }
         match serde_json::from_str::<Entry>(line) {
             Ok(e) if e.kind == "session" => {}

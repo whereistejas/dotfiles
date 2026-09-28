@@ -3,7 +3,7 @@ mod render;
 mod sessions;
 
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -106,7 +106,7 @@ fn main() {
     }
 }
 
-fn run_find(root: &PathBuf, args: &FindArgs) -> Result<(), sessions::Error> {
+fn run_find(root: &Path, args: &FindArgs) -> Result<(), sessions::Error> {
     let mut found: Vec<SessionSummary> = sessions::all_summaries(root)?
         .into_iter()
         .filter(|s| match &args.id {
@@ -168,8 +168,8 @@ fn run_find(root: &PathBuf, args: &FindArgs) -> Result<(), sessions::Error> {
             }
             let _ = writeln!(
                 out,
-                "{:<36}  {:<20}  {:<20}  {:>8}  {:>5}  {:>6}  {}",
-                "ID", "STARTED", "ENDED", "DURATION", "MSGS", "SIZE", "CWD"
+                "{:<36}  {:<20}  {:<20}  {:>8}  {:>5}  {:>6}  CWD",
+                "ID", "STARTED", "ENDED", "DURATION", "MSGS", "SIZE"
             );
             for s in &found {
                 let dur = render::duration_between(&s.started, &s.ended)
@@ -192,7 +192,7 @@ fn run_find(root: &PathBuf, args: &FindArgs) -> Result<(), sessions::Error> {
     Ok(())
 }
 
-fn run_read(root: &PathBuf, args: &ReadArgs) -> Result<(), sessions::Error> {
+fn run_read(root: &Path, args: &ReadArgs) -> Result<(), sessions::Error> {
     let summary = sessions::resolve(root, &args.id)?;
     let loaded = sessions::load(&summary.path)?;
     let opts = RenderOptions {
