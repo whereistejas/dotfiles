@@ -32,6 +32,8 @@ config/pi/agent/bin/**
 config/pi/agent/git/**
 config/pi/agent/npm/**
 config/pi/agent/*.log
+# Model catalog cache, rewritten by pi on refresh
+config/pi/agent/models-store.json
 # fff frecency / query-history LMDB databases (pi-fff extension)
 config/pi/agent/fff/**
 # Credentials / machine-local trust state
