@@ -81,7 +81,7 @@ fn thousands(n: u64) -> String {
     let s = n.to_string();
     let mut out = String::new();
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(c);
@@ -391,10 +391,10 @@ fn render_message(entry: &Entry, time: &str, opts: &RenderOptions) -> Option<Str
             exit_code,
         } => {
             let mut s = format!("## bash · {time}\n\n$ {}\n", one_line(command, 200));
-            if let Some(code) = exit_code {
-                if *code != 0 {
-                    s.push_str(&format!("_[exit {code}]_\n"));
-                }
+            if let Some(code) = exit_code
+                && *code != 0
+            {
+                s.push_str(&format!("_[exit {code}]_\n"));
             }
             if opts.results > 0 && !output.trim().is_empty() {
                 s.push_str(&fence(&truncate(output.trim_end(), opts.results)));
