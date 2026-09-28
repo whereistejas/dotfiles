@@ -112,6 +112,7 @@ M.select = function()
 	mappings.choose_in_tabpage = ""
 	mappings.move_start = ""
 	mappings.mark = ""
+	mappings.choose = ""
 
 	MiniPick.start({
 		source = {
