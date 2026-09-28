@@ -226,26 +226,6 @@ local function split_params(line)
 	return out
 end
 
--- Toggle all diagnostic display (virtual text/lines, underline, signs).
-function _G.toggle_diagnostics()
-	local cfg = vim.diagnostic.config()
-	if cfg.virtual_text then
-		vim.diagnostic.config({
-			virtual_text = false,
-			virtual_lines = false,
-			underline = false,
-			signs = false,
-		})
-	else
-		vim.diagnostic.config({
-			virtual_text = true,
-			virtual_lines = true,
-			underline = true,
-			signs = true,
-		})
-	end
-end
-
 -- Copy the visual selection with context — relative path, line range, and the
 -- enclosing LSP symbol path (e.g. Class.method) — to the clipboard.
 local symbol_kind = vim.lsp.protocol.SymbolKind
