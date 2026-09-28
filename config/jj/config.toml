@@ -59,12 +59,13 @@ show-cryptographic-signatures = true
 default-command = "status"
 
 [git]
-# Beacon-internal notes in config/pi/agent/AGENTS.md must never reach a remote.
+# The `local:` commit (work identity, Beacon notes in config/pi/agent/AGENTS.md)
+# must never reach a remote.
 # Keep the *matched* commit (not this one) at the top of the stack: private-commits
 # also blocks pushing any descendant, so if it sinks to the bottom nothing is pushable.
-# Rebase it back up with `jj rebase -r ktkkytyorwrt -A @` after landing work beneath it.
+# Rebase it back up with `jj rebase -r xkzyuwqvmxpo -A @` after landing work beneath it.
 # Matched by change id (stable across rewrites) and by description as a backstop.
-private-commits = 'present(ktkkytyorwrt) | description(glob:"AGENTS: document Beacon*")'
+private-commits = 'present(xkzyuwqvmxpo) | description(glob:"local:*")'
 
 [remotes.origin]
 auto-track-bookmarks = 'exact:"main" | exact:"master"'
