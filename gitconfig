@@ -9,7 +9,6 @@
 	ch = checkout
 	lo = log --oneline -n 20
 	st = status
-	diff = df
 	df = difftool --staged
 	ca = commit -a --amend --no-edit
 	pu = push u
