@@ -11,8 +11,6 @@
 	st = status
 	df = difftool --staged
 	ca = commit -a --amend --no-edit
-	pu = push u
-	puf = push u --force
 	sl = stash list
 	sd = stash drop
 
