@@ -2,10 +2,10 @@
 theme = "gruvbox-light"
 
 [diff]
-wrap = true
+wrap = false
 
 [preview]
-wrap = true
+wrap = false
 
 [[bindings]]
 action = "revisions.refresh"
