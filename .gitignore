@@ -12,6 +12,7 @@
 **/config/beacon
 **/config/github-copilot
 **/config/karabiner/automatic_backups
+**/config/hunk/state.json
 **/config/cni
 **/config/zed
 **/config/cognition/skills
