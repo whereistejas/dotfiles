@@ -110,5 +110,5 @@ fi
 #   - the correct directories to the PATH
 #   - auto-completion for the opam binary
 # This section can be safely removed at any time if needed.
-test -r '/Users/tejas.sanap/.opam/opam-init/init.sh' && . '/Users/tejas.sanap/.opam/opam-init/init.sh' > /dev/null 2> /dev/null || true
+test -r "$HOME/.opam/opam-init/init.sh" && . "$HOME/.opam/opam-init/init.sh" > /dev/null 2> /dev/null || true
 # END opam configuration
