@@ -1,9 +1,5 @@
 {
   "plugins": {
-    "codediff.nvim": {
-      "rev": "09d9ebef2cc5a5c04db7a349cd6c61bdf84ecc8e",
-      "src": "https://github.com/esmuellert/codediff.nvim"
-    },
     "fff": {
       "rev": "c6013ba6a5918221b6c482486aca01acc0830825",
       "src": "https://github.com/dmtrKovalenko/fff",
@@ -25,10 +21,6 @@
     "no-neck-pain.nvim": {
       "rev": "55f69b7ff536303dcd37460d7cbced9691b3f0a2",
       "src": "https://github.com/shortcuts/no-neck-pain.nvim"
-    },
-    "nui.nvim": {
-      "rev": "10fc361835c856ba4233ef5ea135b919bf3dce97",
-      "src": "https://github.com/MunifTanjim/nui.nvim"
     },
     "nvim-lspconfig": {
       "rev": "a9bb4d5f4276aa5cddc015faa3ecc5a7b5a26b14",

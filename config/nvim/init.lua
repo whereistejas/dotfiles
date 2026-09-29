@@ -71,12 +71,6 @@ vim.opt.relativenumber = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 
--- Pick up vifm's bundled vim plugin (syntax, ftdetect, ftplugin) from brew.
-local vifm_rtp = (vim.env.HOMEBREW_PREFIX or "/opt/homebrew") .. "/opt/vifm/share/vifm/vim"
-if vim.uv.fs_stat(vifm_rtp) then
-	vim.opt.runtimepath:append(vifm_rtp)
-end
-
 -- =============================================================================
 -- Plugins
 -- =============================================================================
@@ -112,8 +106,6 @@ vim.pack.add({
 	-- Own fork, on the branch that stacks the annotate tooltip fix on top of the
 	-- log picker. Dev checkout lives in ~/build/git/jj.nvim.
 	{ src = "https://github.com/whereistejas/jj.nvim", version = "fix-annotate-tooltip" },
-	"https://github.com/esmuellert/codediff.nvim",
-	"https://github.com/MunifTanjim/nui.nvim",
 
 	-- Picker / QoL
 	"https://github.com/folke/snacks.nvim",
@@ -141,15 +133,8 @@ vim.pack.add({
 
 -- Auto-detect jj repo: walk up from buffer path, stopping at cwd.
 local function find_jj_repo()
-	local cwd = vim.fn.getcwd()
-	local dir = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":p:h")
-	while #dir >= #cwd do
-		if vim.fn.isdirectory(dir .. "/.jj") == 1 then return dir end
-		local parent = vim.fn.fnamemodify(dir, ":h")
-		if parent == dir then break end
-		dir = parent
-	end
-	return nil
+	local root = vim.fs.root(0, ".jj")
+	return root and vim.fs.relpath(vim.fn.getcwd(), root) and root or nil
 end
 
 -- cd into jj repo. If last arg names a repo dir under cwd, use that and
@@ -302,10 +287,8 @@ vim.cmd("colorscheme gruvbox")
 local MiniDiff = require("mini.diff")
 
 local function buf_jj_root(bufnr)
-	local name = vim.api.nvim_buf_get_name(bufnr)
-	if name == "" or vim.bo[bufnr].buftype ~= "" then return nil end
-	local jj = vim.fs.find(".jj", { path = vim.fs.dirname(name), upward = true, type = "directory" })[1]
-	return jj and vim.fs.dirname(jj) or nil
+	if vim.api.nvim_buf_get_name(bufnr) == "" or vim.bo[bufnr].buftype ~= "" then return nil end
+	return vim.fs.root(bufnr, ".jj")
 end
 
 local function jj_set_ref(bufnr, root)
@@ -347,24 +330,12 @@ MiniDiff.setup({
 	},
 })
 
--- codediff.nvim — VSCode-style side-by-side diff viewer. It is git-based
--- (shells out to `git rev-parse`/`cat-file`), so it only works in git-colocated
--- jj repos; in a jj *workspace* (no per-worktree .git) it errors "not a git
--- repo". The "auto" backend below routes around that.
-require("codediff").setup()
-
 -- jj.nvim
 require("jj").setup({
 	-- Use the snacks picker for jj.nvim's status/file_history/conflict pickers
 	-- (falls back to vim.ui.select when snacks is disabled).
 	picker = {
 		snacks = {},
-	},
-	diff = {
-		-- "auto" (registered below): codediff's side-by-side view in git-colocated
-		-- repos, else the jj-native backend (works in workspaces too). `d` in
-		-- :J log dispatches through it.
-		backend = "auto",
 	},
 	-- Open jj terminal windows (log/status) as a vertical split. splitright is
 	-- unset (default off), so the split lands on the left.
@@ -420,100 +391,6 @@ require("jj").setup({
 		},
 	},
 })
-
--- "auto" diff backend: prefer codediff's side-by-side view (it's git-based),
--- falling back to the jj-native backend only when git can't back the diff.
--- Registered after jj.setup so the built-in codediff/native backends load first.
---
--- codediff shells out to git in a working dir. That's fine in a git-colocated
--- jj repo, but a jj *workspace* has no per-worktree .git, so codediff errors
--- "not a git repo". Trick: `jj git root` points at the shared colocated git
--- repo backing the workspace, and every workspace commit already lives in that
--- shared object store (verified). codediff's revision/explorer paths fall back
--- to the *cwd* git root (captured synchronously at command entry), so for a
--- workspace we run codediff with cwd temporarily set to that shared worktree
--- and its git calls resolve correctly.
-local jjdiff = require("jj.diff")
-
--- Returns (worktree, colocated). `worktree` is a git working dir whose object
--- store holds this jj repo's commits, or nil if there's no git backing at all.
--- Memoized per jj root: the git backing of a given root can't change while
--- nvim is running, and the `jj git root` call is on a keypress path.
-local jj_worktree_cache = {}
-
-local function jj_git_worktree()
-	local jj = vim.fs.find(".jj", { path = vim.fn.getcwd(), upward = true, type = "directory" })[1]
-	if not jj then return nil, false end
-	local root = vim.fs.dirname(jj)
-	local cached = jj_worktree_cache[root]
-	if cached then return cached[1], cached[2] end
-
-	local function remember(wt, colocated)
-		jj_worktree_cache[root] = { wt, colocated }
-		return wt, colocated
-	end
-
-	if vim.fn.isdirectory(root .. "/.git") == 1 or vim.fn.filereadable(root .. "/.git") == 1 then
-		return remember(root, true) -- colocated: the jj root is itself a git worktree
-	end
-	local ok, obj = pcall(function()
-		return vim.system({ "jj", "git", "root" }, { cwd = root, text = true }):wait(2000)
-	end)
-	if ok and obj.code == 0 then
-		local out = vim.trim(obj.stdout or "")
-		if out ~= "" then
-			local wt = vim.fn.fnamemodify(out, ":h")                     -- dirname of .../repo/.git => .../repo
-			if vim.fn.isdirectory(wt) == 1 then return remember(wt, false) end -- workspace: shared worktree
-		end
-	end
-	return remember(nil, false)
-end
-
--- Run fn with cwd temporarily set to `dir`. codediff captures cwd synchronously
--- at command entry, so restoring immediately after is safe.
-local function with_cwd(dir, fn)
-	local prev = vim.fn.getcwd()
-	pcall(vim.cmd.lcd, vim.fn.fnameescape(dir))
-	local ok, err = pcall(fn)
-	pcall(vim.cmd.lcd, vim.fn.fnameescape(prev))
-	if not ok then vim.notify("jj auto-diff: " .. tostring(err), vim.log.levels.ERROR) end
-end
-
-local function auto(kind)
-	return function(o)
-		o = o or {}
-		local wt, colocated = jj_git_worktree()
-		-- "current" diffs the live working-copy file; codediff can only reach it
-		-- when git backs the worktree in place (colocated). With no git backing at
-		-- all, use the jj-native backend (it does side-by-side via `jj file show`).
-		if not wt or (kind == "current" and not colocated) then
-			o.backend = "native"
-			return jjdiff.open(kind, o)
-		end
-		o.backend = "codediff"
-		if colocated then return jjdiff.open(kind, o) end
-		with_cwd(wt, function() jjdiff.open(kind, o) end)
-	end
-end
-
-jjdiff.register_backend("auto", {
-	diff_current = auto("current"),
-	show_revision = auto("revision"),
-	diff_revisions = auto("revisions"),
-	diff_history_revisions = auto("history"),
-})
-
--- jj.nvim hardcodes `:J log` to --limit 20; bump it unless the caller overrode.
-local jj_log_module = require("jj.cmd.log")
-local orig_log = jj_log_module.log
-jj_log_module.log = function(opts)
-	opts = opts or {}
-	if not opts.raw_flags and not opts.limit then
-		opts.limit = 9999
-	end
-	return orig_log(opts)
-end
-require("jj.cmd").log = jj_log_module.log
 
 -- Wrap jj.cmd.j so the original :J command (with completion) stays intact.
 local jj_cmd = require("jj.cmd")
@@ -1051,10 +928,10 @@ vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" }
 
 -- jj.nvim
 vim.keymap.set("n", "<space>jj", "<cmd>J log<CR>", { desc = "jj log (jj.nvim)" })
--- Diff the working copy against @- in codediff (`d` in :J log diffs a change).
+-- Diff the working copy against @- (`d` in :J log diffs a change).
 vim.keymap.set("n", "<space>jd", function()
 	require("jj.diff").diff_current({ rev = "@-" })
-end, { desc = "jj diff working copy vs @- (codediff)" })
+end, { desc = "jj diff working copy vs @-" })
 -- jj.nvim pickers (snacks-backed)
 vim.keymap.set("n", "<space>jl", function() require("jj.picker").log({ revset = "all()" }) end,
 	{ desc = "jj picker: log (all)" })
