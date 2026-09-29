@@ -85,7 +85,7 @@ Managed via `vim.pack` (Neovim's built-in package manager):
 - servery.nvim (switch between per-directory nvim sessions)
 - nvim-treesitter, nvim-treesitter-textobjects
 - nvim-lspconfig (completion via Neovim's built-in LSP client)
-- mini.diff, jj.nvim (+ nui.nvim), codediff.nvim
+- mini.diff, jj.nvim
 - render-markdown.nvim
 - vim-surround, vim-fetch, no-neck-pain.nvim
 - gruvbox.nvim
