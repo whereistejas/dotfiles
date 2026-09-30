@@ -36,6 +36,7 @@ M.select = function()
 			local new_items = servery.get_picker_items() --[[@as snacks.picker.finder.result]]
 			for i, item in ipairs(new_items) do
 				item.text = item:display_name()
+				item.has_server = item.server ~= nil
 				item.idx = i
 			end
 			return new_items
@@ -52,7 +53,7 @@ M.select = function()
 				{ item:time_since_start(), "ServeryTime" },
 			}
 		end,
-		sort = function(a, b) return a.idx < b.idx end,
+		sort = { fields = { "has_server", "score:desc", "idx" } },
 		layout = { preview = false },
 		win = { input = { keys = keys } },
 		actions = {
