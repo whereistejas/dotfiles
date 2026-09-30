@@ -103,9 +103,7 @@ vim.pack.add({
 
 	-- VCS
 	"https://github.com/echasnovski/mini.diff",
-	-- Own fork, on the branch that stacks the annotate tooltip fix on top of the
-	-- log picker. Dev checkout lives in ~/build/git/jj.nvim.
-	{ src = "https://github.com/whereistejas/jj.nvim", version = "fix-annotate-tooltip" },
+	"https://github.com/NicolasGB/jj.nvim",
 
 	-- Picker / QoL
 	"https://github.com/folke/snacks.nvim",
@@ -130,27 +128,6 @@ vim.pack.add({
 -- =============================================================================
 -- Functions
 -- =============================================================================
-
--- Auto-detect jj repo: walk up from buffer path, stopping at cwd.
-local function find_jj_repo()
-	local root = vim.fs.root(0, ".jj")
-	return root and vim.fs.relpath(vim.fn.getcwd(), root) and root or nil
-end
-
--- cd into jj repo. If last arg names a repo dir under cwd, use that and
--- strip it from args. Otherwise detect from current buffer.
-local function cd_to_jj_repo(args)
-	if #args > 0 then
-		local candidate = vim.fn.getcwd() .. "/" .. args[#args]
-		if vim.fn.isdirectory(candidate .. "/.jj") == 1 then
-			vim.cmd.cd(candidate)
-			table.remove(args)
-			return
-		end
-	end
-	local repo = find_jj_repo()
-	if repo then vim.cmd.cd(repo) end
-end
 
 -- Split a long signature line (params/fields) one element per line; used by
 -- the LSP hover override below.
@@ -331,75 +308,7 @@ MiniDiff.setup({
 })
 
 -- jj.nvim
-require("jj").setup({
-	-- Use the snacks picker for jj.nvim's status/file_history/conflict pickers
-	-- (falls back to vim.ui.select when snacks is disabled).
-	picker = {
-		snacks = {},
-	},
-	-- Open jj terminal windows (log/status) as a vertical split. splitright is
-	-- unset (default off), so the split lands on the left.
-	terminal = {
-		window = {
-			type = "vsplit",
-		},
-	},
-	-- Open the describe/commit message editor as a vertical split too, so the
-	-- whole jj.nvim UI stays vertical (v0.7.0 added configurable editor layouts).
-	editor = {
-		window = {
-			type = "vsplit",
-		},
-	},
-	cmd = {
-		keymaps = {
-			-- Aligned with jjui's `revisions` scope keybindings.
-			log = {
-				-- jjui parity
-				diff = "d",
-				describe = "<CR>",
-				edit = "e",
-				edit_immutable = "<M-e>",
-				new = "n",
-				abandon = "a",
-				rebase = "r",
-				squash = "<S-s>",
-				split = "s",
-				bookmark = "b",
-				undo = "u",
-				redo = "<S-u>",
-				change_revset = "<S-l>",
-				summary = "<S-k>",
-				-- jj.nvim-only (no jjui log-scope equivalent)
-				push = "<S-p>",
-				push_all = "<C-p>",
-				fetch = "f",
-				open_pr = "o",
-				open_pr_list = "<S-o>",
-				quick_squash = "<C-s>",
-				new_after = "<C-n>",
-				new_after_immutable = "<S-n>",
-				tag_set = "<S-t>",
-				history = "<S-h>",
-				select_next_revision = "gj",
-				select_prev_revision = "gk",
-			},
-			summary_tooltip = {
-				diff = "d",
-				edit = "<CR>",
-			},
-		},
-	},
-})
-
--- Wrap jj.cmd.j so the original :J command (with completion) stays intact.
-local jj_cmd = require("jj.cmd")
-local orig_j = jj_cmd.j
-jj_cmd.j = function(args)
-	if type(args) == "string" then args = vim.split(args, "%s+") end
-	cd_to_jj_repo(args)
-	return orig_j(args)
-end
+require("jj").setup()
 
 -- mermaid-cli (mmdc) drives a headless Chrome via puppeteer, but Homebrew's
 -- mmdc pins a chrome-headless-shell version that is usually absent from
@@ -927,17 +836,6 @@ vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" }
 -- gh applies a hunk (also a hunk textobject), gH resets one to the @- version.
 
 -- jj.nvim
-vim.keymap.set("n", "<space>jj", "<cmd>J log<CR>", { desc = "jj log (jj.nvim)" })
--- Diff the working copy against @- (`d` in :J log diffs a change).
-vim.keymap.set("n", "<space>jd", function()
-	require("jj.diff").diff_current({ rev = "@-" })
-end, { desc = "jj diff working copy vs @-" })
--- jj.nvim pickers (snacks-backed)
-vim.keymap.set("n", "<space>jl", function() require("jj.picker").log({ revset = "all()" }) end,
-	{ desc = "jj picker: log (all)" })
-vim.keymap.set("n", "<space>js", function() require("jj.picker").status() end, { desc = "jj picker: status" })
-vim.keymap.set("n", "<space>jh", function() require("jj.picker").file_history() end, { desc = "jj picker: file history" })
-vim.keymap.set("n", "<space>jc", function() require("jj.picker").conflict() end, { desc = "jj picker: conflicts" })
 -- Takes over the built-in `T` (till-backwards); `F`/`,`/`;` cover backwards search.
 vim.keymap.set("n", "T", function() require("jj.annotate").line() end, { desc = "jj annotate line (tooltip)" })
 
