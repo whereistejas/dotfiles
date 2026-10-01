@@ -50,6 +50,13 @@ require("servery").setup({
 	---@type string[] | fun(): string[]
 	dirs = function() return vim.fs.glob("~/*", true, true) end,
 	session_dir = vim.fs.joinpath(vim.fn.stdpath("cache"), "servery.nvim"),
+	-- Command and additional argument(s) used to start a new session. servery appends
+	-- `--headless --listen {socket}`.
+    -- default uses `vim.v.progpath` / current running nvim, user can add
+    -- arguments here when neovim must be started through a wrapper, resolved
+    -- from PATH, and / or needs extra startup setup, etc...
+	---@type string[]
+	spawn_cmd = { vim.v.progpath },
 	ui = {
 		-- Options: "builtin" | "snacks" | "fzf" | "telescope" | "mini_pick"
 		provider = "builtin", ---@type servery.ui_provider
@@ -115,4 +122,3 @@ I previously managed sessions with Prime's
 served me well but has some rough edges which I'd prefer to avoid, so once
 Neovim added `:connect` and `:detach` I decided to just move my whole life into
 Neovim.
-
