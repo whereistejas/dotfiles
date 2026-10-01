@@ -119,6 +119,8 @@ cfg_defaults = function()
 		---@type string[] | fun(): string[]
 		dirs = function() return vim.fs.glob("~/*", true, true) end,
 		session_dir = vim.fs.joinpath(cache_dir, "servery.nvim"),
+		---@type string[]
+		spawn_cmd = { vim.v.progpath },
 		ui = {
 			provider = "builtin", ---@type servery.ui_provider
 			prompt = "Switch Nvim Session",
@@ -403,7 +405,7 @@ M.spawn_nvim = function(dir)
 
 	local server_name = vim.fs.basename(dir) .. os.date("%Y%m%d-%H%M%S") .. ".pipe"
 	local server_file = vim.fs.joinpath(M.get_cfg().session_dir, server_name)
-	local cmd = { vim.v.progpath, "--headless", "--listen", server_file }
+	local cmd = vim.list_extend(vim.deepcopy(M.get_cfg().spawn_cmd), { "--headless", "--listen", server_file })
 	local cmd_str = table.concat(cmd, " ")
 
 	local chan = vim.fn.jobstart(cmd, { detach = true, cwd = dir })
