@@ -15,62 +15,37 @@ visual select → <leader>pa → block lands in the running pi session
 Payload should be `file:start-end` + the selected lines + `modified` flag, so
 the agent reads the *buffer* state, not a stale disk copy.
 
-**Blocking unknown — do not assume this works yet.**
+pi now runs in a `:terminal` of the same session, which opens a path that did
+not exist before: the keymap can find pi's terminal buffer and `chansend()` the
+payload to its job as a bracketed paste, exactly as if the user had pasted it.
 
-`pi` exposes an RPC mode (`docs/rpc.md`) with `prompt`, `steer` and `follow_up`
-commands as line-delimited JSON. But RPC mode is how you *drive pi headlessly
-over stdin/stdout* — it is not evidence that an already-running interactive TUI
-session listens on anything. Those are different things, and the feature only
-works if the second is possible.
+**Unverified — do not assume this works yet.**
 
-Investigate, in order:
+1. Does pi's TUI accept a bracketed paste of multi-line text into the editor
+   without submitting it? It must land as a draft, not a sent prompt.
+2. Which terminal is pi's? Match `b:terminal_job_pid` against pi's process
+   tree, not the terminal title.
+3. Fallbacks, only if 1 fails: an extension listening on a socket or fifo
+   (`docs/extensions.md`, `examples/extensions/`), else a spool file
+   (`~/.cache/pi-inbox/*.md`) the agent drains on request.
 
-1. `docs/extensions.md` + `examples/extensions/` — can an extension register a
-   listener (socket/fifo/file watch) that injects into the current session?
-2. `docs/rpc.md` §`steer` / §`follow_up` — reachable from outside RPC mode?
-3. `docs/packages.md`, `docs/sdk.md` — any supported side channel.
-4. Fallback if none: write to a spool file (`~/.cache/pi-inbox/*.md`) that the
-   agent drains on request. Degrades "push" to "pull", but always works.
+A keybinding that silently no-ops is worse than one that doesn't exist.
 
-Reject the fallback only after 1–3 are actually ruled out — a keybinding that
-silently no-ops is worse than one that doesn't exist.
+## 2. More recipes
 
-## 2. Open design decisions (blocking the rest of the skill)
+- Diagnostics for the code window's buffer (`vim.diagnostic.get`).
+- Signs / extmarks to annotate lines without touching the quickfix list.
+- `:PiMark`: a user command appending the selection to a queue the agent
+  drains — only if §1 doesn't pan out.
 
-Carried over, still unanswered:
+## 3. Hardening
 
-- **Socket discovery** — fixed path (`~/.cache/nvim-agent.sock`) vs scanning
-  `$TMPDIR/nvim.*/`; per-project sockets keyed by cwd?
-- **Disambiguation** — 2+ live servers seen in practice. Fail loud, or pick by cwd?
-- **Write access** — read + annotate + quickfix only, or may the agent write
-  buffers? (Leaning read-only; buffer writes bypass disk and confuse `jj`.)
-  Partly settled: `nv cd` is allowed to change directory scope, because one
-  long-lived session across many folders is the whole point. Buffer *contents*
-  stay off limits.
-- **Raw `lua` escape hatch** — flexible, but arbitrary code execution in the
-  editor. Leaning no.
-- **No-session policy** — hard-fail, or fall back to disk reads? Silent fallback
-  reintroduces the stale-read bug. Leaning hard-fail.
-- **Commit or gitignore?** — every Rust-CLI skill (`jira`, `gitlab`, `bi-mcp`,
-  `gitolite`, `beacon-code-review`) is gitignored; `session-transcript` and
-  `subagents` are tracked. Unclear whether that's `target/` bloat or secrets.
-
-## 3. Editor-side wiring not yet written
-
-- `vim.fn.serverstart()` in `init.lua` (or a shell alias) so a socket always exists.
-- `:PiMark` command + keymap appending the selection to a drainable queue.
-- `nv marks` verb to drain that queue.
-- `nv diagnostics`, `nv sign`, `nv diff` verbs.
-
-Done: `nv cwd` / `nv cd --scope global|tab|window|buffer` / `nv cd --unset`.
-
-## 4. Hardening
-
-- `nv doctor` self-check (socket present, reachable, API level ≥ 12).
-- Test suite against throwaway headless nvim instances. `cwd`/`cd` were verified
-  this way by hand (throwaway socket, torn down after); nothing is automated yet,
-  so a regression in the scope handling would go unnoticed.
-- `nv cd` leaves no audit trail. If a stale `:lcd` from an earlier request
-  confuses a later one, there is no way to see who set it. Consider recording
-  agent-issued directory changes somewhere the user can inspect.
-- Decide vendored/`--offline` cargo (like `bi-mcp`) vs plain crates.io.
+- Automate the throwaway-session checks in SKILL.md's Status section. They
+  were run by hand (headless session with `-n`, code window + terminal,
+  torn down after); a regression in a recipe or in `rpc.lua` would go
+  unnoticed.
+- Chunk error line numbers include `prelude.lua`'s lines. `rpc.lua` could
+  take the prelude as a separate chunk so `chunk:N` matches the heredoc.
+- Directory changes leave no audit trail. If a stale `:lcd` from an earlier
+  request confuses a later one, there is no way to see who set it. Consider
+  recording agent-issued changes in a session variable the cwd recipe reports.
