@@ -5,10 +5,10 @@ local M = {}
 ---@alias servery.ui_provider "builtin" | "snacks" | "fzf" | "telescope" | "mini_pick"
 ---@alias servery.action "switch" | "switch_and_detach" | "spawn" | "detach"
 
----@param opts { count: integer?, name: string?, only_running: boolean? }
+---@param opts { count: integer?, name: string?, status: ("any" | "active" | "inactive")? }
 ---@return servery.Session?
 local get_session = function(opts)
-	local sessions = M.list_sessions(opts.only_running)
+	local sessions = M.list_sessions(opts.status)
 
 	if opts.count then
 		local servers = vim.tbl_filter(
@@ -105,7 +105,7 @@ local setup_cmds = function()
 		count = true,
 		bang = true,
 		complete = function()
-			return vim.tbl_map(function(session) return session:display_name() end, M.list_sessions(true))
+			return vim.tbl_map(function(session) return session:display_name() end, M.list_sessions("active"))
 		end,
 	})
 end
@@ -318,7 +318,7 @@ end
 ---List running servers
 ---
 ---@return servery.SessionActive[]
-M.list_servers = function()
+list_servers = function()
 	local servers = vim.fn.serverlist({ peer = true }) --[[@as string[] ]]
 
 	local out = {}
@@ -352,28 +352,29 @@ end
 ---List configured session directories
 ---
 ---@return servery.Session[]
-M.list_dirs = function()
+list_dirs = function()
 	local cfg = M.get_cfg()
 	local dirs = type(cfg.dirs) == "table" and cfg.dirs or cfg.dirs()
 	return vim.tbl_map(Session.new, dirs)
 end
 
----List all sessions, both active and inactive
+---List the sessions discoverable by servery
 ---
----@param only_running boolean?
+---@param status? "any" | "active" | "inactive"
 ---@return servery.Session[]
----@see `M.list_servers()`
----@see `M.list_dirs()`
-M.list_sessions = function(only_running)
-	local sessions = M.list_servers()
+M.list_sessions = function(status)
+	status = status or "any"
+	local out = {} --[[@as servery.Session[] ]]
 
-	if not only_running then
-		for _, dir in ipairs(M.list_dirs()) do
-			table.insert(sessions, dir)
-		end
+	if status == "any" or status == "active" then
+		vim.list_extend(out, list_servers())
 	end
 
-	table.sort(sessions, function(a, b)
+	if status == "any" or status == "inactive" then
+		vim.list_extend(out, list_dirs())
+	end
+
+	table.sort(out, function(a, b)
 		if a.server and not b.server then
 			return true
 		end
@@ -399,7 +400,7 @@ M.list_sessions = function(only_running)
 		return a.cwd < b.cwd
 	end)
 
-	return sessions
+	return out
 end
 
 ---@param provider? servery.ui_provider
