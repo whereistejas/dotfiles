@@ -36,6 +36,8 @@ M.switch_to = function(server, detach)
 	end
 end
 
+M.nilify = function(x) return not x == vim.NIL and x end
+
 M.notify_warn = function(...) vim.notify(string.format(...), vim.log.levels.WARN) end
 M.notify_error = function(...) vim.notify(string.format(...), vim.log.levels.ERROR) end
 M.notify_info = function(...) vim.notify(string.format(...), vim.log.levels.INFO) end
