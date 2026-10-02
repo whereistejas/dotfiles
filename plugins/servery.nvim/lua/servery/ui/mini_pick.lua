@@ -14,28 +14,28 @@ M.select = function()
 	local cfg = servery.get_cfg()
 
 	local time = os.time()
-	local items = {} --[[@as servery.PickerItem[] ]]
+	local sessions = {} --[[@as servery.Session[] ]]
 
 	---@return table[]
-	local get_items = function()
-		items = servery.get_picker_items() --[[@as table[] ]]
+	local get_sessions = function()
+		sessions = servery.list_sessions() --[[@as table[] ]]
 		time = os.time()
-		for _, item in ipairs(items) do
-			item.text = item:display_name()
+		for _, session in ipairs(sessions) do
+			session.text = session:display_name()
 		end
-		return items
+		return sessions
 	end
 
 	local ns = vim.api.nvim_create_namespace("servery_mini_pick")
 
-	local show = function(buf_id, items_to_show, _query)
+	local show = function(buf_id, sessions_to_show, _query)
 		local lines = {}
 		local hl_data = {}
-		for i, item in ipairs(items_to_show) do
-			local icon = item:icon()
-			local status = item:status()
-			local name = item:display_name()
-			local active_time = item:time_since_start(time) or ""
+		for i, session in ipairs(sessions_to_show) do
+			local icon = session:icon()
+			local status = session:status()
+			local name = session:display_name()
+			local active_time = session:time_since_start(time) or ""
 			local suffix = active_time ~= "" and ("  " .. active_time) or ""
 			lines[i] = icon .. "  " .. name .. suffix
 
@@ -55,30 +55,30 @@ M.select = function()
 		end
 	end
 
-	---@type table<servery.action, fun(item: servery.PickerItem?): any>
+	---@type table<servery.action, fun(session: servery.Session?): any>
 	local mini_actions = {
-		switch = function(item)
-			if item then
-				item:switch()
+		switch = function(session)
+			if session then
+				session:switch()
 			end
 			return true
 		end,
-		switch_and_detach = function(item)
-			if item then
-				item:switch(true)
+		switch_and_detach = function(session)
+			if session then
+				session:switch(true)
 			end
 			return true
 		end,
-		spawn = function(item)
-			if item then
-				item:spawn_new()
-				vim.defer_fn(function() MiniPick.set_picker_items(get_items()) end, 500)
+		spawn = function(session)
+			if session then
+				session:spawn_new()
+				vim.defer_fn(function() MiniPick.set_picker_items(get_sessions()) end, 500)
 			end
 		end,
-		detach = function(item)
-			if item then
-				item:detach()
-				vim.defer_fn(function() MiniPick.set_picker_items(get_items()) end, 500)
+		detach = function(session)
+			if session then
+				session:detach()
+				vim.defer_fn(function() MiniPick.set_picker_items(get_sessions()) end, 500)
 			end
 		end,
 	}
@@ -95,8 +95,8 @@ M.select = function()
 			mappings["servery_" .. action] = {
 				char = normalize_key(key),
 				func = function()
-					local item = MiniPick.get_picker_matches().current --[[@as servery.PickerItem?]]
-					return fn(item)
+					local session = MiniPick.get_picker_matches().current --[[@as servery.Session?]]
+					return fn(session)
 				end,
 			}
 		else
@@ -118,12 +118,12 @@ M.select = function()
 
 	MiniPick.start({
 		source = {
-			items = get_items(),
+			items = get_sessions(),
 			name = cfg.ui.prompt,
 			show = show,
-			choose = function(item)
-				if item then
-					item:switch()
+			choose = function(session)
+				if session then
+					session:switch()
 				end
 			end,
 		},

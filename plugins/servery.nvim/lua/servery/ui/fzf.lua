@@ -12,20 +12,20 @@ local function ansi_hl(s, group)
 end
 
 local time = -99
-local items = {} --[[@as servery.PickerItem[] ]]
+local sessions = {} --[[@as servery.Session[] ]]
 
----@param item servery.PickerItem
+---@param session servery.Session
 ---@param hl? boolean
 ---@return string
-local format_item = function(item, hl)
-	local icon = item:icon()
-	local active_time = item:time_since_start(time)
-	local status = item:status()
+local format_session = function(session, hl)
+	local icon = session:icon()
+	local active_time = session:time_since_start(time)
+	local status = session:status()
 
 	local pieces = {
 		{ icon, "ServeryIcon" .. status },
 		{ "  " },
-		{ item:display_name(), "ServeryLine" .. status },
+		{ session:display_name(), "ServeryLine" .. status },
 		active_time and { "  " },
 		active_time and { active_time, "ServeryTime" },
 	}
@@ -37,11 +37,11 @@ local format_item = function(item, hl)
 	return out
 end
 
----@return servery.PickerItem?
-local get_item = function(text)
-	for _, item in ipairs(items) do
-		if format_item(item) == text then
-			return item
+---@return servery.Session?
+local get_session = function(text)
+	for _, session in ipairs(sessions) do
+		if format_session(session) == text then
+			return session
 		end
 	end
 end
@@ -52,9 +52,9 @@ local fzf_actions = {
 		---@param selection string[]
 		fn = function(selection, _opts, _ctx)
 			for _, text in ipairs(selection) do
-				local item = get_item(text)
-				if item then
-					item:switch()
+				local session = get_session(text)
+				if session then
+					session:switch()
 				end
 			end
 		end,
@@ -63,9 +63,9 @@ local fzf_actions = {
 		---@param selection string[]
 		fn = function(selection, _opts, _ctx)
 			for _, text in ipairs(selection) do
-				local item = get_item(text)
-				if item then
-					item:switch(true)
+				local session = get_session(text)
+				if session then
+					session:switch(true)
 				end
 			end
 		end,
@@ -74,9 +74,9 @@ local fzf_actions = {
 		---@param selection string[]
 		fn = function(selection, _opts, _ctx)
 			for _, text in ipairs(selection) do
-				local item = get_item(text)
-				if item then
-					item:spawn_new()
+				local session = get_session(text)
+				if session then
+					session:spawn_new()
 					vim.uv.sleep(500)
 				end
 			end
@@ -87,9 +87,9 @@ local fzf_actions = {
 		---@param selection string[]
 		fn = function(selection, _opts, _ctx)
 			for _, text in ipairs(selection) do
-				local item = get_item(text)
-				if item then
-					item:detach()
+				local session = get_session(text)
+				if session then
+					session:detach()
 					vim.uv.sleep(500)
 				end
 			end
@@ -108,11 +108,11 @@ M.select = function()
 	local cfg = servery.get_cfg()
 
 	local get_items = function(fzf_cb)
-		items = servery.get_picker_items()
+		sessions = servery.list_sessions()
 		time = os.time()
 
-		for _, item in ipairs(items) do
-			fzf_cb(format_item(item, true))
+		for _, session in ipairs(sessions) do
+			fzf_cb(format_session(session, true))
 		end
 
 		fzf_cb()

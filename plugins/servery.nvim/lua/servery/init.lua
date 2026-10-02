@@ -1,19 +1,20 @@
 local utils = require("servery.utils")
+local Session = require("servery.session")
 
 local M = {}
 
 ---@alias servery.ui_provider "builtin" | "snacks" | "fzf" | "telescope" | "mini_pick"
 ---@alias servery.action "switch" | "switch_and_detach" | "spawn" | "detach"
 
----@param opts { count: integer?, name: string?, only_running: boolean? }
----@return servery.PickerItem?
-local get_picker_item = function(opts)
-	local items = M.get_picker_items(opts.only_running)
+---@param opts { count: integer?, name: string?, status: ("any" | "active" | "inactive")? }
+---@return servery.Session?
+local get_session = function(opts)
+	local sessions = M.list_sessions(opts.status)
 
 	if opts.count then
 		local servers = vim.tbl_filter(
-			function(item) return item.server and item.server.socket ~= vim.v.servername or false end,
-			items
+			function(session) return session.server and session.server.socket ~= vim.v.servername or false end,
+			sessions
 		)
 		local out = servers[opts.count]
 		if not out then
@@ -28,29 +29,11 @@ local get_picker_item = function(opts)
 
 	if opts.name then
 		---@diagnostic disable-next-line: param-type-mismatch
-		for _, item in ipairs(items) do
-			if item:display_name() == opts.name then
-				return item
+		for _, session in ipairs(sessions) do
+			if session:display_name() == opts.name then
+				return session
 			end
 		end
-	end
-end
-
----@type table<string, vim.api.keyset.highlight>
-local highlights = {
-	ServeryLineCurrent = { link = "@keyword" },
-	ServeryLineActive = { link = "NONE" },
-	ServeryLineInactive = { link = "NONE" },
-	ServeryIconCurrent = { link = "CursorLineNr" },
-	ServeryIconActive = { link = "@label" },
-	ServeryIconInactive = { link = "ComplHint" },
-	ServeryTime = { link = "Comment" },
-}
-
-local set_highlights = function()
-	for group, hl in pairs(highlights) do
-		hl.default = true
-		vim.api.nvim_set_hl(0, group, hl)
 	end
 end
 
@@ -63,13 +46,13 @@ local setup_cmds = function()
 		assert(not (count and arg), "Cannot combine forms `:[N]Sv` and `:Sv [dir]`")
 
 		if count or arg then
-			local item = get_picker_item({ count = count, name = arg })
-			if item then
-				item:switch()
+			local session = get_session({ count = count, name = arg })
+			if session then
+				session:switch()
 			elseif arg then
 				local stat = vim.uv.fs_stat(vim.fs.normalize(arg))
 				if stat and stat.type == "directory" then
-					utils.switch_to(M.spawn_nvim(arg), bang)
+					utils.switch_to(spawn_nvim(arg), bang)
 				else
 					utils.notify_error("No such directory found '%s'", arg)
 				end
@@ -82,7 +65,7 @@ local setup_cmds = function()
 		count = true,
 		bang = true,
 		complete = function()
-			return vim.tbl_map(function(item) return item:display_name() end, M.get_picker_items())
+			return vim.tbl_map(function(session) return session:display_name() end, M.list_sessions())
 		end,
 	})
 
@@ -93,9 +76,9 @@ local setup_cmds = function()
 		assert(not (count and arg), "Cannot combine forms `:[N]SvStop` and `:SvStop [server]`")
 
 		if count or arg then
-			local item = get_picker_item({ count = count, name = arg, only_running = true })
-			if item then
-				item:detach()
+			local session = get_session({ count = count, name = arg, only_running = true })
+			if session then
+				session:detach()
 			elseif arg then
 				utils.notify_error("No such running server found '%s'", arg)
 			end
@@ -105,7 +88,7 @@ local setup_cmds = function()
 		count = true,
 		bang = true,
 		complete = function()
-			return vim.tbl_map(function(item) return item:display_name() end, M.get_picker_items(true))
+			return vim.tbl_map(function(session) return session:display_name() end, M.list_sessions("active"))
 		end,
 	})
 end
@@ -118,6 +101,15 @@ cfg_defaults = function()
 	local out = {
 		---@type string[] | fun(): string[]
 		dirs = function() return vim.fs.glob("~/*", true, true) end,
+		---@type fun(): string[]
+		servers = function()
+			return vim.tbl_filter(
+				-- By default, servers are only shown if the 'name' part of the
+				-- server name is "nvim". See `:h serverstart()` for more info.
+				function(s) return vim.startswith(vim.fs.basename(s), "nvim.") end,
+				vim.fn.serverlist({ peer = true })
+			)
+		end,
 		session_dir = vim.fs.joinpath(cache_dir, "servery.nvim"),
 		---@type string[]
 		spawn_cmd = { vim.v.progpath },
@@ -149,6 +141,24 @@ cfg_defaults = function()
 	return out
 end
 
+---@type table<string, vim.api.keyset.highlight>
+local highlights = {
+	ServeryLineCurrent = { link = "@keyword" },
+	ServeryLineActive = { link = "NONE" },
+	ServeryLineInactive = { link = "NONE" },
+	ServeryIconCurrent = { link = "CursorLineNr" },
+	ServeryIconActive = { link = "@label" },
+	ServeryIconInactive = { link = "ComplHint" },
+	ServeryTime = { link = "Comment" },
+}
+
+local set_highlights = function()
+	for group, hl in pairs(highlights) do
+		hl.default = true
+		vim.api.nvim_set_hl(0, group, hl)
+	end
+end
+
 M.cfg = nil --[[@as servery.Cfg?]]
 
 ---@param opts? servery.Cfg | {}
@@ -171,104 +181,6 @@ M.get_cfg = function()
 	return M.cfg
 end
 
----@class servery.PickerItem
----@field cwd string
----@field server servery.ServerInfo?
-local PickerItem = {}
-PickerItem.__index = PickerItem
-
----@class servery.PickerItemServer : servery.PickerItem
----@field server servery.ServerInfo
-
----@param cwd string
----@param server servery.ServerInfo
-PickerItem.new = function(cwd, server)
-	--
-	return setmetatable({ cwd = cwd, server = server }, PickerItem)
-end
-
-function PickerItem:status()
-	local socket = self.server and self.server.socket
-	if socket == vim.v.servername then
-		return "Current"
-	elseif socket then
-		return "Active"
-	else
-		return "Inactive"
-	end
-end
-
-function PickerItem:icon()
-	local cfg = M.get_cfg()
-	return cfg.ui.icons[string.lower(self:status())] or " "
-end
-
----@param as_of? integer
----@return string?
-function PickerItem:time_since_start(as_of)
-	if self.server and self.server.starttime then
-		return "(" .. utils.time_since(self.server.starttime / 1e9, as_of) .. ")"
-	end
-end
-
--- TODO: warn unsaved files, etc?
----@param detach boolean?
-function PickerItem:switch(detach)
-	M.connect({
-		server = self.server and self.server.socket,
-		dir = self.cwd,
-	}, detach)
-end
-
-function PickerItem:spawn_new() M.spawn_nvim(self.cwd) end
-
-function PickerItem:display_name()
-	local dir = vim.fn.fnamemodify(self.cwd, ":~")
-	if self:status() == "Inactive" then
-		return dir
-	else
-		local curr_dir = vim.fs.basename(dir)
-		local original_cwd = self.server and self.server.original_cwd
-		if original_cwd and original_cwd ~= self.cwd then
-			local original_dir = vim.fs.basename(vim.fn.fnamemodify(original_cwd, ":~"))
-			return original_dir .. " ( " .. curr_dir .. ")"
-		end
-		return curr_dir
-	end
-end
-
-function PickerItem:detach()
-	if not self.server then
-		return
-	end
-
-	local chan = vim.fn.sockconnect("pipe", self.server.socket, { rpc = true })
-
-	local unsaved = vim.rpcrequest(
-		chan,
-		"nvim_exec_lua",
-		[[
-			return vim.tbl_filter(
-				function(b) return vim.bo[b.bufnr].buftype == "" end,
-				vim.fn.getbufinfo({ bufmodified = 1 })
-			)
-		]],
-		{}
-	) --[[@as table[] ]]
-
-	if #unsaved > 0 then
-		local names = vim.tbl_map(function(b) return "`" .. vim.fn.fnamemodify(b.name, ":~:.") .. "`" end, unsaved)
-		local check = table.concat(names, ", ")
-		utils.notify_warn("Can't close session '%s' due to unsaved changes. Check %s", self:display_name(), check)
-	else
-		-- Slightly defer the :qall so we have time to close the channel, rather
-		-- than having it forcibly closed and show an annoying message
-		vim.rpcrequest(chan, "nvim_exec_lua", "vim.defer_fn(vim.cmd.qall, 100)", {})
-	end
-
-	vim.fn.chanclose(chan)
-end
-
 ---@class servery.ServerInfo
 ---@field socket string
 ---@field pid integer
@@ -286,19 +198,17 @@ end
 ---@return string
 M.cwd = function() return vim.g.servery_original_cwd or vim.fn.getcwd() end
 
-local nilify = function(x) return not x == vim.NIL and x end
-
----@return servery.PickerItemServer
+---@return servery.SessionActive
 local get_server_info = function(server)
 	local chan = vim.fn.sockconnect("pipe", server, { rpc = true })
 	assert(chan ~= 0, "Could not connect to server at " .. server)
 
-	local out = PickerItem.new(vim.rpcrequest(chan, "nvim_call_function", "getcwd", {})--[[@as string]], {
+	local out = Session.new(vim.rpcrequest(chan, "nvim_call_function", "getcwd", {})--[[@as string]], {
 		socket = server,
 		pid = vim.rpcrequest(chan, "nvim_call_function", "getpid", {}) --[[@as integer]],
 		useractive = vim.fn.has("nvim-0.13") == 1 and vim.rpcrequest(chan, "nvim_get_vvar", "useractive") or nil --[[@as integer?]],
 		starttime = vim.fn.has("nvim-0.13") == 1 and vim.rpcrequest(chan, "nvim_get_vvar", "starttime") or nil --[[@as integer?]],
-		original_cwd = nilify(vim.rpcrequest(
+		original_cwd = utils.nilify(vim.rpcrequest(
 			chan,
 			"nvim_exec_lua",
 			[[
@@ -312,26 +222,13 @@ local get_server_info = function(server)
 	return out
 end
 
----@return servery.PickerItemServer[]
-M.list_servers = function()
-	local servers = vim.fn.serverlist({ peer = true }) --[[@as string[] ]]
+---List running servers
+---
+---@return servery.SessionActive[]
+list_servers = function()
+	local out = M.get_cfg().servers()
 
-	local out = {}
-
-	for _, server in ipairs(servers) do
-		-- See :h serverstart
-		-- serverstart() generates names like:
-		--   stdpath("run").."/{name}.{pid}.{counter}"
-		-- {name} is "nvim" for servers which are generated normally (i.e. by
-		-- starting nvim). Processes which embed nvim, however, (should) use
-		-- a different {name}. We don't want to surface embedded nvim sessions
-		-- to the user.
-		local name = vim.fs.basename(server):match("(.+)%.[^.]+%.[^.]+$")
-		if name == "nvim" then
-			table.insert(out, server)
-		end
-	end
-
+	-- Servers already started by servery should always be included
 	for name, type in vim.fs.dir(M.get_cfg().session_dir) do
 		if type == "socket" then
 			local server = vim.fs.joinpath(M.get_cfg().session_dir, name)
@@ -344,25 +241,32 @@ M.list_servers = function()
 	return vim.tbl_map(get_server_info, out)
 end
 
----@return servery.PickerItem[]
-M.list_dirs = function()
+---List configured session directories
+---
+---@return servery.Session[]
+list_dirs = function()
 	local cfg = M.get_cfg()
 	local dirs = type(cfg.dirs) == "table" and cfg.dirs or cfg.dirs()
-	return vim.tbl_map(PickerItem.new, dirs)
+	return vim.tbl_map(Session.new, dirs)
 end
 
----@param only_running boolean?
----@return servery.PickerItem[]
-M.get_picker_items = function(only_running)
-	local items = M.list_servers()
+---List the sessions discoverable by servery
+---
+---@param status? "any" | "active" | "inactive"
+---@return servery.Session[]
+M.list_sessions = function(status)
+	status = status or "any"
+	local out = {} --[[@as servery.Session[] ]]
 
-	if not only_running then
-		for _, dir in ipairs(M.list_dirs()) do
-			table.insert(items, dir)
-		end
+	if status == "any" or status == "active" then
+		vim.list_extend(out, list_servers())
 	end
 
-	table.sort(items, function(a, b)
+	if status == "any" or status == "inactive" then
+		vim.list_extend(out, list_dirs())
+	end
+
+	table.sort(out, function(a, b)
 		if a.server and not b.server then
 			return true
 		end
@@ -388,7 +292,7 @@ M.get_picker_items = function(only_running)
 		return a.cwd < b.cwd
 	end)
 
-	return items
+	return out
 end
 
 ---@param provider? servery.ui_provider
@@ -398,7 +302,7 @@ M.show_ui = function(provider)
 end
 
 ---@return string
-M.spawn_nvim = function(dir)
+spawn_nvim = function(dir)
 	dir = vim.fs.normalize(dir)
 	local stat = vim.uv.fs_stat(dir)
 	assert(stat and stat.type == "directory", string.format("`%s` is not a directory", dir))
@@ -419,9 +323,9 @@ end
 
 ---@param opts { dir: string?, server: string? }
 ---@param detach boolean?
-M.connect = function(opts, detach)
+connect = function(opts, detach)
 	assert(opts.dir or opts.server, "Must supply `dir` or `server`")
-	utils.switch_to(opts.server or M.spawn_nvim(opts.dir), detach)
+	utils.switch_to(opts.server or spawn_nvim(opts.dir), detach)
 end
 
 return M

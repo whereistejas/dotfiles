@@ -2,36 +2,36 @@ local M = {}
 
 M.buf = -99
 M.ns = vim.api.nvim_create_namespace("servery.ui")
-M.items = {} ---@type servery.PickerItem[]
+M.sessions = {} ---@type servery.Session[]
 
 ---@type table<servery.action, fun()>
 local builtin_actions = {
 	switch = function()
-		local item = M.items[vim.api.nvim_win_get_cursor(0)[1] - 5]
-		if item then
-			item:switch()
+		local session = M.sessions[vim.api.nvim_win_get_cursor(0)[1] - 5]
+		if session then
+			session:switch()
 			vim.cmd.bdelete()
 		end
 	end,
 	spawn = function()
-		local item = M.items[vim.api.nvim_win_get_cursor(0)[1] - 5]
-		if item then
-			item:spawn_new()
+		local session = M.sessions[vim.api.nvim_win_get_cursor(0)[1] - 5]
+		if session then
+			session:spawn_new()
 			vim.defer_fn(function() M.select() end, 400)
 		end
 	end,
 	switch_and_detach = function()
-		local item = M.items[vim.api.nvim_win_get_cursor(0)[1] - 5]
-		if item then
-			item:switch(true)
+		local session = M.sessions[vim.api.nvim_win_get_cursor(0)[1] - 5]
+		if session then
+			session:switch(true)
 			-- Close the selection window when we switch to a new session
 			vim.cmd.bdelete()
 		end
 	end,
 	detach = function()
-		local item = M.items[vim.api.nvim_win_get_cursor(0)[1] - 5]
-		if item then
-			item:detach()
+		local session = M.sessions[vim.api.nvim_win_get_cursor(0)[1] - 5]
+		if session then
+			session:detach()
 			vim.defer_fn(function() M.select() end, 400)
 		end
 	end,
@@ -57,15 +57,11 @@ local make_header_block = function()
 	}
 end
 
----@param items? servery.PickerItem[]
-M.select = function(items)
+M.select = function()
 	local servery = require("servery")
 	local cfg = servery.get_cfg()
 
-	if items then
-		assert(type(items) == "table")
-	end
-	M.items = items or servery.get_picker_items()
+	M.sessions = servery.list_sessions()
 
 	if not vim.api.nvim_buf_is_valid(M.buf) then
 		M.buf = vim.api.nvim_create_buf(false, true)
@@ -105,25 +101,25 @@ M.select = function(items)
 		table.insert(marks, line_marks)
 	end
 
-	for _, item in ipairs(M.items) do
-		local starttime = item.server and item.server.starttime
+	for _, session in ipairs(M.sessions) do
+		local starttime = session.server and session.server.starttime
 		local spacer = starttime and "  " or ""
-		local run_time = item:time_since_start() or ""
-		local status = item:status()
+		local run_time = session:time_since_start() or ""
+		local status = session:status()
 
 		local line = ""
 		local line_marks = {} ---@type [ integer, vim.api.keyset.set_extmark ][]
 
 		---@type vim.api.keyset.set_extmark
 		local indent_mark = {
-			virt_text = { { "  " }, { item:icon(), "ServeryIcon" .. status }, { "  " } },
+			virt_text = { { "  " }, { session:icon(), "ServeryIcon" .. status }, { "  " } },
 			virt_text_pos = "inline",
 		}
 
 		table.insert(line_marks, { 0, indent_mark })
 
 		for _, part in ipairs({
-			{ item:display_name(), "ServeryLine" .. status },
+			{ session:display_name(), "ServeryLine" .. status },
 			{ spacer },
 			{ run_time, "ServeryTime" },
 		}) do

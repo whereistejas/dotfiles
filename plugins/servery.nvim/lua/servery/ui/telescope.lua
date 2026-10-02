@@ -30,30 +30,30 @@ M.select = function()
 		},
 	})
 
-	---@param entry { value: servery.PickerItem }
+	---@param entry { value: servery.Session }
 	local make_display = function(entry)
-		local item = entry.value
-		local status = item:status()
+		local session = entry.value
+		local status = session:status()
 		return displayer({
-			{ item:icon(), "ServeryIcon" .. status },
-			{ item:display_name(), "ServeryLine" .. status },
-			{ item:time_since_start(time) or "", "ServeryTime" },
+			{ session:icon(), "ServeryIcon" .. status },
+			{ session:display_name(), "ServeryLine" .. status },
+			{ session:time_since_start(time) or "", "ServeryTime" },
 		})
 	end
 
-	---@param item servery.PickerItem
-	local entry_maker = function(item)
+	---@param session servery.Session
+	local entry_maker = function(session)
 		return {
-			value = item,
+			value = session,
 			display = make_display,
-			ordinal = item:display_name(),
+			ordinal = session:display_name(),
 		}
 	end
 
 	local new_finder = function()
 		time = os.time()
 		return finders.new_table({
-			results = servery.get_picker_items(),
+			results = servery.list_sessions(),
 			entry_maker = entry_maker,
 		})
 	end
