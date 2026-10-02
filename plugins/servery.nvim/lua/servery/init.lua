@@ -101,7 +101,15 @@ cfg_defaults = function()
 	local out = {
 		---@type string[] | fun(): string[]
 		dirs = function() return vim.fs.glob("~/*", true, true) end,
-		servers = function() return vim.fs.glob("~/*", true, true) end,
+		---@type fun(): string[]
+		servers = function()
+			return vim.tbl_filter(
+				-- By default, servers are only shown if the 'name' part of the
+				-- server name is "nvim". See `:h serverstart()` for more info.
+				function(s) return vim.startswith(vim.fs.basename(s), "nvim.") end,
+				vim.fn.serverlist({ peer = true })
+			)
+		end,
 		session_dir = vim.fs.joinpath(cache_dir, "servery.nvim"),
 		---@type string[]
 		spawn_cmd = { vim.v.progpath },
@@ -218,24 +226,9 @@ end
 ---
 ---@return servery.SessionActive[]
 list_servers = function()
-	local servers = vim.fn.serverlist({ peer = true }) --[[@as string[] ]]
+	local out = M.get_cfg().servers()
 
-	local out = {}
-
-	for _, server in ipairs(servers) do
-		-- See :h serverstart
-		-- serverstart() generates names like:
-		--   stdpath("run").."/{name}.{pid}.{counter}"
-		-- {name} is "nvim" for servers which are generated normally (i.e. by
-		-- starting nvim). Processes which embed nvim, however, (should) use
-		-- a different {name}. We don't want to surface embedded nvim sessions
-		-- to the user.
-		local name = vim.fs.basename(server):match("(.+)%.[^.]+%.[^.]+$")
-		if name == "nvim" then
-			table.insert(out, server)
-		end
-	end
-
+	-- Servers already started by servery should always be included
 	for name, type in vim.fs.dir(M.get_cfg().session_dir) do
 		if type == "socket" then
 			local server = vim.fs.joinpath(M.get_cfg().session_dir, name)
