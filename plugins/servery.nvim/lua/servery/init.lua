@@ -69,7 +69,7 @@ local setup_cmds = function()
 			elseif arg then
 				local stat = vim.uv.fs_stat(vim.fs.normalize(arg))
 				if stat and stat.type == "directory" then
-					utils.switch_to(M.spawn_nvim(arg), bang)
+					utils.switch_to(spawn_nvim(arg), bang)
 				else
 					utils.notify_error("No such directory found '%s'", arg)
 				end
@@ -217,13 +217,13 @@ end
 -- TODO: warn unsaved files, etc?
 ---@param detach boolean?
 function Session:switch(detach)
-	M.connect({
+	connect({
 		server = self.server and self.server.socket,
 		dir = self.cwd,
 	}, detach)
 end
 
-function Session:spawn_new() M.spawn_nvim(self.cwd) end
+function Session:spawn_new() spawn_nvim(self.cwd) end
 
 function Session:display_name()
 	local dir = vim.fn.fnamemodify(self.cwd, ":~")
@@ -410,7 +410,7 @@ M.show_ui = function(provider)
 end
 
 ---@return string
-M.spawn_nvim = function(dir)
+spawn_nvim = function(dir)
 	dir = vim.fs.normalize(dir)
 	local stat = vim.uv.fs_stat(dir)
 	assert(stat and stat.type == "directory", string.format("`%s` is not a directory", dir))
@@ -431,9 +431,9 @@ end
 
 ---@param opts { dir: string?, server: string? }
 ---@param detach boolean?
-M.connect = function(opts, detach)
+connect = function(opts, detach)
 	assert(opts.dir or opts.server, "Must supply `dir` or `server`")
-	utils.switch_to(opts.server or M.spawn_nvim(opts.dir), detach)
+	utils.switch_to(opts.server or spawn_nvim(opts.dir), detach)
 end
 
 return M
