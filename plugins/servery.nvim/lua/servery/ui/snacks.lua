@@ -33,7 +33,7 @@ M.select = function()
 	Snacks.picker.pick("servery_sessions", {
 		title = cfg.ui.prompt,
 		finder = function()
-			local new_items = servery.get_picker_items() --[[@as snacks.picker.finder.result]]
+			local new_items = servery.list_sessions() --[[@as snacks.picker.finder.result]]
 			for i, item in ipairs(new_items) do
 				item.text = item:display_name()
 				item.has_server = item.server ~= nil
@@ -41,16 +41,16 @@ M.select = function()
 			end
 			return new_items
 		end,
-		---@param item servery.PickerItem
-		format = function(item, _picker)
-			local icon = item:icon()
-			local status = item:status()
+		---@param session servery.Session
+		format = function(session, _picker)
+			local icon = session:icon()
+			local status = session:status()
 			return {
 				{ icon, "ServeryIcon" .. status },
 				{ "  ", "Normal" },
-				{ item:display_name(), "ServeryLine" .. status },
+				{ session:display_name(), "ServeryLine" .. status },
 				{ "  ", "Normal" },
-				{ item:time_since_start(), "ServeryTime" },
+				{ session:time_since_start(), "ServeryTime" },
 			}
 		end,
 		sort = { fields = { "has_server", "score:desc", "idx" } },
@@ -58,23 +58,23 @@ M.select = function()
 		win = { input = { keys = keys } },
 		actions = {
 			---@param picker snacks.Picker
-			---@param item servery.PickerItem
-			servery_switch = function(picker, item, _action)
-				item:switch()
+			---@param session servery.Session
+			servery_switch = function(picker, session, _action)
+				session:switch()
 				picker:close()
 			end,
-			---@param item servery.PickerItem
-			servery_switch_and_detach = function(_picker, item, _action) item:switch(true) end,
+			---@param session servery.Session
+			servery_switch_and_detach = function(_picker, session, _action) session:switch(true) end,
 			---@param picker snacks.Picker
-			---@param item servery.PickerItem
-			servery_spawn = function(picker, item, _action)
-				item:spawn_new()
+			---@param session servery.Session
+			servery_spawn = function(picker, session, _action)
+				session:spawn_new()
 				vim.defer_fn(function() picker:refresh() end, 500)
 			end,
 			---@param picker snacks.Picker
-			---@param item servery.PickerItem
-			servery_detach = function(picker, item, _action)
-				item:detach()
+			---@param session servery.Session
+			servery_detach = function(picker, session, _action)
+				session:detach()
 				vim.defer_fn(function() picker:refresh() end, 500)
 			end,
 		},
