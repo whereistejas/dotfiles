@@ -95,6 +95,7 @@ vim.pack.add({
 
 	"https://github.com/wsdjeg/vim-fetch",
 	"https://github.com/tpope/vim-surround",
+	"https://github.com/folke/which-key.nvim",
 
 	-- VCS
 	"https://github.com/echasnovski/mini.diff",
@@ -305,6 +306,21 @@ require("jj").setup()
 require("gitsigns").setup({
 	signcolumn = false,
 	current_line_blame = true,
+})
+
+-- which-key (popup of pending keymaps)
+-- Plain-text key names instead of the default Nerd Font glyphs.
+local wk_keys = {
+	Up = "Up", Down = "Down", Left = "Left", Right = "Right",
+	C = "C-", M = "M-", D = "D-", S = "S-",
+	CR = "CR", Esc = "Esc", NL = "NL", BS = "BS", Space = "Space", Tab = "Tab",
+	ScrollWheelDown = "ScrollWheelDown", ScrollWheelUp = "ScrollWheelUp",
+}
+for i = 1, 12 do wk_keys["F" .. i] = "F" .. i end
+require("which-key").setup({
+	preset = "helix",
+	sort = { "group", "local", "order", "alphanum", "mod" }, -- groups always last
+	icons = { mappings = false, separator = "", keys = wk_keys },
 })
 
 -- mermaid-cli (mmdc) drives a headless Chrome via puppeteer, but Homebrew's
