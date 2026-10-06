@@ -48,6 +48,25 @@ project or a known directory.
 - No unsolicited comments, docstrings, or README edits
 - Don't leave TODOs or commented-out code behind
 
+### Rust
+
+- **Divide code into paragraphs.** Separate logically distinct blocks within a
+  function with a blank line.
+- **No inline imports, even in tests.** All `use` statements go at the top of the
+  module, never inside a function or block.
+- **Order imports in groups:** `std`, external crates, internal (workspace) crates,
+  `crate`, `super` — one blank line between groups.
+- **No glob imports.** No `use super::*`, `use crate::foo::*`, or similar; name
+  each item.
+- **`#[expect(lint, reason = "...")]`, not `#[allow]`.** An `expect` warns once
+  the suppression is no longer needed.
+- **No narrowing `as` casts.** Use `From` / `TryFrom`; `as` truncates silently.
+- **`expect("<invariant>")`, not bare `unwrap()`, outside tests.** The message
+  states why the value cannot be absent.
+- **Every `unsafe` block carries a `// SAFETY:` comment** stating the invariant
+  that makes it sound.
+- **No `.clone()` to appease the borrow checker.** Restructure the borrow instead.
+
 ## Workflow
 
 - For non-trivial changes, briefly state the plan before executing
