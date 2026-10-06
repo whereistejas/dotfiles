@@ -1,0 +1,67 @@
+#!/usr/bin/env -S nvim --clean -l
+-- Edit FILE in the parent nvim session ($NVIM) in a new tab, and block until its buffer is wiped (:wq, :q!, :bd). For $VISUAL
+-- inside nvim terminals, so pi's Ctrl-G, jj and git don't nest an nvim.
+
+vim.fn.serverstop(vim.v.servername)
+
+local function fail(msg)
+	io.stderr:write("nvim-wait: ", msg, "\n")
+	os.exit(1)
+end
+
+local file, sock = arg[1], os.getenv("NVIM")
+if not file or #arg ~= 1 then
+	fail("usage: nvim-wait FILE")
+end
+if not sock or sock == "" then
+	fail("$NVIM is not set; run this from an nvim terminal")
+end
+
+local ok, chan = pcall(vim.fn.sockconnect, "pipe", sock, { rpc = true })
+if not ok or chan == 0 then
+	fail("cannot connect to " .. sock)
+end
+
+local REMOTE = [[
+local file, client = ...
+local term_win = vim.api.nvim_get_current_win()
+vim.cmd.tabedit(vim.fn.fnameescape(file))
+local buf = vim.api.nvim_get_current_buf()
+vim.bo[buf].bufhidden = "wipe"
+vim.api.nvim_create_autocmd("BufWipeout", {
+	buffer = buf,
+	once = true,
+	callback = function()
+		vim.schedule(function()
+			if vim.api.nvim_win_is_valid(term_win) then
+				vim.api.nvim_set_current_win(term_win)
+				if vim.bo[vim.api.nvim_win_get_buf(term_win)].buftype == "terminal" then
+					vim.cmd.startinsert()
+				end
+			end
+			pcall(vim.rpcnotify, client, "nvim_exec_lua", "_G.nvim_wait_done()", {})
+		end)
+	end,
+})
+]]
+
+local done = false
+function _G.nvim_wait_done()
+	done = true
+end
+
+local client = vim.rpcrequest(chan, "nvim_get_api_info")[1]
+local opened, err = pcall(vim.rpcrequest, chan, "nvim_exec_lua", REMOTE, { vim.fn.fnamemodify(file, ":p"), client })
+if not opened then
+	fail(tostring(err))
+end
+
+while not done do
+	vim.wait(1000, function()
+		return done
+	end)
+	if not done and vim.tbl_isempty(vim.api.nvim_get_chan_info(chan)) then
+		fail("lost connection to " .. sock)
+	end
+end
+os.exit(0)

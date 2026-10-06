@@ -85,6 +85,15 @@ jjgp() {
 
 inn() { pushd "$1" > /dev/null && shift && "$@"; popd > /dev/null; }
 
+# Inside a neovim terminal, open files in the parent session instead of nesting.
+if [ -n "$NVIM" ]; then
+    export VISUAL="$DOTFILES/scripts/nvim-wait"
+    nvim() {
+        [ $# -eq 0 ] && { command nvim; return; }
+        command nvim --server "$NVIM" --remote "$@"
+    }
+fi
+
 # Clipboard over SSH (dev container): OSC 52 — the terminal on the host side
 # does the copy, so `cmd | pbcopy` works through ssh with no extra plumbing.
 if ! command -v pbcopy >/dev/null; then
