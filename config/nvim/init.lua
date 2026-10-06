@@ -99,6 +99,7 @@ vim.pack.add({
 	-- VCS
 	"https://github.com/echasnovski/mini.diff",
 	"https://github.com/NicolasGB/jj.nvim",
+	"https://github.com/lewis6991/gitsigns.nvim",
 
 	-- Picker / QoL
 	"https://github.com/folke/snacks.nvim",
@@ -299,6 +300,12 @@ MiniDiff.setup({
 
 -- jj.nvim
 require("jj").setup()
+
+-- gitsigns — only for inline blame of the cursor line; mini.diff owns the gutter.
+require("gitsigns").setup({
+	signcolumn = false,
+	current_line_blame = true,
+})
 
 -- mermaid-cli (mmdc) drives a headless Chrome via puppeteer, but Homebrew's
 -- mmdc pins a chrome-headless-shell version that is usually absent from
