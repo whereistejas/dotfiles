@@ -44,6 +44,8 @@ vim.opt.completeopt = { "menuone", "preselect", "popup", "fuzzy" }
 -- buffer-local, so turn it back off in prompt buffers (snacks pickers etc.)
 -- where an unprompted popup just fights with the picker's own list.
 vim.opt.autocomplete = true
+vim.opt.autocompletedelay = 300
+vim.opt.pumheight = 10
 vim.api.nvim_create_autocmd("FileType", {
 	pattern = { "snacks_picker_input", "snacks_input" },
 	callback = function(args)
@@ -646,7 +648,7 @@ end
 -- Diagnostics
 vim.diagnostic.config({
 	virtual_text = true,
-	virtual_lines = true,
+	virtual_lines = { current_line = true },
 })
 
 -- =============================================================================
