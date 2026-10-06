@@ -353,6 +353,40 @@ if not vim.g.snacks_did_setup then
 				-- Drop line-number/sign gutter in the preview pane.
 				preview = { minimal = true },
 			},
+			sources = {
+				-- <space>p: hide the git/GitHub pickers, list jj.nvim's pickers instead.
+				pickers = {
+					finder = function(opts, ctx)
+						local items = vim.tbl_filter(function(item)
+							return not item.text:match("^git_") and not item.text:match("^gh_")
+						end, require("snacks.picker.source.meta").pickers(opts, ctx))
+						local file = vim.api.nvim_get_runtime_file("lua/jj/picker.lua", false)[1]
+						for _, name in ipairs({ "status", "file_history", "conflict", "conflict_sections" }) do
+							table.insert(items, {
+								text = "jj_" .. name,
+								jj = name,
+								file = file,
+								search = ("/^function M\\.%s("):format(name),
+							})
+						end
+						table.sort(items, function(a, b) return a.text < b.text end)
+						return items
+					end,
+					confirm = function(picker, item)
+						picker:close()
+						if not item then return end
+						vim.schedule(function()
+							if item.jj then require("jj.picker")[item.jj]() else Snacks.picker(item.text) end
+						end)
+					end,
+				},
+				lsp_workspace_symbols = {
+					sort = function(a, b)
+						if a.file ~= b.file then return a.file < b.file end
+						return a.pos[1] < b.pos[1]
+					end,
+				},
+			},
 		},
 		explorer = { enabled = true },
 		-- Inline images / mermaid diagrams via the kitty graphics protocol.
@@ -396,6 +430,7 @@ local function servery_pick()
 	local root = vim.fs.normalize("~/build")
 	local seen = {}
 	Snacks.picker.pick({
+		source = "servery",
 		title = "Switch Nvim Session",
 		layout = { preview = false },
 		finder = {
@@ -565,6 +600,10 @@ vim.lsp.config("ty", {
 			},
 		},
 	},
+})
+
+vim.lsp.config("rust_analyzer", {
+	settings = { ["rust-analyzer"] = { workspace = { symbol = { search = { limit = 10000 } } } } },
 })
 
 vim.lsp.enable("lua_ls")
@@ -811,14 +850,15 @@ vim.keymap.set("n", "<space>s", servery_pick, { desc = "Switch nvim sessions" })
 vim.keymap.set("n", "ZV", "<cmd>1Sv<cr>", { desc = "Go to previous session" })
 
 -- snacks picker
-vim.keymap.set("n", "<space>t", function() Snacks.picker.pickers() end, { desc = "Pickers" })
+vim.keymap.set("n", "<space>p", function() Snacks.picker.pickers() end, { desc = "Pickers" })
+vim.keymap.set("n", "<space>t", function() Snacks.picker.lsp_workspace_symbols() end, { desc = "Workspace symbols" })
 vim.keymap.set("n", "<space>B", function() Snacks.picker.buffers() end, { desc = "Buffers" })
 vim.keymap.set("n", "<space>f", function() Snacks.picker.files() end, { desc = "Find files" })
 vim.keymap.set("n", "<space>F", function() Snacks.picker.files({ hidden = true, ignored = true }) end,
 	{ desc = "Find files (hidden + ignored)" })
 vim.keymap.set("n", "?", function() Snacks.picker.grep() end, { desc = "Live grep" })
 vim.keymap.set({ "n", "x" }, "<space>w", function() Snacks.picker.grep_word() end, { desc = "Grep word / selection" })
-vim.keymap.set("n", "<space><space>", function() Snacks.picker.resume() end, { desc = "Resume last picker" })
+vim.keymap.set("n", "<space><space>", function() Snacks.picker.resume({ exclude = { "servery" } }) end, { desc = "Resume last picker" })
 vim.keymap.set("n", "<space>r", function() Snacks.picker.lsp_references() end, { desc = "LSP references" })
 vim.keymap.set("n", "<space>i", function() Snacks.picker.lsp_implementations() end, { desc = "LSP implementations" })
 vim.keymap.set("n", "<space>d", function() Snacks.picker.lsp_definitions() end, { desc = "LSP definitions" })
