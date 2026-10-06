@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.99.2",
+  "lastChangelogVersion": "1.0.4",
   "theme": "light-classic",
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-5-5",
@@ -14,6 +14,7 @@
     "npm:@ff-labs/pi-fff"
   ],
   "quietStartup": true,
+  "tuiMode": "regular",
   "hideThinkingBlock": false,
   "warnings": {
     "anthropicExtraUsage": false
