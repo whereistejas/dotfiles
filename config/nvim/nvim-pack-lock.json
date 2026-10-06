@@ -1,10 +1,5 @@
 {
   "plugins": {
-    "fff": {
-      "rev": "c6013ba6a5918221b6c482486aca01acc0830825",
-      "src": "https://github.com/dmtrKovalenko/fff",
-      "version": "'v0.10.6'"
-    },
     "gruvbox.nvim": {
       "rev": "154eb5ff5b96d0641307113fa385eaf0d36d9796",
       "src": "https://github.com/ellisonleao/gruvbox.nvim"

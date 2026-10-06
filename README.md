@@ -73,7 +73,7 @@ The Neovim config expects these external tools to be installed:
 ### External Tools
 
 - `fd` — lists directories for the session switcher (`<space>s`)
-- `cargo` — fallback build for fff when no prebuilt binary matches its tag
+- `rg` — backs the live grep pickers (`?`, `<space>w`)
 - `mmdc` (optional) — renders mermaid fences (`npm install -g @mermaid-js/mermaid-cli`)
 
 ### Neovim Plugins
@@ -81,7 +81,6 @@ The Neovim config expects these external tools to be installed:
 Managed via `vim.pack` (Neovim's built-in package manager):
 
 - snacks.nvim (pickers, explorer, images)
-- fff (file + live grep picker)
 - servery.nvim (switch between per-directory nvim sessions)
 - nvim-treesitter, nvim-treesitter-textobjects
 - nvim-lspconfig (completion via Neovim's built-in LSP client)
