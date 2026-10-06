@@ -28,6 +28,7 @@ config/pi/*
 !config/pi/agent/
 # But ignore these in agent/
 config/pi/agent/sessions/**
+config/pi/agent/branches/**
 config/pi/agent/bin/**
 config/pi/agent/git/**
 config/pi/agent/npm/**
