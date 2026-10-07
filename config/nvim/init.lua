@@ -57,6 +57,7 @@ vim.opt.tabstop = 4
 vim.opt.shiftwidth = 4
 vim.opt.wrap = true      -- Enable soft wrapping
 vim.opt.linebreak = true -- Wrap at word boundaries
+vim.opt.breakindent = true -- Indent wrapped lines to match their start
 
 vim.opt.list = true
 vim.opt.listchars = { tab = "→ ", trail = "·", nbsp = "␣", lead = "·" }
