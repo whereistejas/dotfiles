@@ -19,7 +19,8 @@ Ask for explicit confirmation before you:
 - Modify or delete any file or folder
 - Modify anything outside the current working directory
 - Run destructive shell commands (`rm -rf`, `dd`, etc.)
-- Push, force-push, or rewrite history (plain commits are fine)
+- Push (except as allowed under Code style → commits), force-push, or rewrite history
+  (plain commits are fine)
 - Touch `.git` or `.jj` internals
 - Install global packages or modify shell rc files
 - Add a dependency
@@ -47,6 +48,10 @@ project or a known directory.
 - Match the existing style and conventions of the repo
 - No unsolicited comments, docstrings, or README edits
 - Don't leave TODOs or commented-out code behind
+- **Make small, logical commits as you go and push them to the git remote.** One coherent
+  change per commit. Before starting the work, confirm once with me that pushing as you
+  go is OK for this task; after that, push each commit without asking again. Force-push
+  and history rewrites still need explicit confirmation
 
 ### Rust
 
