@@ -76,6 +76,9 @@ project or a known directory.
 
 - For non-trivial changes, briefly state the plan before executing
 - Run tests/typecheck/lint after edits when available and relevant
+- Don't block on long tasks. Tests, builds, and running scripts you created go to a
+  `branch` background task when they may take more than ~1 minute; return control
+  instead of waiting. Large scans and investigations may run in blocking mode
 - Don't fabricate APIs — verify by reading source or docs
 - Keep `AGENTS.md` in sync: when a change invalidates something it documents (moved or
   renamed paths, changed commands, env vars, workflows, conventions), update `AGENTS.md`
