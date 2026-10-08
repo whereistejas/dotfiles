@@ -827,6 +827,16 @@ vim.api.nvim_create_autocmd("TermOpen", {
 	group = vim.api.nvim_create_augroup("term-ui", { clear = true }),
 	callback = term_ui,
 })
+-- TermOpen can fire in a throwaway window (e.g. jobstart under nvim_buf_call), so
+-- strip again whenever a terminal buffer lands in a window.
+vim.api.nvim_create_autocmd("BufWinEnter", {
+	group = "term-ui",
+	callback = function()
+		if vim.bo.buftype == "terminal" then
+			term_ui()
+		end
+	end,
+})
 -- Re-strip terminal windows after (re)sourcing, since :set clobbers the current
 -- window's local options.
 vim.api.nvim_create_autocmd("SourcePost", {
