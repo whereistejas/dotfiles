@@ -37,9 +37,9 @@ vim.opt.mouse = "n"
 vim.opt.switchbuf = { "useopen" }
 
 -- Native LSP completion (replaces blink.cmp). 'fuzzy' enables fuzzy matching,
--- 'popup' shows the item's info in a floating window, 'preselect' honours the
--- server's CompletionItem.preselect hint.
-vim.opt.completeopt = { "menuone", "preselect", "popup", "fuzzy" }
+-- 'popup' shows the item's info in a floating window, 'noselect' keeps the
+-- LSP-triggered popup from selecting (and inserting) an item until <Tab>.
+vim.opt.completeopt = { "menuone", "noselect", "popup", "fuzzy" }
 -- Pop the completion menu up as you type, no <C-x><C-o> needed. It is
 -- buffer-local, so turn it back off in prompt buffers (snacks pickers etc.)
 -- where an unprompted popup just fights with the picker's own list.
