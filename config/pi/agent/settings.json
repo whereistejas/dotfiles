@@ -15,7 +15,7 @@
   ],
   "quietStartup": true,
   "tuiMode": "regular",
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "warnings": {
     "anthropicExtraUsage": false
   }
