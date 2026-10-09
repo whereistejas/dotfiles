@@ -8,10 +8,6 @@
       "rev": "154eb5ff5b96d0641307113fa385eaf0d36d9796",
       "src": "https://github.com/ellisonleao/gruvbox.nvim"
     },
-    "jj.nvim": {
-      "rev": "47f695b00a3d84cdc2ef3441afa9bbb434b3265d",
-      "src": "https://github.com/NicolasGB/jj.nvim"
-    },
     "mini.diff": {
       "rev": "626b8a5b93874c4d05ca25aedec56cfff0b378fb",
       "src": "https://github.com/echasnovski/mini.diff"

@@ -102,7 +102,6 @@ vim.pack.add({
 
 	-- VCS
 	"https://github.com/echasnovski/mini.diff",
-	"https://github.com/NicolasGB/jj.nvim",
 	"https://github.com/lewis6991/gitsigns.nvim",
 
 	-- Picker / QoL
@@ -119,6 +118,9 @@ vim.pack.add({
 	-- LSP
 	"https://github.com/neovim/nvim-lspconfig",
 })
+
+-- jumanji (jj UI) — local checkout, loaded straight from the working copy.
+vim.opt.rtp:prepend(vim.fn.expand("~/build/jumanji.nvim"))
 
 -- =============================================================================
 -- Functions
@@ -302,9 +304,6 @@ MiniDiff.setup({
 	},
 })
 
--- jj.nvim
-require("jj").setup()
-
 -- gitsigns — only for inline blame of the cursor line; mini.diff owns the gutter.
 require("gitsigns").setup({
 	signcolumn = false,
@@ -357,30 +356,12 @@ if not vim.g.snacks_did_setup then
 				preview = { minimal = true },
 			},
 			sources = {
-				-- <space>p: hide the git/GitHub pickers, list jj.nvim's pickers instead.
+				-- <space>p: hide the git/GitHub pickers.
 				pickers = {
 					finder = function(opts, ctx)
-						local items = vim.tbl_filter(function(item)
+						return vim.tbl_filter(function(item)
 							return not item.text:match("^git_") and not item.text:match("^gh_")
 						end, require("snacks.picker.source.meta").pickers(opts, ctx))
-						local file = vim.api.nvim_get_runtime_file("lua/jj/picker.lua", false)[1]
-						for _, name in ipairs({ "status", "file_history", "conflict", "conflict_sections" }) do
-							table.insert(items, {
-								text = "jj_" .. name,
-								jj = name,
-								file = file,
-								search = ("/^function M\\.%s("):format(name),
-							})
-						end
-						table.sort(items, function(a, b) return a.text < b.text end)
-						return items
-					end,
-					confirm = function(picker, item)
-						picker:close()
-						if not item then return end
-						vim.schedule(function()
-							if item.jj then require("jj.picker")[item.jj]() else Snacks.picker(item.text) end
-						end)
 					end,
 				},
 				lsp_workspace_symbols = {
@@ -854,9 +835,9 @@ vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" }
 -- Git diff hunks (mini.diff): [h / ]h jump to prev/next hunk, [H / ]H first/last;
 -- gh applies a hunk (also a hunk textobject), gH resets one to the @- version.
 
--- jj.nvim
+-- jumanji
 -- Takes over the built-in `T` (till-backwards); `F`/`,`/`;` cover backwards search.
-vim.keymap.set("n", "T", function() require("jj.annotate").line() end, { desc = "jj annotate line (tooltip)" })
+vim.keymap.set("n", "T", function() require("jumanji.annotate").line() end, { desc = "jj annotate line (float)" })
 
 -- servery
 vim.keymap.set("n", "<space>s", servery_pick, { desc = "Switch nvim sessions" })
