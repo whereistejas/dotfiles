@@ -33,7 +33,7 @@
       "src": "https://github.com/MeanderingProgrammer/render-markdown.nvim"
     },
     "servery.nvim": {
-      "rev": "18b7e67063f676261067cb27b9682fc17c7dc53f",
+      "rev": "226660bcd30ce9abbf0b2c4ffb94731b2704cc3c",
       "src": "https://github.com/whereistejas/servery.nvim",
       "version": "'session-titles'"
     },

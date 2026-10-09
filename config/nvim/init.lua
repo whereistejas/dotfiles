@@ -453,7 +453,7 @@ local function servery_pick()
 				{ item.dir, "ServeryLine" .. status },
 				{ item.title and ("  " .. item.title) or "", "ServeryTitle" },
 				{ "  " },
-				{ sv:time_since_active() or "", "ServeryTime" },
+				{ sv:time_since_start() or "", "ServeryTime" },
 			}
 		end,
 		confirm = function(picker, item)
