@@ -830,8 +830,27 @@ vim.api.nvim_create_autocmd("SourcePost", {
 	end,
 })
 
--- Terminal — double <Esc> leaves terminal mode (single <Esc> still reaches the program).
-vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
+-- Terminal — <S-Esc> leaves terminal mode (<Esc> still reaches the program).
+vim.keymap.set("t", "<S-Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
+
+-- Yanks from terminal buffers drop the trailing whitespace padding each line.
+vim.api.nvim_create_autocmd("TextYankPost", {
+	group = "term-ui",
+	callback = function()
+		local ev = vim.v.event
+		if vim.bo.buftype ~= "terminal" or ev.operator ~= "y" then
+			return
+		end
+		local lines = vim.tbl_map(function(line)
+			return (line:gsub("%s+$", ""))
+		end, ev.regcontents)
+		local reg = ev.regname
+		if reg == "" then
+			reg = vim.o.clipboard:find("unnamedplus") and "+" or '"'
+		end
+		vim.fn.setreg(reg, lines, ev.regtype)
+	end,
+})
 
 -- Git diff hunks (mini.diff): [h / ]h jump to prev/next hunk, [H / ]H first/last;
 -- gh applies a hunk (also a hunk textobject), gH resets one to the @- version.
