@@ -147,7 +147,10 @@ end
 local function move_to_commit(buf, win, change_id)
 	for i, item in ipairs(views[buf].items) do
 		if item.kind == "commit" and item.commit.change_id == change_id then
-			vim.api.nvim_win_set_cursor(win, { i, 0 })
+			-- Keep the display column: graph glyphs differ in byte length.
+			vim.api.nvim_win_call(win, function()
+				vim.fn.cursor(i, vim.fn.virtcol2col(0, i, vim.fn.virtcol(".")))
+			end)
 			return
 		end
 	end
