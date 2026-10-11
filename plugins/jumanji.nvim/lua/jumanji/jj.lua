@@ -77,11 +77,17 @@ function M.log(root, revset, on_done)
 	run(root, cmd, parse, on_done)
 end
 
---- Parse `jj diff --summary` output into { status = string, path = string }.
-local function parse_summary(stdout)
+-- One line per changed file: status, source path, target path (repo-relative).
+local FILES_TEMPLATE = [[self.diff().files().map(|f| f.status() ++ "\x1f" ++ f.source().path() ++ "\x1f" ++ f.path() ++ "\n").join("")]]
+
+local STATUS_LETTER = { added = "A", removed = "D", modified = "M", renamed = "R", copied = "C" }
+
+--- Parse FILES_TEMPLATE output into { status = string, source = string, path = string }.
+local function parse_files(stdout)
 	local files = {}
 	for line in vim.gsplit(stdout, "\n", { plain = true, trimempty = true }) do
-		files[#files + 1] = { status = line:sub(1, 1), path = line:sub(3) }
+		local f = vim.split(line, "\x1f", { plain = true })
+		files[#files + 1] = { status = STATUS_LETTER[f[1]] or "M", source = f[2], path = f[3] }
 	end
 	return files
 end
@@ -91,8 +97,22 @@ end
 ---@param commit_id string
 ---@param on_done fun(files: table?, err: string?)
 function M.files(root, commit_id, on_done)
-	local cmd = { "jj", "diff", "--ignore-working-copy", "--color=never", "--no-pager", "--summary", "-r", commit_id }
-	run(root, cmd, parse_summary, on_done)
+	local cmd = {
+		"jj", "log", "--ignore-working-copy", "--color=never", "--no-pager", "--no-graph",
+		"-r", commit_id, "-T", FILES_TEMPLATE,
+	}
+	run(root, cmd, parse_files, on_done)
+end
+
+--- Read a file's content at a revision. `on_done(text, err)` runs on the main loop.
+---@param root string
+---@param rev string
+---@param path string repo-relative
+---@param on_done fun(text: string?, err: string?)
+function M.file_show(root, rev, path, on_done)
+	local fileset = "root-file:" .. vim.json.encode(path)
+	local cmd = { "jj", "file", "show", "--ignore-working-copy", "--no-pager", "-r", rev, fileset }
+	run(root, cmd, function(text) return text end, on_done)
 end
 
 return M

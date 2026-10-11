@@ -1,3 +1,4 @@
+local diff = require("jumanji.diff")
 local jj = require("jumanji.jj")
 
 local M = {}
@@ -110,6 +111,9 @@ local function render(buf)
 			elseif item.kind == "file" then
 				push(item.file.status, STATUS_HL[item.file.status] or "JumanjiFileModified")
 				push(" ")
+				if item.file.source ~= item.file.path then
+					push(item.file.source .. " \u{2192} ")
+				end
 				push(item.file.path)
 			end
 		end
@@ -239,6 +243,12 @@ local function collapse(buf)
 	move_to_commit(buf, 0, c.change_id)
 end
 
+local function open_diff(buf, in_tab)
+	local item = views[buf].items[vim.fn.line(".")]
+	if not item or item.kind ~= "file" then return end
+	diff.open(views[buf].root, item.commit, item.file, in_tab)
+end
+
 local function set_win_opts()
 	vim.wo[0][0].wrap = false
 	vim.wo[0][0].list = false
@@ -274,6 +284,8 @@ local function create_buf(root)
 	vim.keymap.set("n", "R", function() refresh(buf) end, { buffer = buf, desc = "Refresh jumanji log" })
 	vim.keymap.set("n", "l", function() expand(buf) end, { buffer = buf, desc = "Expand commit" })
 	vim.keymap.set("n", "h", function() collapse(buf) end, { buffer = buf, desc = "Collapse commit" })
+	vim.keymap.set("n", "o", function() open_diff(buf, false) end, { buffer = buf, desc = "Diff file in a split" })
+	vim.keymap.set("n", "O", function() open_diff(buf, true) end, { buffer = buf, desc = "Diff file in a new tab" })
 
 	views[buf] = { root = root, rows = {}, items = {}, expanded = {} }
 	return buf
