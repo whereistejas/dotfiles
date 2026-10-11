@@ -716,7 +716,8 @@ vim.keymap.set("x", "<S-left>", function() vim.treesitter.select("extend_prev", 
 
 -- Treesitter text objects (nvim-treesitter-textobjects):
 --   af/if function, ac/ic class (Rust: struct/enum/trait/impl)
---   ]f/[f, ]c/[c jump to next/previous function or class start
+--   ]f/[f, ]t/[t jump to next/previous function or type (struct/enum/trait/impl) start;
+--   ]c/[c stay as the built-in diff-change jumps
 local ts_select = require("nvim-treesitter-textobjects.select")
 local ts_move = require("nvim-treesitter-textobjects.move")
 for lhs, query in pairs({
@@ -731,8 +732,8 @@ end
 for lhs, spec in pairs({
 	["]f"] = { ts_move.goto_next_start, "@function.outer" },
 	["[f"] = { ts_move.goto_previous_start, "@function.outer" },
-	["]c"] = { ts_move.goto_next_start, "@class.outer" },
-	["[c"] = { ts_move.goto_previous_start, "@class.outer" },
+	["]t"] = { ts_move.goto_next_start, "@class.outer" },
+	["[t"] = { ts_move.goto_previous_start, "@class.outer" },
 }) do
 	local fn, query = spec[1], spec[2]
 	vim.keymap.set({ "n", "x", "o" }, lhs, function() fn(query, "textobjects") end,
