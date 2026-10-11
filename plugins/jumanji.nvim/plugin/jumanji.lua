@@ -13,6 +13,9 @@ local function set_highlights()
 		JumanjiDim = "Comment",
 		JumanjiAuthor = "Identifier",
 		JumanjiTimestamp = "Comment",
+		JumanjiFileAdded = "Added",
+		JumanjiFileModified = "Changed",
+		JumanjiFileDeleted = "Removed",
 	}) do
 		vim.api.nvim_set_hl(0, name, { link = link, default = true })
 	end

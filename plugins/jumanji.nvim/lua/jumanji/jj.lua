@@ -14,12 +14,14 @@ local FIELDS = {
 	[[bookmarks.join(" ")]],
 	"author.email().local()",
 	"committer.timestamp().ago()",
-	"description.first_line()",
+	-- JSON-escaped so a multi-line message stays on the commit's one line.
+	"description.escape_json()",
 }
 local TEMPLATE = [["\x1e" ++ ]] .. table.concat(FIELDS, [[ ++ "\x1f" ++ ]]) .. [[ ++ "\n"]]
 
 local function parse_commit(record)
 	local f = vim.split(record, "\x1f", { plain = true })
+	local message = vim.trim(vim.json.decode(f[12]))
 	return {
 		change_id = f[1],
 		prefix = f[2],
@@ -32,7 +34,8 @@ local function parse_commit(record)
 		bookmarks = f[9],
 		author = f[10],
 		timestamp = f[11],
-		description = f[12],
+		description = message:match("^[^\n]*"),
+		message = message == "" and {} or vim.split(message, "\n", { plain = true }),
 	}
 end
 
@@ -51,6 +54,16 @@ local function parse(stdout)
 	return rows
 end
 
+local function run(root, cmd, parser, on_done)
+	vim.system(cmd, { cwd = root, text = true }, vim.schedule_wrap(function(obj)
+		if obj.code ~= 0 then
+			on_done(nil, vim.trim(obj.stderr or ""))
+		else
+			on_done(parser(obj.stdout or ""))
+		end
+	end))
+end
+
 --- Run `jj log` asynchronously. `on_done(rows, err)` is called on the main loop.
 ---@param root string
 ---@param revset string?
@@ -61,13 +74,25 @@ function M.log(root, revset, on_done)
 		vim.list_extend(cmd, { "-r", revset })
 	end
 
-	vim.system(cmd, { cwd = root, text = true }, vim.schedule_wrap(function(obj)
-		if obj.code ~= 0 then
-			on_done(nil, vim.trim(obj.stderr or ""))
-		else
-			on_done(parse(obj.stdout or ""))
-		end
-	end))
+	run(root, cmd, parse, on_done)
+end
+
+--- Parse `jj diff --summary` output into { status = string, path = string }.
+local function parse_summary(stdout)
+	local files = {}
+	for line in vim.gsplit(stdout, "\n", { plain = true, trimempty = true }) do
+		files[#files + 1] = { status = line:sub(1, 1), path = line:sub(3) }
+	end
+	return files
+end
+
+--- List the files changed in a commit. `on_done(files, err)` runs on the main loop.
+---@param root string
+---@param commit_id string
+---@param on_done fun(files: table?, err: string?)
+function M.files(root, commit_id, on_done)
+	local cmd = { "jj", "diff", "--ignore-working-copy", "--color=never", "--no-pager", "--summary", "-r", commit_id }
+	run(root, cmd, parse_summary, on_done)
 end
 
 return M

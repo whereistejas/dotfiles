@@ -4,8 +4,12 @@ local M = {}
 
 local ns = vim.api.nvim_create_namespace("jumanji")
 
--- Log buffers, keyed by bufnr: { root = string, revset = string?, rows = table }
+-- Log buffers, keyed by bufnr:
+-- { root = string, revset = string?, rows = table, items = table, expanded = { [change_id] = true } }
 local views = {}
+
+-- Changed files per commit id: { { status = string, path = string } }
+local file_cache = {}
 
 -- Builds one line from highlighted chunks, recording the column range of each.
 local function line_builder()
@@ -50,15 +54,64 @@ local function render_commit(push, graph, c)
 	end
 end
 
+local STATUS_HL = {
+	A = "JumanjiFileAdded",
+	D = "JumanjiFileDeleted",
+}
+
+-- The graph prefix for lines under a commit: its node becomes an edge.
+local function graph_continuation(graph)
+	local edge = "\u{2502}"
+	local out = {}
+	for _, ch in ipairs(vim.fn.split(graph, [[\zs]])) do
+		out[#out + 1] = (ch == " " or ch == edge) and ch or edge
+	end
+	return table.concat(out)
+end
+
+-- Display items, one per buffer line: jj's rows plus, under each expanded
+-- commit, its message lines and changed files.
+local function build_items(view)
+	local items = {}
+	for _, row in ipairs(view.rows) do
+		local c = row.commit
+		items[#items + 1] = { kind = c and "commit" or "graph", graph = row.graph, commit = c }
+
+		local files = c and view.expanded[c.change_id] and file_cache[c.commit_id]
+		if files then
+			local graph = graph_continuation(row.graph)
+			for _, text in ipairs(c.message) do
+				items[#items + 1] = { kind = "message", graph = graph, commit = c, text = text }
+			end
+			if #c.message > 0 and #files > 0 then
+				items[#items + 1] = { kind = "message", graph = graph, commit = c, text = "" }
+			end
+			for _, file in ipairs(files) do
+				items[#items + 1] = { kind = "file", graph = graph, commit = c, file = file }
+			end
+		end
+	end
+	return items
+end
+
 local function render(buf)
 	local view = views[buf]
+	view.items = build_items(view)
+
 	local lines, line_marks = {}, {}
-	for i, row in ipairs(view.rows) do
+	for i, item in ipairs(view.items) do
 		local push, finish = line_builder()
-		if row.commit then
-			render_commit(push, row.graph, row.commit)
+		if item.kind == "commit" then
+			render_commit(push, item.graph, item.commit)
 		else
-			push(row.graph, "JumanjiGraph")
+			push(item.graph, "JumanjiGraph")
+			if item.kind == "message" then
+				push(item.text)
+			elseif item.kind == "file" then
+				push(item.file.status, STATUS_HL[item.file.status] or "JumanjiFileModified")
+				push(" ")
+				push(item.file.path)
+			end
 		end
 		lines[i], line_marks[i] = finish()
 	end
@@ -72,8 +125,8 @@ local function render(buf)
 		for _, m in ipairs(marks) do
 			vim.api.nvim_buf_set_extmark(buf, ns, i - 1, m[1], { end_col = m[2], hl_group = m[3] })
 		end
-		local c = view.rows[i].commit
-		if c then
+		local c = view.items[i].commit
+		if view.items[i].kind == "commit" then
 			vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
 				virt_text = {
 					{ c.author, "JumanjiAuthor" }, { " " },
@@ -87,8 +140,43 @@ local function render(buf)
 end
 
 local function commit_at(buf, lnum)
-	local row = views[buf].rows[lnum]
-	return row and row.commit
+	local item = views[buf].items[lnum]
+	return item and item.commit
+end
+
+local function move_to_commit(buf, win, change_id)
+	for i, item in ipairs(views[buf].items) do
+		if item.kind == "commit" and item.commit.change_id == change_id then
+			vim.api.nvim_win_set_cursor(win, { i, 0 })
+			return
+		end
+	end
+end
+
+-- Fetch the file lists of the given commits that aren't cached yet, then call
+-- `on_done`. Lists are keyed by commit id, which changes whenever a commit is
+-- rewritten, so they never go stale.
+local function load_files(root, commits, on_done)
+	local pending = 1
+	local function finish()
+		pending = pending - 1
+		if pending == 0 then on_done() end
+	end
+
+	for _, c in ipairs(commits) do
+		if not file_cache[c.commit_id] then
+			pending = pending + 1
+			jj.files(root, c.commit_id, function(files, err)
+				if files then
+					file_cache[c.commit_id] = files
+				else
+					vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+				end
+				finish()
+			end)
+		end
+	end
+	finish()
 end
 
 local function refresh(buf)
@@ -100,26 +188,52 @@ local function refresh(buf)
 			return
 		end
 
-		-- Keep the cursor on the same change across refreshes.
-		local wins = vim.fn.win_findbuf(buf)
-		local cursors = {}
-		for _, win in ipairs(wins) do
-			local c = commit_at(buf, vim.api.nvim_win_get_cursor(win)[1])
-			cursors[win] = c and c.change_id
-		end
-
-		view.rows = rows
-		render(buf)
-
-		for win, change_id in pairs(cursors) do
-			for i, row in ipairs(rows) do
-				if row.commit and row.commit.change_id == change_id then
-					vim.api.nvim_win_set_cursor(win, { i, 0 })
-					break
-				end
+		local expanded = {}
+		for _, row in ipairs(rows) do
+			if row.commit and view.expanded[row.commit.change_id] then
+				expanded[#expanded + 1] = row.commit
 			end
 		end
+
+		load_files(view.root, expanded, function()
+			if not vim.api.nvim_buf_is_valid(buf) then return end
+
+			-- Keep the cursor on the same change across refreshes.
+			local cursors = {}
+			for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+				local c = commit_at(buf, vim.api.nvim_win_get_cursor(win)[1])
+				cursors[win] = c and c.change_id
+			end
+
+			view.rows = rows
+			render(buf)
+
+			for win, change_id in pairs(cursors) do
+				move_to_commit(buf, win, change_id)
+			end
+		end)
 	end)
+end
+
+local function expand(buf)
+	local view = views[buf]
+	local c = commit_at(buf, vim.fn.line("."))
+	if not c or view.expanded[c.change_id] then return end
+
+	view.expanded[c.change_id] = true
+	load_files(view.root, { c }, function()
+		if vim.api.nvim_buf_is_valid(buf) then render(buf) end
+	end)
+end
+
+local function collapse(buf)
+	local view = views[buf]
+	local c = commit_at(buf, vim.fn.line("."))
+	if not c or not view.expanded[c.change_id] then return end
+
+	view.expanded[c.change_id] = nil
+	render(buf)
+	move_to_commit(buf, 0, c.change_id)
 end
 
 local function set_win_opts()
@@ -155,8 +269,10 @@ local function create_buf(root)
 
 	vim.keymap.set("n", "q", close, { buffer = buf, desc = "Close jumanji log" })
 	vim.keymap.set("n", "R", function() refresh(buf) end, { buffer = buf, desc = "Refresh jumanji log" })
+	vim.keymap.set("n", "l", function() expand(buf) end, { buffer = buf, desc = "Expand commit" })
+	vim.keymap.set("n", "h", function() collapse(buf) end, { buffer = buf, desc = "Collapse commit" })
 
-	views[buf] = { root = root, rows = {} }
+	views[buf] = { root = root, rows = {}, items = {}, expanded = {} }
 	return buf
 end
 
