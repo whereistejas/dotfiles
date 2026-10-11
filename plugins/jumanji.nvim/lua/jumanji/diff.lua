@@ -9,10 +9,17 @@ local function url(root, rev, path)
 	return ("jumanji://%s//%s/%s"):format(root, rev, path)
 end
 
+--- Split a jumanji:// file URL into its parts; nil for any other name.
+---@param name string
+---@return string? root, string? rev, string? path
+function M.parse_url(name)
+	return name:match("^jumanji://(/.-)//([^/]+)/(.+)$")
+end
+
 --- BufReadCmd handler: fill the buffer with the file's content at the revision.
 ---@param buf integer
 function M.read(buf)
-	local root, rev, path = vim.api.nvim_buf_get_name(buf):match("^jumanji://(.-)//([^/]+)/(.+)$")
+	local root, rev, path = M.parse_url(vim.api.nvim_buf_get_name(buf))
 	if not root then return end
 
 	local obj = jj.file_show(root, rev, path)

@@ -104,6 +104,22 @@ function M.files(root, commit_id, on_done)
 	run(root, cmd, parse_files, on_done)
 end
 
+--- Annotate one line of a file, synchronously. On success, stdout holds the
+--- line's change id, author, date and JSON-escaped message, unit-separated.
+---@param root string
+---@param rev string? defaults to @
+---@param path string repo-relative
+---@param lnum integer
+---@return vim.SystemCompleted
+function M.annotate_line(root, rev, path, lnum)
+	local template = ([[if(line_number == %d, ]] ..
+		[[commit.change_id().short(8) ++ "\x1f" ++ commit.author().name() ++ "\x1f" ++ ]] ..
+		[[commit.author().timestamp().format("%%Y-%%m-%%d %%H:%%M") ++ "\x1f" ++ commit.description().escape_json())]]):format(lnum)
+	local cmd = { "jj", "file", "annotate", "--no-pager", "-T", template, path }
+	if rev then vim.list_extend(cmd, { "-r", rev }) end
+	return vim.system(cmd, { cwd = root, text = true }):wait()
+end
+
 --- Read a file's content at a revision, synchronously.
 ---@param root string
 ---@param rev string
