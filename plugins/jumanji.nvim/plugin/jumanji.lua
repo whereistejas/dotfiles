@@ -27,6 +27,12 @@ vim.api.nvim_create_autocmd("ColorScheme", {
 	callback = set_highlights,
 })
 
+vim.api.nvim_create_autocmd("BufReadCmd", {
+	group = vim.api.nvim_create_augroup("jumanji-read", { clear = true }),
+	pattern = "jumanji:///*",
+	callback = function(args) require("jumanji.diff").read(args.buf) end,
+})
+
 vim.api.nvim_create_user_command("Jumanji", function(opts)
 	require("jumanji").open(opts.args ~= "" and opts.args or nil)
 end, { nargs = "?", desc = "jj commit log, optionally filtered by a revset" })

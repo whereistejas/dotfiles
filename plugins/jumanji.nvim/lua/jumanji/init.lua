@@ -151,10 +151,8 @@ end
 local function move_to_commit(buf, win, change_id)
 	for i, item in ipairs(views[buf].items) do
 		if item.kind == "commit" and item.commit.change_id == change_id then
-			-- Keep the display column: graph glyphs differ in byte length.
-			vim.api.nvim_win_call(win, function()
-				vim.fn.cursor(i, vim.fn.virtcol2col(0, i, vim.fn.virtcol(".")))
-			end)
+			-- With 'nostartofline', G keeps the cursor's display column.
+			vim.api.nvim_win_call(win, function() vim.cmd("normal! " .. i .. "G") end)
 			return
 		end
 	end
@@ -249,16 +247,6 @@ local function open_diff(buf, in_tab)
 	diff.open(views[buf].root, item.commit, item.file, in_tab)
 end
 
-local function set_win_opts()
-	vim.wo[0][0].wrap = false
-	vim.wo[0][0].list = false
-	vim.wo[0][0].number = false
-	vim.wo[0][0].relativenumber = false
-	vim.wo[0][0].signcolumn = "no"
-	vim.wo[0][0].foldcolumn = "0"
-	vim.wo[0][0].cursorline = true
-end
-
 local function close()
 	local alt = vim.fn.bufnr("#")
 	if alt ~= -1 and not views[alt] and vim.api.nvim_buf_is_valid(alt) then
@@ -271,10 +259,8 @@ end
 local function create_buf(root)
 	local buf = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_buf_set_name(buf, "jumanji://log/" .. root)
-	vim.bo[buf].filetype = "jumanji"
 	vim.bo[buf].modifiable = false
 
-	vim.api.nvim_create_autocmd("BufWinEnter", { buffer = buf, callback = set_win_opts })
 	vim.api.nvim_create_autocmd("BufWipeout", {
 		buffer = buf,
 		callback = function() views[buf] = nil end,
@@ -310,10 +296,13 @@ function M.open(revset)
 	for b, view in pairs(views) do
 		if view.root == root then buf = b end
 	end
+	local is_new = not buf
 	buf = buf or create_buf(root)
 
 	views[buf].revset = revset
 	vim.api.nvim_win_set_buf(0, buf)
+	-- Set once the buffer is in its window, so ftplugin's :setlocal lands there.
+	if is_new then vim.bo[buf].filetype = "jumanji" end
 	refresh(buf)
 end
 

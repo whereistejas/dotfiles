@@ -104,15 +104,15 @@ function M.files(root, commit_id, on_done)
 	run(root, cmd, parse_files, on_done)
 end
 
---- Read a file's content at a revision. `on_done(text, err)` runs on the main loop.
+--- Read a file's content at a revision, synchronously.
 ---@param root string
 ---@param rev string
 ---@param path string repo-relative
----@param on_done fun(text: string?, err: string?)
-function M.file_show(root, rev, path, on_done)
+---@return vim.SystemCompleted
+function M.file_show(root, rev, path)
 	local fileset = "root-file:" .. vim.json.encode(path)
 	local cmd = { "jj", "file", "show", "--ignore-working-copy", "--no-pager", "-r", rev, fileset }
-	run(root, cmd, function(text) return text end, on_done)
+	return vim.system(cmd, { cwd = root, text = true }):wait()
 end
 
 return M
