@@ -109,6 +109,17 @@ function M.files(root, commit_ids)
 	return run(root, cmd, parse_files)
 end
 
+--- Change ids and local bookmark names in the default log revset, for completion.
+---@param root string
+---@return string[]
+function M.refs(root)
+	local cmd = {
+		"jj", "log", "--ignore-working-copy", "--color=never", "--no-pager", "--no-graph",
+		"-T", [[change_id.short(8) ++ "\n" ++ local_bookmarks.map(|b| b.name() ++ "\n").join("")]],
+	}
+	return run(root, cmd, function(out) return vim.split(out, "\n", { trimempty = true }) end) or {}
+end
+
 --- Annotate one line of a file, synchronously. On success, stdout holds the
 --- line's change id, author, date and JSON-escaped message, unit-separated.
 ---@param root string

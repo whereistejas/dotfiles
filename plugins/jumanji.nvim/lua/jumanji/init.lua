@@ -256,6 +256,14 @@ function M.read(buf)
 	refresh(buf)
 end
 
+--- Re-read every log buffer shown in a window, after jj changed the repo.
+function M.refresh_all()
+	for buf in pairs(views) do
+		local win = vim.fn.win_findbuf(buf)[1]
+		if win then vim.api.nvim_win_call(win, function() vim.cmd.edit() end) end
+	end
+end
+
 --- Open the commit log for the current repo in a new horizontal split.
 ---@param revset string? defaults to jj's `revsets.log`
 function M.open(revset)

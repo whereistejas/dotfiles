@@ -40,5 +40,9 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
 })
 
 vim.api.nvim_create_user_command("J", function(opts)
-	require("jumanji").open(opts.args ~= "" and opts.args or nil)
-end, { nargs = "?", desc = "jj commit log, optionally filtered by a revset" })
+	require("jumanji.cmd").run(opts.args)
+end, {
+	nargs = "*",
+	complete = function(...) return require("jumanji.cmd").complete(...) end,
+	desc = "Run jj; no args or `log [-r REVSET]` opens the log view",
+})
