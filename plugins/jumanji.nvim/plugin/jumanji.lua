@@ -27,10 +27,16 @@ vim.api.nvim_create_autocmd("ColorScheme", {
 	callback = set_highlights,
 })
 
+local read_group = vim.api.nvim_create_augroup("jumanji-read", { clear = true })
 vim.api.nvim_create_autocmd("BufReadCmd", {
-	group = vim.api.nvim_create_augroup("jumanji-read", { clear = true }),
+	group = read_group,
 	pattern = "jumanji:///*",
 	callback = function(args) require("jumanji.diff").read(args.buf) end,
+})
+vim.api.nvim_create_autocmd("BufReadCmd", {
+	group = read_group,
+	pattern = "jumanji://log/*",
+	callback = function(args) require("jumanji").read(args.buf) end,
 })
 
 vim.api.nvim_create_user_command("J", function(opts)

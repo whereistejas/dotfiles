@@ -148,162 +148,129 @@ local function commit_at(buf, lnum)
 	return item and item.commit
 end
 
-local function move_to_commit(buf, win, change_id)
-	for i, item in ipairs(views[buf].items) do
-		if item.kind == "commit" and item.commit.change_id == change_id then
-			-- With 'nostartofline', G keeps the cursor's display column.
-			vim.api.nvim_win_call(win, function() vim.cmd("normal! " .. i .. "G") end)
-			return
-		end
-	end
-end
-
--- Fetch the file lists of the given commits that aren't cached yet, then call
--- `on_done`. Lists are keyed by commit id, which changes whenever a commit is
--- rewritten, so they never go stale.
-local function load_files(root, commits, on_done)
-	local pending = 1
-	local function finish()
-		pending = pending - 1
-		if pending == 0 then on_done() end
-	end
-
+-- Fetch the file lists of the given commits that aren't cached yet. Lists are
+-- keyed by commit id, which changes whenever a commit is rewritten, so they
+-- never go stale.
+local function load_files(root, commits)
+	local missing = {}
 	for _, c in ipairs(commits) do
-		if not file_cache[c.commit_id] then
-			pending = pending + 1
-			jj.files(root, c.commit_id, function(files, err)
-				if files then
-					file_cache[c.commit_id] = files
-				else
-					vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
-				end
-				finish()
-			end)
-		end
+		if not file_cache[c.commit_id] then missing[#missing + 1] = c.commit_id end
 	end
-	finish()
+	if #missing == 0 then return end
+
+	local files, err = jj.files(root, missing)
+	if not files then
+		vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+		return
+	end
+	for id, list in pairs(files) do file_cache[id] = list end
 end
 
 local function refresh(buf)
 	local view = views[buf]
-	jj.log(view.root, view.revset, function(rows, err)
-		if not vim.api.nvim_buf_is_valid(buf) then return end
-		if not rows then
-			vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
-			return
+	local rows, err = jj.log(view.root, view.revset)
+	if not rows then
+		vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+		return
+	end
+
+	local expanded = {}
+	for _, row in ipairs(rows) do
+		if row.commit and view.expanded[row.commit.change_id] then
+			expanded[#expanded + 1] = row.commit
 		end
+	end
+	load_files(view.root, expanded)
 
-		local expanded = {}
-		for _, row in ipairs(rows) do
-			if row.commit and view.expanded[row.commit.change_id] then
-				expanded[#expanded + 1] = row.commit
-			end
-		end
-
-		load_files(view.root, expanded, function()
-			if not vim.api.nvim_buf_is_valid(buf) then return end
-
-			-- Keep the cursor on the same change across refreshes.
-			local cursors = {}
-			for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-				local c = commit_at(buf, vim.api.nvim_win_get_cursor(win)[1])
-				cursors[win] = c and c.change_id
-			end
-
-			view.rows = rows
-			render(buf)
-
-			for win, change_id in pairs(cursors) do
-				move_to_commit(buf, win, change_id)
-			end
-		end)
-	end)
+	view.rows = rows
+	render(buf)
 end
 
-local function expand(buf)
+--- Expand the commit under the cursor: show its message and changed files.
+function M.expand()
+	local buf = vim.api.nvim_get_current_buf()
 	local view = views[buf]
 	local c = commit_at(buf, vim.fn.line("."))
 	if not c or view.expanded[c.change_id] then return end
 
 	view.expanded[c.change_id] = true
-	load_files(view.root, { c }, function()
-		if vim.api.nvim_buf_is_valid(buf) then render(buf) end
-	end)
+	load_files(view.root, { c })
+	render(buf)
 end
 
-local function collapse(buf)
+--- Collapse the commit under the cursor (or the one the cursor is inside).
+function M.collapse()
+	local buf = vim.api.nvim_get_current_buf()
 	local view = views[buf]
 	local c = commit_at(buf, vim.fn.line("."))
 	if not c or not view.expanded[c.change_id] then return end
 
 	view.expanded[c.change_id] = nil
 	render(buf)
-	move_to_commit(buf, 0, c.change_id)
-end
-
-local function open_diff(buf, in_tab)
-	local item = views[buf].items[vim.fn.line(".")]
-	if not item or item.kind ~= "file" then return end
-	diff.open(views[buf].root, item.commit, item.file, in_tab)
-end
-
-local function close()
-	local alt = vim.fn.bufnr("#")
-	if alt ~= -1 and not views[alt] and vim.api.nvim_buf_is_valid(alt) then
-		vim.api.nvim_win_set_buf(0, alt)
-	else
-		vim.cmd.enew()
+	for i, item in ipairs(view.items) do
+		if item.kind == "commit" and item.commit.change_id == c.change_id then
+			-- With 'nostartofline', G keeps the cursor's display column.
+			vim.cmd("normal! " .. i .. "G")
+			return
+		end
 	end
 end
 
-local function create_buf(root)
-	local buf = vim.api.nvim_create_buf(false, true)
-	vim.api.nvim_buf_set_name(buf, "jumanji://log/" .. root)
+--- Open the file under the cursor as a diff against the commit's parent.
+---@param in_tab boolean open in a new tab instead of a split
+function M.open_diff(in_tab)
+	local view = views[vim.api.nvim_get_current_buf()]
+	local item = view.items[vim.fn.line(".")]
+	if not item or item.kind ~= "file" then return end
+	diff.open(view.root, item.commit, item.file, in_tab)
+end
+
+-- A log is the buffer jumanji://log<root>[//<revset>], read by the BufReadCmd
+-- autocmd in plugin/jumanji.lua.
+local function log_url(root, revset)
+	return "jumanji://log" .. root .. (revset and ("//" .. revset) or "")
+end
+
+local function parse_log_url(name)
+	local root, revset = name:match("^jumanji://log(/.-)//(.+)$")
+	return root or name:match("^jumanji://log(/.+)$"), revset
+end
+
+--- BufReadCmd handler for log buffers; also what `:edit` runs to refresh one.
+---@param buf integer
+function M.read(buf)
+	if not views[buf] then
+		local root, revset = parse_log_url(vim.api.nvim_buf_get_name(buf))
+		views[buf] = { root = root, revset = revset, rows = {}, items = {}, expanded = {} }
+		vim.api.nvim_create_autocmd("BufWipeout", {
+			buffer = buf,
+			once = true,
+			callback = function() views[buf] = nil end,
+		})
+	end
+
+	vim.bo[buf].buftype = "nofile"
+	vim.bo[buf].swapfile = false
 	vim.bo[buf].modifiable = false
-
-	vim.api.nvim_create_autocmd("BufWipeout", {
-		buffer = buf,
-		callback = function() views[buf] = nil end,
-	})
-
-	vim.keymap.set("n", "q", close, { buffer = buf, desc = "Close jumanji log" })
-	vim.keymap.set("n", "R", function() refresh(buf) end, { buffer = buf, desc = "Refresh jumanji log" })
-	vim.keymap.set("n", "l", function() expand(buf) end, { buffer = buf, desc = "Expand commit" })
-	vim.keymap.set("n", "h", function() collapse(buf) end, { buffer = buf, desc = "Collapse commit" })
-	vim.keymap.set("n", "o", function() open_diff(buf, false) end, { buffer = buf, desc = "Diff file in a split" })
-	vim.keymap.set("n", "O", function() open_diff(buf, true) end, { buffer = buf, desc = "Diff file in a new tab" })
-
-	views[buf] = { root = root, rows = {}, items = {}, expanded = {} }
-	return buf
+	vim.bo[buf].filetype = "jumanji"
+	refresh(buf)
 end
 
-local function find_root()
-	local current = views[vim.api.nvim_get_current_buf()]
-	if current then return current.root end
-	return vim.fs.root(0, ".jj") or vim.fs.root(vim.fn.getcwd(), ".jj")
-end
-
---- Open the commit log for the current repo in the current window.
+--- Open the commit log for the current repo in a new horizontal split.
 ---@param revset string? defaults to jj's `revsets.log`
 function M.open(revset)
-	local root = find_root()
+	local current = views[vim.api.nvim_get_current_buf()]
+	local root = current and current.root or vim.fs.root(0, ".jj") or vim.fs.root(vim.fn.getcwd(), ".jj")
 	if not root then
 		vim.notify("jumanji: not inside a jj repo", vim.log.levels.ERROR)
 		return
 	end
 
-	local buf
-	for b, view in pairs(views) do
-		if view.root == root then buf = b end
-	end
-	local is_new = not buf
-	buf = buf or create_buf(root)
-
-	views[buf].revset = revset
-	vim.api.nvim_win_set_buf(0, buf)
-	-- Set once the buffer is in its window, so ftplugin's :setlocal lands there.
-	if is_new then vim.bo[buf].filetype = "jumanji" end
-	refresh(buf)
+	local url = log_url(root, revset)
+	local loaded = vim.fn.bufloaded(url) == 1
+	vim.cmd("split " .. vim.fn.fnameescape(url))
+	-- :split only reads a buffer that isn't loaded; re-read a loaded one.
+	if loaded then vim.cmd.edit() end
 end
 
 return M

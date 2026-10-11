@@ -54,54 +54,59 @@ local function parse(stdout)
 	return rows
 end
 
-local function run(root, cmd, parser, on_done)
-	vim.system(cmd, { cwd = root, text = true }, vim.schedule_wrap(function(obj)
-		if obj.code ~= 0 then
-			on_done(nil, vim.trim(obj.stderr or ""))
-		else
-			on_done(parser(obj.stdout or ""))
-		end
-	end))
+-- Run jj synchronously; returns the parsed stdout, or nil and jj's stderr.
+local function run(root, cmd, parser)
+	local obj = vim.system(cmd, { cwd = root, text = true }):wait()
+	if obj.code ~= 0 then return nil, vim.trim(obj.stderr or "") end
+	return parser(obj.stdout or "")
 end
 
---- Run `jj log` asynchronously. `on_done(rows, err)` is called on the main loop.
+--- Run `jj log`; returns rows, or nil and an error.
 ---@param root string
 ---@param revset string?
----@param on_done fun(rows: table?, err: string?)
-function M.log(root, revset, on_done)
+---@return table? rows, string? err
+function M.log(root, revset)
 	local cmd = { "jj", "log", "--color=never", "--no-pager", "-T", TEMPLATE }
 	if revset then
 		vim.list_extend(cmd, { "-r", revset })
 	end
 
-	run(root, cmd, parse, on_done)
+	return run(root, cmd, parse)
 end
 
--- One line per changed file: status, source path, target path (repo-relative).
-local FILES_TEMPLATE = [[self.diff().files().map(|f| f.status() ++ "\x1f" ++ f.source().path() ++ "\x1f" ++ f.path() ++ "\n").join("")]]
+-- Per commit: a record separator and its short id on one line, then one line
+-- per changed file: status, source path, target path (repo-relative).
+local FILES_TEMPLATE = [["\x1e" ++ commit_id.short(8) ++ "\n" ++ ]] ..
+	[[self.diff().files().map(|f| f.status() ++ "\x1f" ++ f.source().path() ++ "\x1f" ++ f.path() ++ "\n").join("")]]
 
 local STATUS_LETTER = { added = "A", removed = "D", modified = "M", renamed = "R", copied = "C" }
 
---- Parse FILES_TEMPLATE output into { status = string, source = string, path = string }.
+--- Parse FILES_TEMPLATE output into { [commit_id] = { { status, source, path } } }.
 local function parse_files(stdout)
-	local files = {}
+	local by_commit, files = {}, nil
 	for line in vim.gsplit(stdout, "\n", { plain = true, trimempty = true }) do
-		local f = vim.split(line, "\x1f", { plain = true })
-		files[#files + 1] = { status = STATUS_LETTER[f[1]] or "M", source = f[2], path = f[3] }
+		local id = line:match("^\x1e(.*)$")
+		if id then
+			files = {}
+			by_commit[id] = files
+		else
+			local f = vim.split(line, "\x1f", { plain = true })
+			files[#files + 1] = { status = STATUS_LETTER[f[1]] or "M", source = f[2], path = f[3] }
+		end
 	end
-	return files
+	return by_commit
 end
 
---- List the files changed in a commit. `on_done(files, err)` runs on the main loop.
+--- List the files changed in each of the given commits, in one jj call.
 ---@param root string
----@param commit_id string
----@param on_done fun(files: table?, err: string?)
-function M.files(root, commit_id, on_done)
+---@param commit_ids string[] short (8-char) commit ids
+---@return table? files_by_commit_id, string? err
+function M.files(root, commit_ids)
 	local cmd = {
 		"jj", "log", "--ignore-working-copy", "--color=never", "--no-pager", "--no-graph",
-		"-r", commit_id, "-T", FILES_TEMPLATE,
+		"-r", table.concat(commit_ids, " | "), "-T", FILES_TEMPLATE,
 	}
-	run(root, cmd, parse_files, on_done)
+	return run(root, cmd, parse_files)
 end
 
 --- Annotate one line of a file, synchronously. On success, stdout holds the
