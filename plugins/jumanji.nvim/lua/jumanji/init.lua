@@ -454,9 +454,10 @@ end
 
 --- Open the commit log for the current repo in a new horizontal split.
 ---@param revset string? defaults to jj's `revsets.log`
-function M.open(revset)
+---@param root string? defaults to the current log's repo, or the current file's
+function M.open(revset, root)
 	local current = views[vim.api.nvim_get_current_buf()]
-	local root = current and current.root or vim.fs.root(0, ".jj") or vim.fs.root(vim.fn.getcwd(), ".jj")
+	root = root or current and current.root or vim.fs.root(0, ".jj") or vim.fs.root(vim.fn.getcwd(), ".jj")
 	if not root then
 		vim.notify("jumanji: not inside a jj repo", vim.log.levels.ERROR)
 		return

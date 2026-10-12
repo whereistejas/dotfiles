@@ -50,6 +50,9 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
 	callback = function(args) require("jumanji").read(args.buf) end,
 })
 
+local has_snacks, snacks_sources = pcall(require, "snacks.picker.config.sources")
+if has_snacks then require("jumanji.picker").register(snacks_sources) end
+
 local snapshot_group = vim.api.nvim_create_augroup("jumanji-snapshot", { clear = true })
 vim.api.nvim_create_autocmd("BufWritePost", {
 	group = snapshot_group,
