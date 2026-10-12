@@ -16,6 +16,7 @@ local function set_highlights()
 		JumanjiFileAdded = "Added",
 		JumanjiFileModified = "Changed",
 		JumanjiFileDeleted = "Removed",
+		JumanjiSelected = "Special",
 	}) do
 		vim.api.nvim_set_hl(0, name, { link = link, default = true })
 	end

@@ -118,6 +118,48 @@ function M.show_git(root, rev)
 	return run(root, cmd, function(out) return out end)
 end
 
+--- Run a jj command that changes the repo; returns nil and jj's stderr on failure.
+---@param root string
+---@param args string[]
+---@return true? ok, string? err
+function M.exec(root, args)
+	return run(root, vim.list_extend({ "jj", "--no-pager" }, args), function() return true end)
+end
+
+local BOOKMARK_TEMPLATE = table.concat({
+	"name", "remote", [[if(synced, "1")]], [[if(conflict, "1")]],
+	[[if(normal_target, normal_target.change_id().short(8))]],
+	[[if(normal_target, normal_target.description().first_line())]],
+}, [[ ++ "\x1f" ++ ]]) .. [[ ++ "\n"]]
+
+--- Local and remote bookmarks. A remote bookmark synced with its local one,
+--- and the git remote that mirrors the backing repo, are left out.
+---@param root string
+---@return table[]? bookmarks { name, remote?, conflict, change_id?, description? }, string? err
+function M.bookmarks(root)
+	local cmd = {
+		"jj", "bookmark", "list", "--all-remotes", "--ignore-working-copy", "--color=never", "--no-pager",
+		"-T", BOOKMARK_TEMPLATE,
+	}
+	return run(root, cmd, function(out)
+		local list = {}
+		for line in vim.gsplit(out, "\n", { plain = true, trimempty = true }) do
+			local f = vim.split(line, "\x1f", { plain = true })
+			local remote = f[2] ~= "" and f[2] or nil
+			if not (remote and (remote == "git" or f[3] == "1")) then
+				list[#list + 1] = {
+					name = f[1],
+					remote = remote,
+					conflict = f[4] == "1",
+					change_id = f[5] ~= "" and f[5] or nil,
+					description = f[6],
+				}
+			end
+		end
+		return list
+	end)
+end
+
 --- Change ids and local bookmark names in the default log revset, for completion.
 ---@param root string
 ---@return string[]

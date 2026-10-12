@@ -8,7 +8,7 @@ local ns = vim.api.nvim_create_namespace("jumanji")
 
 -- Log buffers, keyed by bufnr:
 -- { root = string, revset = string?, rows = table, items = table, expanded = { [change_id] = true },
---   stale = boolean? (the repo changed while no window showed it) }
+--   selected = { [change_id] = true }, stale = boolean? (the repo changed while no window showed it) }
 local views = {}
 
 -- Changed files per commit id: { { status = string, path = string } }
@@ -133,6 +133,9 @@ local function render(buf)
 		end
 		local c = view.items[i].commit
 		if view.items[i].kind == "commit" then
+			if view.selected[c.change_id] then
+				vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, { sign_text = "\u{25cf}", sign_hl_group = "JumanjiSelected" })
+			end
 			vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
 				virt_text = {
 					{ c.author, "JumanjiAuthor" }, { " " },
@@ -197,6 +200,14 @@ local function refresh(buf)
 		end
 	end
 	load_files(view.root, expanded)
+
+	local shown = {}
+	for _, row in ipairs(rows) do
+		if row.commit then shown[row.commit.change_id] = true end
+	end
+	for id in pairs(view.selected) do
+		if not shown[id] then view.selected[id] = nil end
+	end
 
 	view.rows = rows
 	render(buf)
@@ -294,6 +305,112 @@ function M.preview(in_tab)
 	end
 end
 
+-- Run a jj command that changes the repo. The log refreshes through its
+-- watcher; buffers of files jj rewrote reload (with 'autoread').
+local function exec(root, args)
+	local ok, err = jj.exec(root, args)
+	if not ok then
+		vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+		return false
+	end
+	vim.cmd.checktime()
+	return true
+end
+
+--- Make the commit under the cursor the working copy (`jj edit`).
+function M.edit()
+	local buf = vim.api.nvim_get_current_buf()
+	local c = commit_at(buf, vim.fn.line("."))
+	if c then exec(views[buf].root, { "edit", c.commit_id }) end
+end
+
+--- On a file line: edit its commit, then open the file for editing.
+---@param in_tab boolean open in a new tab instead of a split
+function M.open_file(in_tab)
+	local view = views[vim.api.nvim_get_current_buf()]
+	local item = view.items[vim.fn.line(".")]
+	if not item or item.kind ~= "file" then return end
+	if item.file.status == "D" then
+		vim.notify("jumanji: " .. item.file.path .. " is deleted in this commit", vim.log.levels.WARN)
+		return
+	end
+
+	if not exec(view.root, { "edit", item.commit.commit_id }) then return end
+	local path = vim.fs.joinpath(view.root, item.file.path)
+	vim.cmd((in_tab and "tabedit " or "belowright split ") .. vim.fn.fnameescape(path))
+end
+
+--- Toggle the selection of the commit under the cursor, then move to the
+--- next commit.
+function M.toggle_select()
+	local buf = vim.api.nvim_get_current_buf()
+	local view = views[buf]
+	local lnum = vim.fn.line(".")
+	local c = commit_at(buf, lnum)
+	if not c then return end
+
+	view.selected[c.change_id] = not view.selected[c.change_id] or nil
+	render(buf)
+	for i = lnum + 1, #view.items do
+		if view.items[i].kind == "commit" then
+			vim.cmd("normal! " .. i .. "G")
+			return
+		end
+	end
+end
+
+--- Abandon the selected commits, or the one under the cursor, once confirmed.
+function M.abandon()
+	local buf = vim.api.nvim_get_current_buf()
+	local view = views[buf]
+	local targets = {}
+	for _, item in ipairs(view.items) do
+		if item.kind == "commit" and view.selected[item.commit.change_id] then targets[#targets + 1] = item.commit end
+	end
+	if #targets == 0 then targets = { commit_at(buf, vim.fn.line(".")) } end
+	if #targets == 0 then return end
+
+	local lines, ids = {}, {}
+	for _, c in ipairs(targets) do
+		lines[#lines + 1] = ("  %s %s"):format(c.change_id:sub(1, 8), c.description)
+		ids[#ids + 1] = c.commit_id
+	end
+	local prompt = ("Abandon %d commit%s?\n%s"):format(#targets, #targets == 1 and "" or "s", table.concat(lines, "\n"))
+	if vim.fn.confirm(prompt, "&Yes\n&No", 2) ~= 1 then return end
+
+	if exec(view.root, vim.list_extend({ "abandon" }, ids)) then
+		view.selected = {}
+		render(buf)
+	end
+end
+
+--- Move a local bookmark, picked from a list, to the commit under the cursor.
+function M.set_bookmark()
+	local view = views[vim.api.nvim_get_current_buf()]
+	local c = commit_at(vim.api.nvim_get_current_buf(), vim.fn.line("."))
+	if not c then return end
+
+	local bookmarks, err = jj.bookmarks(view.root)
+	if not bookmarks then
+		vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+		return
+	end
+	local names = {}
+	for _, b in ipairs(bookmarks) do
+		if not b.remote then names[#names + 1] = b.name end
+	end
+	if #names == 0 then
+		vim.notify("jumanji: no local bookmarks")
+		return
+	end
+
+	vim.ui.select(names, { prompt = "Move bookmark to " .. c.change_id:sub(1, 8) }, function(name)
+		if name then
+			exec(view.root, { "bookmark", "set", name, "--allow-backwards", "-r", c.commit_id })
+		end
+	end)
+end
+
 -- A log is the buffer jumanji://log<root>[//<revset>], read by the BufReadCmd
 -- autocmd in plugin/jumanji.lua.
 local function log_url(root, revset)
@@ -310,7 +427,7 @@ end
 function M.read(buf)
 	if not views[buf] then
 		local root, revset = parse_log_url(vim.api.nvim_buf_get_name(buf))
-		views[buf] = { root = root, revset = revset, rows = {}, items = {}, expanded = {} }
+		views[buf] = { root = root, revset = revset, rows = {}, items = {}, expanded = {}, selected = {} }
 		watch.start(root, function() M.refresh_root(root) end)
 		vim.api.nvim_create_autocmd("BufWinEnter", {
 			buffer = buf,
