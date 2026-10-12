@@ -5,6 +5,7 @@ local watch = require("jumanji.watch")
 local M = {}
 
 local ns = vim.api.nvim_create_namespace("jumanji")
+local block_ns = vim.api.nvim_create_namespace("jumanji-block")
 
 -- Log buffers, keyed by bufnr:
 -- { root = string, revset = string?, rows = table, items = table, expanded = { [change_id] = true },
@@ -48,7 +49,16 @@ local function render_commit(push, graph, c)
 		push(c.bookmarks, "JumanjiBookmark")
 		push(" ")
 	end
-	if c.conflict then push("(conflict) ", "JumanjiConflict") end
+	push(c.author, "JumanjiAuthor")
+	push(" ")
+	push(c.timestamp, "JumanjiTimestamp")
+	push(" ")
+	push(c.commit_id, "JumanjiCommitId")
+	if c.conflict then push(" (conflict)", "JumanjiConflict") end
+end
+
+local function render_description(push, graph, c)
+	push(graph, "JumanjiGraph")
 	if c.empty then push("(empty) ", "JumanjiDim") end
 	if c.description == "" then
 		push("(no description set)", "JumanjiDim")
@@ -62,31 +72,29 @@ local STATUS_HL = {
 	D = "JumanjiFileDeleted",
 }
 
--- The graph prefix for lines under a commit: its node becomes an edge.
-local function graph_continuation(graph)
-	local edge = "\u{2502}"
-	local out = {}
-	for _, ch in ipairs(vim.fn.split(graph, [[\zs]])) do
-		out[#out + 1] = (ch == " " or ch == edge) and ch or edge
-	end
-	return table.concat(out)
+-- The message after its first line, which the description row shows.
+local function message_body(message)
+	local body = vim.list_slice(message, 2)
+	while body[1] == "" do table.remove(body, 1) end
+	return body
 end
 
 -- Display items, one per buffer line: jj's rows plus, under each expanded
--- commit, its message lines and changed files.
+-- commit's description row, the rest of its message and its changed files.
 local function build_items(view)
 	local items = {}
 	for _, row in ipairs(view.rows) do
 		local c = row.commit
-		items[#items + 1] = { kind = c and "commit" or "graph", graph = row.graph, commit = c }
+		items[#items + 1] = { kind = row.kind, graph = row.graph, commit = c }
 
-		local files = c and view.expanded[c.change_id] and file_cache[c.commit_id]
+		local files = row.kind == "description" and view.expanded[c.change_id] and file_cache[c.commit_id]
 		if files then
-			local graph = graph_continuation(row.graph)
-			for _, text in ipairs(c.message) do
+			local graph = row.graph
+			local body = message_body(c.message)
+			for _, text in ipairs(body) do
 				items[#items + 1] = { kind = "message", graph = graph, commit = c, text = text }
 			end
-			if #c.message > 0 and #files > 0 then
+			if #body > 0 and #files > 0 then
 				items[#items + 1] = { kind = "message", graph = graph, commit = c, text = "" }
 			end
 			for _, file in ipairs(files) do
@@ -95,6 +103,26 @@ local function build_items(view)
 		end
 	end
 	return items
+end
+
+-- Highlight every line of the commit under the cursor: its two rows and, when
+-- expanded, its message and files.
+local function highlight_block(buf)
+	local view = views[buf]
+	vim.api.nvim_buf_clear_namespace(buf, block_ns, 0, -1)
+
+	local win = vim.api.nvim_get_current_buf() == buf and vim.api.nvim_get_current_win() or vim.fn.win_findbuf(buf)[1]
+	if not win then return end
+	local lnum = vim.api.nvim_win_get_cursor(win)[1]
+	local c = view.items[lnum] and view.items[lnum].commit
+	if not c then return end
+
+	local first, last = lnum, lnum
+	while view.items[first - 1] and view.items[first - 1].commit == c do first = first - 1 end
+	while view.items[last + 1] and view.items[last + 1].commit == c do last = last + 1 end
+	for i = first, last do
+		vim.api.nvim_buf_set_extmark(buf, block_ns, i - 1, 0, { line_hl_group = "JumanjiCursorBlock" })
+	end
 end
 
 local function render(buf)
@@ -106,6 +134,8 @@ local function render(buf)
 		local push, finish = line_builder()
 		if item.kind == "commit" then
 			render_commit(push, item.graph, item.commit)
+		elseif item.kind == "description" then
+			render_description(push, item.graph, item.commit)
 		else
 			push(item.graph, "JumanjiGraph")
 			if item.kind == "message" then
@@ -131,22 +161,14 @@ local function render(buf)
 		for _, m in ipairs(marks) do
 			vim.api.nvim_buf_set_extmark(buf, ns, i - 1, m[1], { end_col = m[2], hl_group = m[3] })
 		end
-		local c = view.items[i].commit
-		if view.items[i].kind == "commit" then
-			if view.selected[c.change_id] then
-				vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, { sign_text = "\u{25cf}", sign_hl_group = "JumanjiSelected" })
-			end
-			vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, {
-				virt_text = {
-					{ c.author, "JumanjiAuthor" }, { " " },
-					{ c.timestamp, "JumanjiTimestamp" }, { " " },
-					{ c.commit_id, "JumanjiCommitId" },
-				},
-				virt_text_pos = "right_align",
-			})
+		local item = view.items[i]
+		if item.kind == "commit" and view.selected[item.commit.change_id] then
+			vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, { sign_text = "\u{25cf}", sign_hl_group = "JumanjiSelected" })
 		end
 	end
+	highlight_block(buf)
 end
+
 
 local function commit_at(buf, lnum)
 	local item = views[buf].items[lnum]
@@ -195,7 +217,7 @@ local function refresh(buf)
 
 	local expanded = {}
 	for _, row in ipairs(rows) do
-		if row.commit and view.expanded[row.commit.change_id] then
+		if row.kind == "commit" and view.expanded[row.commit.change_id] then
 			expanded[#expanded + 1] = row.commit
 		end
 	end
@@ -224,6 +246,7 @@ local function refresh(buf)
 		lnum = math.max(1, math.min(lnum, #view.items))
 		vim.api.nvim_win_set_cursor(win, { lnum, cursor.pos[2] })
 	end
+	highlight_block(buf)
 end
 
 --- Re-read the root's logs after the repo changed: the ones in a window now,
@@ -280,6 +303,7 @@ function M.collapse()
 		if item.kind == "commit" and item.commit.change_id == c.change_id then
 			-- With 'nostartofline', G keeps the cursor's display column.
 			vim.cmd("normal! " .. i .. "G")
+			highlight_block(buf)
 			return
 		end
 	end
@@ -354,6 +378,7 @@ function M.toggle_select()
 	for i = lnum + 1, #view.items do
 		if view.items[i].kind == "commit" then
 			vim.cmd("normal! " .. i .. "G")
+			highlight_block(buf)
 			return
 		end
 	end
@@ -434,6 +459,10 @@ function M.read(buf)
 			callback = function()
 				if views[buf].stale then refresh(buf) end
 			end,
+		})
+		vim.api.nvim_create_autocmd("CursorMoved", {
+			buffer = buf,
+			callback = function() highlight_block(buf) end,
 		})
 		vim.api.nvim_create_autocmd("BufWipeout", {
 			buffer = buf,

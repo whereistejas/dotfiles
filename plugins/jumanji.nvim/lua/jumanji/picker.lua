@@ -71,7 +71,7 @@ local function log_items(opts)
 	local items = {}
 	for _, row in ipairs(rows) do
 		local c = row.commit
-		if c then
+		if row.kind == "commit" then
 			items[#items + 1] = {
 				text = table.concat({ c.change_id, c.bookmarks, c.description, c.author }, " "),
 				commit = c,

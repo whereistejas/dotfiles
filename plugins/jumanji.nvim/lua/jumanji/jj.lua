@@ -1,7 +1,9 @@
 local M = {}
 
--- One record per commit: a record separator marks where jj's graph prefix ends,
--- then the fields, joined by a unit separator.
+-- Two lines per commit. The first: a record separator marks where jj's graph
+-- prefix ends, then the fields, joined by a unit separator. The second is a
+-- group separator alone, so jj draws the graph prefix of the commit's second
+-- row.
 local FIELDS = {
 	"change_id.short(12)",
 	"change_id.shortest(1).prefix()",
@@ -17,7 +19,7 @@ local FIELDS = {
 	-- JSON-escaped so a multi-line message stays on the commit's one line.
 	"description.escape_json()",
 }
-local TEMPLATE = [["\x1e" ++ ]] .. table.concat(FIELDS, [[ ++ "\x1f" ++ ]]) .. [[ ++ "\n"]]
+local TEMPLATE = [["\x1e" ++ ]] .. table.concat(FIELDS, [[ ++ "\x1f" ++ ]]) .. [[ ++ "\n\x1d\n"]]
 
 local function parse_commit(record)
 	local f = vim.split(record, "\x1f", { plain = true })
@@ -39,16 +41,21 @@ local function parse_commit(record)
 	}
 end
 
---- Parse `jj log` output into rows of { graph = string, commit = table? }.
---- Rows without a commit are graph-only lines (edges, elisions).
+--- Parse `jj log` output into rows of { kind = string, graph = string, commit = table? }.
+--- A commit has a "commit" row then a "description" row; "graph" rows are
+--- graph-only lines (edges, elisions).
 local function parse(stdout)
-	local rows = {}
+	local rows, commit = {}, nil
 	for line in vim.gsplit(stdout, "\n", { plain = true, trimempty = true }) do
 		local graph, record = line:match("^(.-)\x1e(.*)$")
+		local second = line:match("^(.-)\x1d$")
 		if graph then
-			rows[#rows + 1] = { graph = graph, commit = parse_commit(record) }
+			commit = parse_commit(record)
+			rows[#rows + 1] = { kind = "commit", graph = graph, commit = commit }
+		elseif second and commit then
+			rows[#rows + 1] = { kind = "description", graph = second, commit = commit }
 		else
-			rows[#rows + 1] = { graph = line }
+			rows[#rows + 1] = { kind = "graph", graph = line }
 		end
 	end
 	return rows
