@@ -274,13 +274,24 @@ function M.collapse()
 	end
 end
 
---- Open the file under the cursor as a diff against the commit's parent.
----@param in_tab boolean open in a new tab instead of a split
-function M.open_diff(in_tab)
+--- Preview the change under the cursor. On a file: its side-by-side diff.
+--- On a commit: every file in one buffer (split), or each file side by side
+--- through a quickfix list (tab).
+---@param in_tab boolean
+function M.preview(in_tab)
 	local view = views[vim.api.nvim_get_current_buf()]
 	local item = view.items[vim.fn.line(".")]
-	if not item or item.kind ~= "file" then return end
-	diff.open(view.root, item.commit, item.file, in_tab)
+	if not item or not item.commit then return end
+
+	if item.kind == "file" then
+		diff.open(view.root, item.commit, item.file, in_tab)
+	elseif not in_tab then
+		diff.open_show(view.root, item.commit)
+	else
+		load_files(view.root, { item.commit })
+		local files = file_cache[item.commit.commit_id]
+		if files then diff.open_files(view.root, item.commit, files) end
+	end
 end
 
 -- A log is the buffer jumanji://log<root>[//<revset>], read by the BufReadCmd

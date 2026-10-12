@@ -109,6 +109,15 @@ function M.files(root, commit_ids)
 	return run(root, cmd, parse_files)
 end
 
+--- A commit's header, message and whole change in git's diff format.
+---@param root string
+---@param rev string
+---@return string? text, string? err
+function M.show_git(root, rev)
+	local cmd = { "jj", "show", "--git", "--ignore-working-copy", "--color=never", "--no-pager", "-r", rev }
+	return run(root, cmd, function(out) return out end)
+end
+
 --- Change ids and local bookmark names in the default log revset, for completion.
 ---@param root string
 ---@return string[]

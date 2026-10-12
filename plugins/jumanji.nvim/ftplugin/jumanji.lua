@@ -17,9 +17,9 @@ map("q", "<Cmd>bdelete<CR>", "Close jumanji log")
 map("R", "<Cmd>edit<CR>", "Refresh jumanji log")
 map("l", function() require("jumanji").expand() end, "Expand commit")
 map("h", function() require("jumanji").collapse() end, "Collapse commit")
-map("o", function() require("jumanji").open_diff(false) end, "Diff file in a split")
-map("O", function() require("jumanji").open_diff(true) end, "Diff file in a new tab")
+map("p", function() require("jumanji").preview(false) end, "Preview diff in a split")
+map("P", function() require("jumanji").preview(true) end, "Preview diff in a new tab")
 
 vim.b.undo_ftplugin = "setlocal wrap< list< number< relativenumber< signcolumn< foldcolumn< cursorline<"
 	.. " | silent! nunmap <buffer> q | silent! nunmap <buffer> R | silent! nunmap <buffer> l"
-	.. " | silent! nunmap <buffer> h | silent! nunmap <buffer> o | silent! nunmap <buffer> O"
+	.. " | silent! nunmap <buffer> h | silent! nunmap <buffer> p | silent! nunmap <buffer> P"

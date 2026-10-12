@@ -33,6 +33,16 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
 	pattern = "jumanji:///*",
 	callback = function(args) require("jumanji.diff").read(args.buf) end,
 })
+vim.api.nvim_create_autocmd("BufWinEnter", {
+	group = read_group,
+	pattern = "jumanji:///*",
+	callback = function(args) require("jumanji.diff").on_win_enter(args.buf) end,
+})
+vim.api.nvim_create_autocmd("BufReadCmd", {
+	group = read_group,
+	pattern = "jumanji://show/*",
+	callback = function(args) require("jumanji.diff").read_show(args.buf) end,
+})
 vim.api.nvim_create_autocmd("BufReadCmd", {
 	group = read_group,
 	pattern = "jumanji://log/*",
