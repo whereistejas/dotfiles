@@ -39,6 +39,20 @@ vim.api.nvim_create_autocmd("BufReadCmd", {
 	callback = function(args) require("jumanji").read(args.buf) end,
 })
 
+local snapshot_group = vim.api.nvim_create_augroup("jumanji-snapshot", { clear = true })
+vim.api.nvim_create_autocmd("BufWritePost", {
+	group = snapshot_group,
+	callback = function(args)
+		if package.loaded.jumanji then require("jumanji").snapshot(vim.fs.abspath(args.file)) end
+	end,
+})
+vim.api.nvim_create_autocmd("FocusGained", {
+	group = snapshot_group,
+	callback = function()
+		if package.loaded.jumanji then require("jumanji").snapshot() end
+	end,
+})
+
 vim.api.nvim_create_user_command("J", function(opts)
 	require("jumanji.cmd").run(opts.args)
 end, {

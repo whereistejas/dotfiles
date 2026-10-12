@@ -1,12 +1,14 @@
 local diff = require("jumanji.diff")
 local jj = require("jumanji.jj")
+local watch = require("jumanji.watch")
 
 local M = {}
 
 local ns = vim.api.nvim_create_namespace("jumanji")
 
 -- Log buffers, keyed by bufnr:
--- { root = string, revset = string?, rows = table, items = table, expanded = { [change_id] = true } }
+-- { root = string, revset = string?, rows = table, items = table, expanded = { [change_id] = true },
+--   stale = boolean? (the repo changed while no window showed it) }
 local views = {}
 
 -- Changed files per commit id: { { status = string, path = string } }
@@ -166,12 +168,26 @@ local function load_files(root, commits)
 	for id, list in pairs(files) do file_cache[id] = list end
 end
 
+-- What a line shows, stable across re-renders: nil for graph-only lines.
+local function item_key(item)
+	if not item or not item.commit then return nil end
+	local detail = item.file and item.file.path or item.text or ""
+	return table.concat({ item.commit.change_id, item.kind, detail }, "\0")
+end
+
 local function refresh(buf)
 	local view = views[buf]
+	view.stale = nil
 	local rows, err = jj.log(view.root, view.revset)
 	if not rows then
 		vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
 		return
+	end
+
+	local cursors = {}
+	for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+		local pos = vim.api.nvim_win_get_cursor(win)
+		cursors[win] = { key = item_key(view.items[pos[1]]), pos = pos }
 	end
 
 	local expanded = {}
@@ -184,6 +200,48 @@ local function refresh(buf)
 
 	view.rows = rows
 	render(buf)
+
+	-- Keep each cursor on what it was on, wherever that moved to.
+	for win, cursor in pairs(cursors) do
+		local lnum = cursor.pos[1]
+		for i, item in ipairs(view.items) do
+			if cursor.key and item_key(item) == cursor.key then
+				lnum = i
+				break
+			end
+		end
+		lnum = math.max(1, math.min(lnum, #view.items))
+		vim.api.nvim_win_set_cursor(win, { lnum, cursor.pos[2] })
+	end
+end
+
+--- Re-read the root's logs after the repo changed: the ones in a window now,
+--- the rest once they're shown again.
+---@param root string
+function M.refresh_root(root)
+	for buf, view in pairs(views) do
+		if view.root == root then
+			if #vim.fn.win_findbuf(buf) > 0 then
+				refresh(buf)
+			else
+				view.stale = true
+			end
+		end
+	end
+end
+
+--- Snapshot the working copy of every repo with a log open, so edits made
+--- outside jj show up. Logs refresh through their watchers.
+---@param path string? only the repo containing this file
+function M.snapshot(path)
+	-- Compare real paths: a symlink (like macOS's /tmp) can lead to either side.
+	path = path and vim.uv.fs_realpath(path)
+	local roots = {}
+	for _, view in pairs(views) do
+		local real_root = vim.uv.fs_realpath(view.root) or view.root
+		if not path or vim.startswith(path, real_root .. "/") then roots[view.root] = true end
+	end
+	for root in pairs(roots) do jj.snapshot(root) end
 end
 
 --- Expand the commit under the cursor: show its message and changed files.
@@ -242,10 +300,20 @@ function M.read(buf)
 	if not views[buf] then
 		local root, revset = parse_log_url(vim.api.nvim_buf_get_name(buf))
 		views[buf] = { root = root, revset = revset, rows = {}, items = {}, expanded = {} }
+		watch.start(root, function() M.refresh_root(root) end)
+		vim.api.nvim_create_autocmd("BufWinEnter", {
+			buffer = buf,
+			callback = function()
+				if views[buf].stale then refresh(buf) end
+			end,
+		})
 		vim.api.nvim_create_autocmd("BufWipeout", {
 			buffer = buf,
 			once = true,
-			callback = function() views[buf] = nil end,
+			callback = function()
+				views[buf] = nil
+				watch.stop(root)
+			end,
 		})
 	end
 
@@ -254,14 +322,6 @@ function M.read(buf)
 	vim.bo[buf].modifiable = false
 	vim.bo[buf].filetype = "jumanji"
 	refresh(buf)
-end
-
---- Re-read every log buffer shown in a window, after jj changed the repo.
-function M.refresh_all()
-	for buf in pairs(views) do
-		local win = vim.fn.win_findbuf(buf)[1]
-		if win then vim.api.nvim_win_call(win, function() vim.cmd.edit() end) end
-	end
 end
 
 --- Open the commit log for the current repo in a new horizontal split.

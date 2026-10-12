@@ -76,7 +76,6 @@ local function run_job(args, paged)
 			if msg ~= "" then
 				vim.api.nvim_echo({ { msg, code ~= 0 and "ErrorMsg" or nil } }, true, {})
 			end
-			require("jumanji").refresh_all()
 		end,
 	})
 end
@@ -100,10 +99,7 @@ function M.run(args)
 
 	if interactive then
 		vim.cmd.new()
-		vim.fn.jobstart("jj " .. args, {
-			term = true,
-			on_exit = function() require("jumanji").refresh_all() end,
-		})
+		vim.fn.jobstart("jj " .. args, { term = true })
 		vim.cmd.startinsert()
 		return
 	end

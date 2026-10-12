@@ -136,6 +136,27 @@ function M.annotate_line(root, rev, path, lnum)
 	return vim.system(cmd, { cwd = root, text = true }):wait()
 end
 
+--- The repo's store directory. A secondary workspace's .jj/repo is a file
+--- holding the path to the main workspace's store.
+---@param root string
+---@return string
+function M.repo_dir(root)
+	local path = vim.fs.joinpath(root, ".jj", "repo")
+	local stat = vim.uv.fs_stat(path)
+	if not stat or stat.type ~= "file" then return path end
+
+	local target = vim.trim(table.concat(vim.fn.readfile(path), "\n"))
+	if not vim.startswith(target, "/") then target = vim.fs.joinpath(root, ".jj", target) end
+	return vim.fs.normalize(target)
+end
+
+--- Snapshot the working copy in the background. Creates an operation only
+--- when files changed, which the log watchers pick up.
+---@param root string
+function M.snapshot(root)
+	vim.system({ "jj", "util", "snapshot" }, { cwd = root })
+end
+
 --- Read a file's content at a revision, synchronously.
 ---@param root string
 ---@param rev string
