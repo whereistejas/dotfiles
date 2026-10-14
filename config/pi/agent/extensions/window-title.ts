@@ -4,7 +4,8 @@
  * Sets the terminal (Ghostty) window title to a short, Haiku-generated
  * summary of what the current session is working on. Shows a braille
  * spinner while the agent is running, then refreshes the summary when
- * the turn finishes.
+ * the turn finishes. The summary is saved in the session, so a resumed
+ * session gets its title back straight away.
  *
  * Title format:  "<spinner> π — <summary> — <cwd>"
  *
@@ -19,9 +20,17 @@ import path from "node:path";
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const SPINNER_INTERVAL_MS = 80;
 const MAX_SUMMARY_CHARS = 48;
+const SUMMARY_ENTRY = "window-title";
+// pi paints its default title after session_start handlers finish.
+const RESTORE_REPAINT_MS = 1000;
 
 type ContentBlock = { type?: string; text?: string };
-type SessionEntry = { type: string; message?: { role?: string; content?: unknown } };
+type SessionEntry = {
+	type: string;
+	customType?: string;
+	data?: { summary?: unknown };
+	message?: { role?: string; content?: unknown };
+};
 
 function extractText(content: unknown): string {
 	if (typeof content === "string") return content;
@@ -44,6 +53,16 @@ function buildConversationText(entries: SessionEntry[]): string {
 	}
 	// Only the tail matters for "what are we doing right now".
 	return sections.slice(-12).join("\n\n");
+}
+
+function savedSummary(entries: SessionEntry[]): string {
+	for (let i = entries.length - 1; i >= 0; i--) {
+		const entry = entries[i];
+		if (entry.type === "custom" && entry.customType === SUMMARY_ENTRY && typeof entry.data?.summary === "string") {
+			return entry.data.summary;
+		}
+	}
+	return "";
 }
 
 function resolveModel() {
@@ -141,7 +160,9 @@ export default function (pi: ExtensionAPI) {
 				.trim();
 
 			if (label) {
-				summary = label.length > MAX_SUMMARY_CHARS ? `${label.slice(0, MAX_SUMMARY_CHARS - 1)}…` : label;
+				const next = label.length > MAX_SUMMARY_CHARS ? `${label.slice(0, MAX_SUMMARY_CHARS - 1)}…` : label;
+				if (next !== summary) pi.appendEntry(SUMMARY_ENTRY, { summary: next });
+				summary = next;
 				paint(ctx);
 			}
 		} catch {
@@ -151,7 +172,14 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
-	pi.on("session_start", async (_event, ctx) => paint(ctx));
+	pi.on("session_start", async (_event, ctx) => {
+		summary = savedSummary(ctx.sessionManager.getBranch() as SessionEntry[]);
+		paint(ctx);
+		if (!summary) return;
+		setTimeout(() => {
+			if (!timer) paint(ctx);
+		}, RESTORE_REPAINT_MS);
+	});
 
 	pi.on("agent_start", async (_event, ctx) => startSpinner(ctx));
 
