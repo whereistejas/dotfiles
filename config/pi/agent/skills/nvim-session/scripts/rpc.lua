@@ -125,10 +125,11 @@ local function list_sockets()
 			add(vim.fs.joinpath(run, path))
 		end
 	end
-	local dir = vim.fs.joinpath(vim.fn.stdpath("cache"), "servery.nvim")
-	for name, type in vim.fs.dir(dir) do
-		if type == "socket" then
-			add(vim.fs.joinpath(dir, name))
+	for _, dir in ipairs({ vim.fs.joinpath(run, "servery"), vim.fs.joinpath(vim.fn.stdpath("cache"), "servery.nvim") }) do
+		for name, type in vim.fs.dir(dir) do
+			if type == "socket" then
+				add(vim.fs.joinpath(dir, name))
+			end
 		end
 	end
 	return socks
