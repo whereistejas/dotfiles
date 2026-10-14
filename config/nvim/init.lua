@@ -830,6 +830,14 @@ vim.api.nvim_create_autocmd("SourcePost", {
 	end,
 })
 
+-- Terminal jobs (pi's Ctrl-G, jj, git) edit in this session instead of nesting an
+-- nvim, even when started without an interactive bash (e.g. `:term pi`).
+vim.env.VISUAL = vim.fs.joinpath(
+	vim.fs.dirname(vim.fs.dirname(vim.uv.fs_realpath(vim.fn.stdpath("config")))),
+	"scripts",
+	"nvim-wait"
+)
+
 -- Terminal — <S-Esc> leaves terminal mode (<Esc> still reaches the program).
 vim.keymap.set("t", "<S-Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
 
