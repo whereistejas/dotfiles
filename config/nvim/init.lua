@@ -883,6 +883,14 @@ vim.keymap.set("n", "T", function() require("jumanji.annotate").line() end, { de
 vim.keymap.set("n", "<space>jb", function() Snacks.picker.jj_bookmarks() end, { desc = "jj bookmarks" })
 vim.keymap.set("n", "<space>jl", function() Snacks.picker.jj_log() end, { desc = "jj log" })
 
+-- Lowercase names for :J (jumanji) and :Pi (pi.nvim): user commands must start
+-- uppercase, so expand `jj` / `pi` when they are the whole `:` command line so far.
+for lhs, rhs in pairs({ jj = "J", pi = "Pi" }) do
+	vim.keymap.set("ca", lhs, function()
+		return (vim.fn.getcmdtype() == ":" and vim.fn.getcmdline() == lhs) and rhs or lhs
+	end, { expr = true, desc = ":" .. lhs .. " runs :" .. rhs })
+end
+
 -- servery
 vim.keymap.set("n", "<space>s", servery_pick, { desc = "Switch nvim sessions" })
 vim.keymap.set("n", "ZV", "<cmd>1Sv<cr>", { desc = "Go to previous session" })
