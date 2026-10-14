@@ -79,9 +79,9 @@ Complements the `subagents` skill, which stays for parallel fan-out.
     `readOnlyHint`. It's a best-effort command denylist with a read-verb allowlist
     for known CLIs. Anything unclassifiable that looks remote is blocked.
 - **Writers get a jj workspace** (flow A with `write: true`). The fork's cwd is
-  set to a new `jj workspace add` directory, and the session header's `cwd` is
-  rewritten to match. Read-only branches stay in the parent cwd. Flow B keeps its
-  cwd because the process is already running.
+  set to a new `jj workspace add --colocate` directory (its own Git worktree), and
+  the session header's `cwd` is rewritten to match. Read-only branches stay in the
+  parent cwd. Flow B keeps its cwd because the process is already running.
 - **Model** (flow A): inherit the parent model unless `model` is given. Only pick
   `claude-haiku-4-5` when the fork fits comfortably within 200K tokens. Flow B keeps
   its model.
@@ -206,7 +206,7 @@ session files, nvim buffer, cwd, workspace, status), `to-receiver/`,
    receiver agent asks the user, and the answer is sent with `steer` (follow-up
    if the worker is idle). The worker continues and reports again.
 6. **Writer branch.** "Port module X in the background." `branch start` with
-   `write: true` creates `jj workspace add ../dotfiles-port-x` and the worker edits
+   `write: true` creates `jj workspace add --colocate ../dotfiles-port-x` and the worker edits
    there. The report lists change ids; integrating them is a normal jj step done
    by the receiver agent (`jj-subagent-workspaces` skill).
 7. **Receiver gone.** The user closes the receiver pi before the worker finishes.

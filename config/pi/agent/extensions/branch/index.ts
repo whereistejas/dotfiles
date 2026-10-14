@@ -247,7 +247,7 @@ async function addWorkspace(cwd: string, name: string): Promise<string> {
 	const root = (await run("jj", ["root"], { cwd })).stdout.trim();
 	const dir = path.join(path.dirname(root), `${path.basename(root)}-${name}`);
 	if (fs.existsSync(dir)) throw new Error(`${dir} already exists`);
-	await run("jj", ["workspace", "add", "--name", name, "-r", "@", dir], { cwd: root });
+	await run("jj", ["workspace", "add", "--colocate", "--name", name, "-r", "@", dir], { cwd: root });
 	return dir;
 }
 

@@ -88,6 +88,19 @@ project or a known directory.
 
 Always use `jj` instead of `git` for VCS operations (status, diff, log, bookmarks, etc.).
 
+### Workspaces are always Git-colocated
+
+Create every jj workspace with `--colocate`, so it gets its own Git worktree and
+git-based tooling (editors, hooks, build scripts) works in it:
+
+```bash
+jj workspace add --colocate --name <name> -r <parent> <path>
+```
+
+This overrides any skill that says workspaces lack `.git/`. Remove one with
+`jj workspace forget <name>` (which also removes the Git worktree), then delete the
+directory.
+
 ### Avoiding interactive jj commands
 
 When stdin is not a terminal — as it is for you — interactive `jj` commands abort with
