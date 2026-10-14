@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""Call read-only Microsoft 365 connector tools through headless Claude Code.
+
+The claude.ai "Microsoft 365" connector is only reachable from Claude Code logged in to
+the claude.ai account that connected it. This runs `claude -p` with exactly one connector
+tool allowed, asks it to make one call with the given arguments, and prints the raw tool
+result read from the stream-json events, so the model never retypes the data.
+
+Usage:
+  m365 call <tool> [JSON_ARGS]   raw result text on stdout
+  m365 schema <tool>             input schema as reported by the model
+  m365 tools                     the read-only tools this wrapper allows
+
+Exit codes: 0 ok, 1 usage or claude failure, 2 tool returned an error,
+3 the model did not make exactly the requested call.
+"""
+
+import json
+import os
+import subprocess
+import sys
+import tempfile
+
+PREFIX = "mcp__claude_ai_Microsoft_365__"
+
+READ_ONLY = (
+    "chat_message_search",
+    "teams_list_chats",
+    "teams_list_teams",
+    "teams_list_channels",
+    "teams_list_channel_messages",
+    "read_resource",
+    "outlook_email_search",
+    "outlook_calendar_search",
+    "outlook_find_available_time",
+    "find_meeting_availability",
+    "sharepoint_search",
+    "sharepoint_folder_search",
+    "search_people",
+    "get_me",
+    "get_granted_scopes",
+)
+
+DENIED = (
+    "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Agent", "Task",
+    PREFIX + "outlook_send_mail", PREFIX + "outlook_send_draft", PREFIX + "outlook_forward_mail",
+    PREFIX + "outlook_batch_delete_messages", PREFIX + "outlook_trash_thread",
+    PREFIX + "teams_send_chat_message", PREFIX + "teams_send_channel_message",
+    PREFIX + "teams_reply_channel_message", PREFIX + "teams_create_chat",
+    PREFIX + "sharepoint_delete_item", PREFIX + "sharepoint_upload_file", PREFIX + "sharepoint_update_file",
+)
+
+MODEL = os.environ.get("M365_MODEL", "haiku")
+TIMEOUT = int(os.environ.get("M365_TIMEOUT", "300"))
+
+
+def die(msg, code=1):
+    print(f"m365: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def run_claude(tool, prompt):
+    full = PREFIX + tool
+    cmd = [
+        "claude", "-p",
+        "--model", MODEL,
+        "--output-format", "stream-json", "--verbose",
+        "--allowedTools", f"ToolSearch,{full}",
+        "--disallowedTools", ",".join(DENIED),
+        "--permission-mode", "dontAsk",
+        "--no-session-persistence",
+        prompt,
+    ]
+
+    with tempfile.TemporaryDirectory(prefix="m365-") as cwd:
+        try:
+            proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=TIMEOUT)
+        except subprocess.TimeoutExpired:
+            die(f"claude timed out after {TIMEOUT}s")
+
+    events = []
+    for line in proc.stdout.splitlines():
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            continue
+
+    result = next((e for e in events if e.get("type") == "result"), None)
+    if result is None:
+        die(f"claude produced no result (exit {proc.returncode}): {(proc.stderr or proc.stdout).strip()[:500]}")
+    if result.get("is_error"):
+        die(f"claude failed: {result.get('result') or result.get('subtype')}")
+
+    return events, result
+
+
+def tool_calls(events, full):
+    uses = {}
+    results = {}
+    for e in events:
+        content = (e.get("message") or {}).get("content")
+        if not isinstance(content, list):
+            continue
+        for c in content:
+            if c.get("type") == "tool_use" and c.get("name") == full:
+                uses[c["id"]] = c.get("input")
+            elif c.get("type") == "tool_result":
+                results[c.get("tool_use_id")] = c
+
+    return [(uses[i], results.get(i)) for i in uses]
+
+
+def result_text(res):
+    content = res.get("content")
+    if isinstance(content, str):
+        return content
+    return "\n".join(c.get("text", "") for c in content or [] if c.get("type") == "text")
+
+
+def cmd_call(tool, args):
+    full = PREFIX + tool
+    prompt = (
+        f"First call ToolSearch with query 'select:{full}' to load the tool. "
+        f"Then call {full} exactly once with exactly these arguments, unchanged:\n"
+        f"{json.dumps(args)}\n"
+        "Make no other calls. Then reply only DONE."
+    )
+    events, _ = run_claude(tool, prompt)
+
+    calls = tool_calls(events, full)
+    if len(calls) != 1:
+        die(f"expected 1 call to {tool}, the model made {len(calls)}", 3)
+
+    sent, res = calls[0]
+    if sent != args:
+        die(f"model changed the arguments: sent {json.dumps(sent)}", 3)
+    if res is None:
+        die("no tool result recorded", 3)
+
+    print(result_text(res))
+    if res.get("is_error"):
+        sys.exit(2)
+
+
+def cmd_schema(tool):
+    full = PREFIX + tool
+    prompt = (
+        f"Call ToolSearch with query 'select:{full}' to load the tool. Do not call {full}. "
+        "Then reply with only its description and its input JSON schema, verbatim, as one JSON "
+        'object {"description": ..., "input_schema": ...}. No prose, no code fence.'
+    )
+    _, result = run_claude(tool, prompt)
+    print(result.get("result", "").strip())
+
+
+def main():
+    argv = sys.argv[1:]
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return
+
+    sub = argv[0]
+    if sub == "tools":
+        print("\n".join(READ_ONLY))
+        return
+    if sub not in ("call", "schema") or len(argv) < 2:
+        die("usage: m365 call <tool> [JSON_ARGS] | m365 schema <tool> | m365 tools")
+
+    tool = argv[1].removeprefix(PREFIX)
+    if tool not in READ_ONLY:
+        die(f"'{tool}' is not an allowed read-only tool; see: m365 tools")
+
+    if sub == "schema":
+        cmd_schema(tool)
+        return
+
+    try:
+        args = json.loads(argv[2]) if len(argv) > 2 else {}
+    except ValueError as e:
+        die(f"JSON_ARGS is not valid JSON: {e}")
+    if not isinstance(args, dict):
+        die("JSON_ARGS must be a JSON object")
+
+    cmd_call(tool, args)
+
+
+if __name__ == "__main__":
+    main()

@@ -41,6 +41,7 @@ config/pi/agent/fff/**
 # Credentials / machine-local trust state
 config/pi/agent/auth.json
 config/pi/agent/trust.json
+config/pi/agent/mcp-auth.json
 
 # Beacon-specific skills (keep local, don't commit)
 config/pi/agent/skills/beacon-code-review/
