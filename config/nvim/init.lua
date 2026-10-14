@@ -121,6 +121,20 @@ vim.pack.add({
 
 -- jumanji (jj UI) — local checkout, loaded straight from the working copy.
 vim.opt.rtp:prepend(vim.fn.expand("~/build/jumanji.nvim"))
+-- pi.nvim (pi terminal helpers) — local checkout, likewise.
+vim.opt.rtp:prepend(vim.fn.expand("~/build/pi.nvim"))
+
+-- Statusline — nvim's default, plus the jj workspace (unless default) and change
+-- id of the window's repo: the one a pi terminal runs in, else the file's or cwd's.
+function _G.jj_statusline()
+	local root = require("pi").root() or vim.fs.root(0, ".jj") or vim.fs.root(vim.fn.getcwd(), ".jj")
+	return root and require("jumanji.status").get(root) or ""
+end
+if not vim.o.statusline:find("jj_statusline", 1, true) then
+	local stl = vim.o.statusline
+	local split = assert(stl:find("%=", 1, true), "the default statusline has a %= separator")
+	vim.o.statusline = stl:sub(1, split + 1) .. "%(%{v:lua.jj_statusline()} %)" .. stl:sub(split + 2)
+end
 
 -- =============================================================================
 -- Functions
