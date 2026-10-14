@@ -348,6 +348,14 @@ function M.edit()
 	if c then exec(views[buf].root, { "edit", c.commit_id }) end
 end
 
+--- Start a new working-copy commit on top of the commit under the cursor
+--- (`jj new`).
+function M.new()
+	local buf = vim.api.nvim_get_current_buf()
+	local c = commit_at(buf, vim.fn.line("."))
+	if c then exec(views[buf].root, { "new", c.commit_id }) end
+end
+
 --- On a file line: edit its commit, then open the file for editing.
 ---@param in_tab boolean open in a new tab instead of a split
 function M.open_file(in_tab)
