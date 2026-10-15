@@ -23,4 +23,54 @@ function M.root(buf)
 	return cwd and vim.fs.root(cwd, ".jj")
 end
 
+local function running(buf)
+	return M.cwd(buf) ~= nil and vim.fn.jobwait({ vim.bo[buf].channel }, 0)[1] == -1
+end
+
+--- The running pi terminal to act on: the current buffer, else one shown in the
+--- current tab, else the most recently used one.
+---@return integer?
+function M.target()
+	local current = vim.api.nvim_get_current_buf()
+	if running(current) then return current end
+
+	for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+		local buf = vim.api.nvim_win_get_buf(win)
+		if running(buf) then return buf end
+	end
+
+	local latest
+	for _, info in ipairs(vim.fn.getbufinfo({ bufloaded = 1 })) do
+		if running(info.bufnr) and (not latest or info.lastused > latest.lastused) then latest = info end
+	end
+	return latest and latest.bufnr
+end
+
+-- Show the buffer: in its window in the current tab, else in the current window.
+local function focus(buf)
+	local tab_wins = vim.api.nvim_tabpage_list_wins(0)
+	for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+		if vim.list_contains(tab_wins, win) then
+			vim.api.nvim_set_current_win(win)
+			return
+		end
+	end
+	vim.api.nvim_win_set_buf(0, buf)
+end
+
+--- Type a slash command into the target pi terminal and focus it, in terminal
+--- mode. Text already in pi's editor stays, so the command is appended to it.
+---@param cmd string the command without its slash, e.g. "tree"; "" only focuses
+function M.command(cmd)
+	local buf = M.target()
+	if not buf then
+		vim.notify("pi: no running pi terminal", vim.log.levels.ERROR)
+		return
+	end
+
+	if cmd ~= "" then vim.fn.chansend(vim.bo[buf].channel, "/" .. cmd .. "\r") end
+	focus(buf)
+	vim.cmd.startinsert()
+end
+
 return M
