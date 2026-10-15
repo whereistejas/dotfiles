@@ -6,6 +6,15 @@ local M = {}
 -- { listeners = { [on_change] = integer }, handle = uv_fs_event_t, timer = uv_timer_t }
 local watchers = {}
 
+local function close(root)
+	local w = watchers[root]
+	if not w then return end
+
+	w.handle:close()
+	w.timer:close()
+	watchers[root] = nil
+end
+
 --- Call `on_change(root)` (debounced, on the main loop) after every jj
 --- operation in the repo, whoever runs it: each one replaces the operation
 --- head file. Each listener is called once per change, however often it
@@ -21,6 +30,9 @@ function M.start(root, on_change)
 		local heads = vim.fs.joinpath(jj.repo_dir(root), "op_heads", "heads")
 		handle:start(heads, {}, function()
 			timer:start(50, 0, vim.schedule_wrap(function()
+				-- A workspace shares its repo's operation heads, so they outlive a deleted workspace root.
+				if not vim.uv.fs_stat(root) then return close(root) end
+
 				for listener in pairs(w.listeners) do listener(root) end
 			end))
 		end)
@@ -40,9 +52,7 @@ function M.stop(root, on_change)
 	w.listeners[on_change] = w.listeners[on_change] - 1
 	if w.listeners[on_change] == 0 then w.listeners[on_change] = nil end
 	if next(w.listeners) then return end
-	w.handle:close()
-	w.timer:close()
-	watchers[root] = nil
+	close(root)
 end
 
 return M
