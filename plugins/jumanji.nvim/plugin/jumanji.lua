@@ -9,6 +9,7 @@ local function set_highlights()
 		JumanjiChangeId = "Comment",
 		JumanjiCommitId = "Comment",
 		JumanjiBookmark = "Constant",
+		JumanjiWorkspace = "Title",
 		JumanjiConflict = "DiagnosticError",
 		JumanjiDim = "Comment",
 		JumanjiAuthor = "Identifier",

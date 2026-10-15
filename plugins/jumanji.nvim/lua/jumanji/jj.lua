@@ -18,6 +18,8 @@ local FIELDS = {
 	"committer.timestamp().ago()",
 	-- JSON-escaped so a multi-line message stays on the commit's one line.
 	"description.escape_json()",
+	-- Workspaces whose working copy this is; empty while the repo has just one.
+	[[working_copies.map(|w| w.name()).join(" ")]],
 }
 local TEMPLATE = [["\x1e" ++ ]] .. table.concat(FIELDS, [[ ++ "\x1f" ++ ]]) .. [[ ++ "\n\x1d\n"]]
 
@@ -38,6 +40,7 @@ local function parse_commit(record)
 		timestamp = f[11],
 		description = message:match("^[^\n]*"),
 		message = message == "" and {} or vim.split(message, "\n", { plain = true }),
+		workspaces = vim.split(f[13], " ", { trimempty = true }),
 	}
 end
 
@@ -162,6 +165,24 @@ function M.bookmarks(root)
 					description = f[6],
 				}
 			end
+		end
+		return list
+	end)
+end
+
+--- The repo's workspaces. `root` is nil for a workspace jj has no path for.
+---@param root string
+---@return { name: string, root: string? }[]? workspaces, string? err
+function M.workspaces(root)
+	local cmd = {
+		"jj", "workspace", "list", "--ignore-working-copy", "--color=never", "--no-pager",
+		"-T", [[name ++ "\x1f" ++ root ++ "\n"]],
+	}
+	return run(root, cmd, function(out)
+		local list = {}
+		for line in vim.gsplit(out, "\n", { plain = true, trimempty = true }) do
+			local f = vim.split(line, "\x1f", { plain = true })
+			list[#list + 1] = { name = f[1], root = f[2] ~= "" and f[2] or nil }
 		end
 		return list
 	end)

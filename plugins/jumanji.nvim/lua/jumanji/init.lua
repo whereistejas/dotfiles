@@ -45,6 +45,10 @@ local function render_commit(push, graph, c)
 	if c.divergent then push("??", "JumanjiConflict") end
 	push(" ")
 
+	for _, name in ipairs(c.workspaces) do
+		push(name .. "@", "JumanjiWorkspace")
+		push(" ")
+	end
 	if c.bookmarks ~= "" then
 		push(c.bookmarks, "JumanjiBookmark")
 		push(" ")
@@ -415,6 +419,66 @@ function M.abandon()
 		view.selected = {}
 		render(buf)
 	end
+end
+
+-- Real paths, so a symlink (like macOS's /tmp) can lead to either side.
+local function same_dir(a, b)
+	return (vim.uv.fs_realpath(a) or a) == (vim.uv.fs_realpath(b) or b)
+end
+
+--- Forget a workspace whose working copy is the commit under the cursor and,
+--- with `delete`, delete its directory too, once confirmed. Its working-copy
+--- commit stays.
+---@param delete boolean
+function M.forget_workspace(delete)
+	local buf = vim.api.nvim_get_current_buf()
+	local view = views[buf]
+	local c = commit_at(buf, vim.fn.line("."))
+	if not c or #c.workspaces == 0 then
+		vim.notify("jumanji: not a workspace's working copy")
+		return
+	end
+
+	local workspaces, err = jj.workspaces(view.root)
+	if not workspaces then
+		vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+		return
+	end
+	local roots = {}
+	for _, w in ipairs(workspaces) do roots[w.name] = w.root end
+
+	local function forget(name)
+		local dir = roots[name]
+		if dir and same_dir(dir, view.root) then
+			vim.notify("jumanji: " .. name .. " is the workspace this log is in", vim.log.levels.ERROR)
+			return
+		end
+		if delete and not dir then
+			vim.notify("jumanji: jj has no directory for " .. name, vim.log.levels.ERROR)
+			return
+		end
+		if delete and vim.fn.isdirectory(vim.fs.joinpath(dir, ".jj", "repo")) == 1 then
+			vim.notify("jumanji: " .. dir .. " holds the repo itself; only forget " .. name, vim.log.levels.ERROR)
+			return
+		end
+
+		local prompt = delete and ("Forget workspace %s and delete %s?"):format(name, dir)
+			or ("Forget workspace %s? Its files stay in %s."):format(name, dir or "place")
+		if vim.fn.confirm(prompt, "&Yes\n&No", 2) ~= 1 then return end
+
+		if not exec(view.root, { "workspace", "forget", name }) then return end
+		if delete and vim.fn.delete(dir, "rf") ~= 0 then
+			vim.notify("jumanji: forgot " .. name .. ", but couldn't delete " .. dir, vim.log.levels.ERROR)
+		end
+	end
+
+	if #c.workspaces == 1 then
+		forget(c.workspaces[1])
+		return
+	end
+	vim.ui.select(c.workspaces, { prompt = delete and "Delete workspace" or "Forget workspace" }, function(name)
+		if name then forget(name) end
+	end)
 end
 
 --- Move a local bookmark, picked from a list, to the commit under the cursor.
