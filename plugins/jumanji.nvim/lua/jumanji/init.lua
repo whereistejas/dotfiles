@@ -426,11 +426,9 @@ local function same_dir(a, b)
 	return (vim.uv.fs_realpath(a) or a) == (vim.uv.fs_realpath(b) or b)
 end
 
---- Forget a workspace whose working copy is the commit under the cursor and,
---- with `delete`, delete its directory too, once confirmed. Its working-copy
---- commit stays.
----@param delete boolean
-function M.forget_workspace(delete)
+--- Pick a workspace whose working copy is the commit under the cursor, then
+--- whether to forget it or also delete its directory.
+function M.workspace_actions()
 	local buf = vim.api.nvim_get_current_buf()
 	local view = views[buf]
 	local c = commit_at(buf, vim.fn.line("."))
@@ -447,37 +445,38 @@ function M.forget_workspace(delete)
 	local roots = {}
 	for _, w in ipairs(workspaces) do roots[w.name] = w.root end
 
-	local function forget(name)
+	local function act(name)
 		local dir = roots[name]
 		if dir and same_dir(dir, view.root) then
 			vim.notify("jumanji: " .. name .. " is the workspace this log is in", vim.log.levels.ERROR)
 			return
 		end
-		if delete and not dir then
-			vim.notify("jumanji: jj has no directory for " .. name, vim.log.levels.ERROR)
-			return
-		end
-		if delete and vim.fn.isdirectory(vim.fs.joinpath(dir, ".jj", "repo")) == 1 then
-			vim.notify("jumanji: " .. dir .. " holds the repo itself; only forget " .. name, vim.log.levels.ERROR)
-			return
-		end
 
-		local prompt = delete and ("Forget workspace %s and delete %s?"):format(name, dir)
-			or ("Forget workspace %s? Its files stay in %s."):format(name, dir or "place")
-		if vim.fn.confirm(prompt, "&Yes\n&No", 2) ~= 1 then return end
+		-- The directory that holds the repo's store can't go: every workspace needs it.
+		local deletable = dir and vim.fn.isdirectory(vim.fs.joinpath(dir, ".jj", "repo")) == 0
+		local actions = { { label = "Forget, keep its files" .. (dir and (" in " .. dir) or "") } }
+		if deletable then actions[2] = { label = "Forget and delete " .. dir, delete = true } end
 
-		if not exec(view.root, { "workspace", "forget", name }) then return end
-		if delete and vim.fn.delete(dir, "rf") ~= 0 then
-			vim.notify("jumanji: forgot " .. name .. ", but couldn't delete " .. dir, vim.log.levels.ERROR)
-		end
+		vim.ui.select(actions, {
+			prompt = "Workspace " .. name,
+			format_item = function(a) return a.label end,
+		}, function(action)
+			if not action then return end
+			if action.delete and vim.fn.confirm(("Delete %s?"):format(dir), "&Yes\n&No", 2) ~= 1 then return end
+
+			if not exec(view.root, { "workspace", "forget", name }) then return end
+			if action.delete and vim.fn.delete(dir, "rf") ~= 0 then
+				vim.notify("jumanji: forgot " .. name .. ", but couldn't delete " .. dir, vim.log.levels.ERROR)
+			end
+		end)
 	end
 
 	if #c.workspaces == 1 then
-		forget(c.workspaces[1])
+		act(c.workspaces[1])
 		return
 	end
-	vim.ui.select(c.workspaces, { prompt = delete and "Delete workspace" or "Forget workspace" }, function(name)
-		if name then forget(name) end
+	vim.ui.select(c.workspaces, { prompt = "Workspace" }, function(name)
+		if name then act(name) end
 	end)
 end
 

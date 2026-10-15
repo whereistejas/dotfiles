@@ -24,12 +24,11 @@ map("O", function() require("jumanji").open_file(true) end, "Edit commit, open f
 map("B", function() require("jumanji").set_bookmark() end, "Move a bookmark here")
 map("<Tab>", function() require("jumanji").toggle_select() end, "Select commit, move to next")
 map("a", function() require("jumanji").abandon() end, "Abandon selected commits or the one under the cursor")
-map("w", function() require("jumanji").forget_workspace(false) end, "Forget the workspace whose working copy this is")
-map("W", function() require("jumanji").forget_workspace(true) end, "Forget the workspace whose working copy this is, delete its directory")
+map("W", function() require("jumanji").workspace_actions() end, "Forget the workspace whose working copy this is, or delete it")
 
 vim.b.undo_ftplugin = "setlocal wrap< list< signcolumn< foldcolumn< cursorline<"
 	.. " | silent! nunmap <buffer> q | silent! nunmap <buffer> R | silent! nunmap <buffer> l"
 	.. " | silent! nunmap <buffer> h | silent! nunmap <buffer> p | silent! nunmap <buffer> P"
 	.. " | silent! nunmap <buffer> e | silent! nunmap <buffer> n | silent! nunmap <buffer> o | silent! nunmap <buffer> O"
 	.. " | silent! nunmap <buffer> B | silent! nunmap <buffer> <Tab> | silent! nunmap <buffer> a"
-	.. " | silent! nunmap <buffer> w | silent! nunmap <buffer> W"
+	.. " | silent! nunmap <buffer> W"
