@@ -170,22 +170,45 @@ function M.bookmarks(root)
 	end)
 end
 
---- The repo's workspaces. `root` is nil for a workspace jj has no path for.
+-- Run jj in the background. `on_done` runs on the main loop with the parsed
+-- stdout, or nil and jj's stderr.
+local function run_async(root, cmd, parser, on_done)
+	vim.system(cmd, { cwd = root, text = true }, function(obj)
+		vim.schedule(function()
+			if obj.code ~= 0 then
+				on_done(nil, vim.trim(obj.stderr or ""))
+				return
+			end
+			on_done(parser(obj.stdout or ""))
+		end)
+	end)
+end
+
+--- Run a jj command that changes the repo, in the background.
 ---@param root string
----@return { name: string, root: string? }[]? workspaces, string? err
-function M.workspaces(root)
+---@param args string[]
+---@param on_done fun(ok: true?, err: string?)
+function M.exec_async(root, args, on_done)
+	run_async(root, vim.list_extend({ "jj", "--no-pager" }, args), function() return true end, on_done)
+end
+
+--- List the repo's workspaces in the background. `root` is nil for a
+--- workspace jj has no path for.
+---@param root string
+---@param on_done fun(workspaces: { name: string, root: string? }[]?, err: string?)
+function M.workspaces(root, on_done)
 	local cmd = {
 		"jj", "workspace", "list", "--ignore-working-copy", "--color=never", "--no-pager",
 		"-T", [[name ++ "\x1f" ++ root ++ "\n"]],
 	}
-	return run(root, cmd, function(out)
+	run_async(root, cmd, function(out)
 		local list = {}
 		for line in vim.gsplit(out, "\n", { plain = true, trimempty = true }) do
 			local f = vim.split(line, "\x1f", { plain = true })
 			list[#list + 1] = { name = f[1], root = f[2] ~= "" and f[2] or nil }
 		end
 		return list
-	end)
+	end, on_done)
 end
 
 --- Change ids and local bookmark names in the default log revset, for completion.

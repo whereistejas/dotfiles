@@ -426,8 +426,28 @@ local function same_dir(a, b)
 	return (vim.uv.fs_realpath(a) or a) == (vim.uv.fs_realpath(b) or b)
 end
 
+-- Forget a workspace in the background and, given its directory, then delete that.
+local function forget_workspace(root, name, dir)
+	jj.exec_async(root, { "workspace", "forget", name }, function(_, err)
+		if err then
+			vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+			return
+		end
+		if not dir then return end
+
+		vim.system({ "rm", "-rf", "--", dir }, {}, vim.schedule_wrap(function(obj)
+			if obj.code ~= 0 then
+				vim.notify("jumanji: forgot " .. name .. ", but couldn't delete " .. dir, vim.log.levels.ERROR)
+				return
+			end
+			vim.notify("jumanji: deleted " .. dir)
+		end))
+	end)
+end
+
 --- Pick a workspace whose working copy is the commit under the cursor, then
---- whether to forget it or also delete its directory.
+--- whether to forget it or also delete its directory. jj and the deletion run
+--- in the background.
 function M.workspace_actions()
 	local buf = vim.api.nvim_get_current_buf()
 	local view = views[buf]
@@ -437,16 +457,7 @@ function M.workspace_actions()
 		return
 	end
 
-	local workspaces, err = jj.workspaces(view.root)
-	if not workspaces then
-		vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
-		return
-	end
-	local roots = {}
-	for _, w in ipairs(workspaces) do roots[w.name] = w.root end
-
-	local function act(name)
-		local dir = roots[name]
+	local function act(name, dir)
 		if dir and same_dir(dir, view.root) then
 			vim.notify("jumanji: " .. name .. " is the workspace this log is in", vim.log.levels.ERROR)
 			return
@@ -464,19 +475,25 @@ function M.workspace_actions()
 			if not action then return end
 			if action.delete and vim.fn.confirm(("Delete %s?"):format(dir), "&Yes\n&No", 2) ~= 1 then return end
 
-			if not exec(view.root, { "workspace", "forget", name }) then return end
-			if action.delete and vim.fn.delete(dir, "rf") ~= 0 then
-				vim.notify("jumanji: forgot " .. name .. ", but couldn't delete " .. dir, vim.log.levels.ERROR)
-			end
+			forget_workspace(view.root, name, action.delete and dir or nil)
 		end)
 	end
 
-	if #c.workspaces == 1 then
-		act(c.workspaces[1])
-		return
-	end
-	vim.ui.select(c.workspaces, { prompt = "Workspace" }, function(name)
-		if name then act(name) end
+	jj.workspaces(view.root, function(workspaces, err)
+		if not workspaces then
+			vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+			return
+		end
+		local roots = {}
+		for _, w in ipairs(workspaces) do roots[w.name] = w.root end
+
+		if #c.workspaces == 1 then
+			act(c.workspaces[1], roots[c.workspaces[1]])
+			return
+		end
+		vim.ui.select(c.workspaces, { prompt = "Workspace" }, function(name)
+			if name then act(name, roots[name]) end
+		end)
 	end)
 end
 
