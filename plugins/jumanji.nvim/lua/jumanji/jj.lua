@@ -215,6 +215,29 @@ function M.snapshot(root)
 	vim.system({ "jj", "util", "snapshot" }, { cwd = root })
 end
 
+-- The working copy's workspace, unless it's the default one, and its change id.
+local WORKING_COPY_TEMPLATE = [[working_copies.filter(|w| w.name() != "default").map(|w| w.name()).join(" ")]] ..
+	[[ ++ "\x1f" ++ change_id.short(8)]]
+
+--- Read the working copy in the background, without snapshotting it.
+--- `on_done` runs on the main loop, and only if jj succeeds.
+---@param root string
+---@param on_done fun(wc: { workspace: string?, change_id: string })
+function M.working_copy(root, on_done)
+	local cmd = {
+		"jj", "log", "--ignore-working-copy", "--color=never", "--no-pager", "--no-graph",
+		"-r", "@", "-T", WORKING_COPY_TEMPLATE,
+	}
+	vim.system(cmd, { cwd = root, text = true }, function(obj)
+		if obj.code ~= 0 then return end
+
+		local f = vim.split(obj.stdout or "", "\x1f", { plain = true })
+		vim.schedule(function()
+			on_done({ workspace = f[1] ~= "" and f[1] or nil, change_id = f[2] })
+		end)
+	end)
+end
+
 --- Read a file's content at a revision, synchronously.
 ---@param root string
 ---@param rev string
