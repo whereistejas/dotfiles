@@ -461,7 +461,7 @@ function M.read(buf)
 	if not views[buf] then
 		local root, revset = parse_log_url(vim.api.nvim_buf_get_name(buf))
 		views[buf] = { root = root, revset = revset, rows = {}, items = {}, expanded = {}, selected = {} }
-		watch.start(root, function() M.refresh_root(root) end)
+		watch.start(root, M.refresh_root)
 		vim.api.nvim_create_autocmd("BufWinEnter", {
 			buffer = buf,
 			callback = function()
@@ -477,7 +477,7 @@ function M.read(buf)
 			once = true,
 			callback = function()
 				views[buf] = nil
-				watch.stop(root)
+				watch.stop(root, M.refresh_root)
 			end,
 		})
 	end
