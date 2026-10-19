@@ -94,3 +94,6 @@
 	updateRefs = true
 [remote "origin"]
 	tagOpt = --no-tags
+
+[include]
+	path = ~/.gitconfig.local
