@@ -326,7 +326,12 @@ end
 ---
 ---@return servery.SessionActive[]
 list_servers = function()
-	local out = M.get_cfg().servers()
+	local out = {}
+	for _, server in ipairs(M.get_cfg().servers()) do
+		if not vim.tbl_contains(out, server) then
+			table.insert(out, server)
+		end
+	end
 
 	-- Servers already started by servery should always be included
 	for name, type in vim.fs.dir(M.get_cfg().session_dir) do
