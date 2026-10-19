@@ -33,6 +33,7 @@ local real_notify = vim.notify
 ---@field notes { msg: string, level: integer? }[]
 ---@field dir string
 ---@field spawned string[]
+---@field path string?
 local state
 
 ---Make a directory for a test session. The first 5 letters of the name are
@@ -107,6 +108,45 @@ M.remote = function(socket, code, args)
 	return out
 end
 
+---Open a terminal that looks like the pi extension's: named
+---`term://<cwd>//<pid>:pi --session <file>`, with `b:pi_session` set
+---@param socket string
+---@param opts { file: string?, session: table?, branch: string?, cmd: string?, tab: boolean? }
+---@return integer buf
+M.open_pi = function(socket, opts)
+	return M.remote(
+		socket,
+		[[
+			local opts = ...
+			vim.cmd(opts.tab and "tabnew" or "enew")
+			vim.fn.jobstart(opts.cmd or "sleep 100", { term = true })
+			local name = "term://" .. vim.fn.getcwd() .. "//" .. vim.fn.jobpid(vim.bo.channel) .. ":pi"
+			if opts.file then
+				name = name .. " --session " .. opts.file
+			end
+			vim.cmd("keepalt file " .. vim.fn.fnameescape(name))
+			vim.b.pi_session = opts.session
+			vim.b.pi_branch = opts.branch
+			return vim.api.nvim_get_current_buf()
+		]],
+		{ opts }
+	)
+end
+
+---Put a fake `pi` on PATH that records its arguments and keeps running.
+---Returns the file the arguments are written to.
+---@return string
+M.fake_pi = function()
+	local bin = vim.fs.joinpath(state.dir, "bin")
+	local log = vim.fs.joinpath(state.dir, "pi-args")
+	vim.fn.mkdir(bin, "p")
+	vim.fn.writefile({ "#!/bin/sh", 'echo "$@" >> ' .. log, "exec sleep 100" }, vim.fs.joinpath(bin, "pi"))
+	vim.fn.setfperm(vim.fs.joinpath(bin, "pi"), "rwxr-xr-x")
+	state.path = vim.env.PATH
+	vim.env.PATH = bin .. ":" .. vim.env.PATH
+	return log
+end
+
 ---@return servery.test.State
 M.state = function() return state end
 
@@ -162,6 +202,9 @@ end
 local after = function()
 	vim.cmd = real_cmd
 	vim.notify = real_notify
+	if state.path then
+		vim.env.PATH = state.path
+	end
 
 	for name, kind in vim.fs.dir(M.session_dir()) do
 		if kind == "socket" then
