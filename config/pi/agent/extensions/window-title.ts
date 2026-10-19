@@ -5,7 +5,8 @@
  * summary of what the current session is working on. Shows a braille
  * spinner while the agent is running, then refreshes the summary when
  * the turn finishes. The summary is saved in the session, so a resumed
- * session gets its title back straight away.
+ * session gets its title back straight away; a session that has messages
+ * but no saved summary gets one generated as it starts.
  *
  * Title format:  "<spinner> π — <summary> — <cwd>"
  *
@@ -175,9 +176,9 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		summary = savedSummary(ctx.sessionManager.getBranch() as SessionEntry[]);
 		paint(ctx);
-		if (!summary) return;
+		if (!summary) void refreshSummary(ctx);
 		setTimeout(() => {
-			if (!timer) paint(ctx);
+			if (summary && !timer) paint(ctx);
 		}, RESTORE_REPAINT_MS);
 	});
 
