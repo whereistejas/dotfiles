@@ -117,7 +117,8 @@ require("servery").setup({
 * `:Sv`: Open the servery ui.
 * `:[N]Sv[!]`: Go to the nth last visited session. Also stops the current session if `!` is used.
 * `:Sv[!] [dir]`: Go to the session in `[dir]`, creating it if it's not already open. Also stops the current session if `!` is used.
-* `:SvStop[!]`: Close the current session. Use `!` to close it despite unsaved changes.
+* `:SvStop[!]`: Close the current session and move to the last visited one. Use `!` to
+  close it despite unsaved changes.
 * `:[N]SvStop`: Close the nth last visited session.
 * `:SvStop [dir]`: Close the session in `[dir]`.
 * `:SvName [name]`: Name the current session in the ui (no argument clears it).

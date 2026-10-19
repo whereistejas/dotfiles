@@ -75,7 +75,7 @@ M.select = function()
 			---@param picker snacks.Picker
 			---@param session servery.Session
 			servery_detach = function(picker, session, _action)
-				session:detach()
+				session:stop()
 				vim.defer_fn(function() picker:refresh() end, 500)
 			end,
 		},

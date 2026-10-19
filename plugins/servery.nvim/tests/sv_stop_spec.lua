@@ -92,3 +92,39 @@ h.test(":[N]SvStop stops the Nth other session", function()
 	h.eq({}, h.connects())
 	h.eq({}, h.state().quits)
 end)
+
+local find_session = function(socket)
+	return vim.iter(require("servery").list_sessions("active")):find(function(s) return s.server.socket == socket end)
+end
+
+h.test("stopping another session stops it and leaves the UI where it is", function()
+	local other = h.spawn(h.dir("other"))
+
+	find_session(other):stop()
+
+	h.eq(false, h.is_running(other))
+	h.eq({}, h.connects())
+	h.eq({}, h.state().quits)
+end)
+
+h.test("stopping the current session moves the UI to another running session", function()
+	local other = h.spawn(h.dir("other"))
+	h.setup({ servers = function() return { vim.v.servername } end })
+
+	find_session(vim.v.servername):stop()
+
+	h.eq({ { server = other, bang = true } }, h.connects())
+end)
+
+h.test("stopping the current session refuses unsaved changes unless forced", function()
+	local other = h.spawn(h.dir("other"))
+	h.setup({ servers = function() return { vim.v.servername } end })
+	modify_file()
+	local current = find_session(vim.v.servername)
+
+	current:stop()
+	h.eq({}, h.connects())
+
+	current:stop(true)
+	h.eq({ { server = other, bang = true } }, h.connects())
+end)

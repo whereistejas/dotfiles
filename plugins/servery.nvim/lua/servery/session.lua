@@ -91,36 +91,66 @@ function Session:search_text()
 	return self:display_name() .. (title and (" " .. title) or "")
 end
 
-function Session:detach()
+---The name commands refer to the session by: its `:SvName`, else its display name
+---@return string
+function Session:name() return self.server and self.server.name or self:display_name() end
+
+---@param code string
+---@return any
+function Session:exec_lua(code)
+	local chan = vim.fn.sockconnect("pipe", self.server.socket, { rpc = true })
+	local out = vim.rpcrequest(chan, "nvim_exec_lua", code, {})
+	vim.fn.chanclose(chan)
+	return out
+end
+
+---@return string[]
+function Session:unsaved_files()
+	return self:exec_lua([[
+		local files = {}
+		for _, b in ipairs(vim.fn.getbufinfo({ bufmodified = 1 })) do
+			if vim.bo[b.bufnr].buftype == "" then
+				table.insert(files, vim.fn.fnamemodify(b.name, ":~:."))
+			end
+		end
+		return files
+	]])
+end
+
+---Stop the session, unless it has unsaved changes and `force` isn't set. The
+---UI attached to the current session moves to another running session first.
+---@param force boolean?
+function Session:stop(force)
 	if not self.server then
 		return
 	end
 
-	local chan = vim.fn.sockconnect("pipe", self.server.socket, { rpc = true })
-
-	local unsaved = vim.rpcrequest(
-		chan,
-		"nvim_exec_lua",
-		[[
-			return vim.tbl_filter(
-				function(b) return vim.bo[b.bufnr].buftype == "" end,
-				vim.fn.getbufinfo({ bufmodified = 1 })
-			)
-		]],
-		{}
-	) --[[@as table[] ]]
-
+	local unsaved = force == true and {} or self:unsaved_files()
 	if #unsaved > 0 then
-		local names = vim.tbl_map(function(b) return "`" .. vim.fn.fnamemodify(b.name, ":~:.") .. "`" end, unsaved)
-		local check = table.concat(names, ", ")
-		utils.notify_warn("Can't close session '%s' due to unsaved changes. Check %s", self:display_name(), check)
-	else
-		-- Slightly defer the :qall so we have time to close the channel, rather
-		-- than having it forcibly closed and show an annoying message
-		vim.rpcrequest(chan, "nvim_exec_lua", "vim.defer_fn(vim.cmd.qall, 100)", {})
+		local names = vim.tbl_map(function(f) return "`" .. f .. "`" end, unsaved)
+		utils.notify_error(
+			"Can't close session '%s' due to unsaved changes. Check %s",
+			self:name(),
+			table.concat(names, ", ")
+		)
+		return
 	end
 
-	vim.fn.chanclose(chan)
+	if self:status() == "Current" then
+		local next_session = vim.iter(require("servery").list_sessions("active")):find(
+			function(session) return session:status() ~= "Current" end
+		)
+		if next_session then
+			utils.switch_to(next_session.server.socket, true)
+		else
+			vim.cmd("qall!")
+		end
+		return
+	end
+
+	-- Defer the :qall so the request returns before the channel closes
+	self:exec_lua("vim.defer_fn(function() vim.cmd('qall!') end, 10)")
+	vim.wait(1000, function() return vim.uv.fs_stat(self.server.socket) == nil end, 10)
 end
 
 return Session

@@ -78,30 +78,12 @@ local setup_cmds = function()
 		if count or arg then
 			local session = get_session({ count = count, name = arg, only_running = true })
 			if session then
-				session:detach()
+				session:stop(args.bang)
 			elseif arg then
 				utils.notify_error("No such running server found '%s'", arg)
 			end
 		else
-			local unsaved = vim.tbl_filter(
-				function(b) return vim.bo[b.bufnr].buftype == "" end,
-				vim.fn.getbufinfo({ bufmodified = 1 })
-			)
-			if #unsaved > 0 and not args.bang then
-				local names = vim.tbl_map(function(b) return "`" .. vim.fn.fnamemodify(b.name, ":~:.") .. "`" end, unsaved)
-				utils.notify_error("Can't close session due to unsaved changes. Check %s", table.concat(names, ", "))
-				return
-			end
-
-			-- `:connect!` stops this server without checking for unsaved changes
-			local next_session = vim.iter(M.list_sessions("active")):find(
-				function(session) return session.server.socket ~= vim.v.servername end
-			)
-			if next_session then
-				utils.switch_to(next_session.server.socket, true)
-			else
-				vim.cmd("qall!")
-			end
+			Session.new(M.cwd(), { socket = vim.v.servername }):stop(args.bang)
 		end
 	end, {
 		nargs = "?",

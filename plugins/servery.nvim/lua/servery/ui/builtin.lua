@@ -31,7 +31,7 @@ local builtin_actions = {
 	detach = function()
 		local session = M.sessions[vim.api.nvim_win_get_cursor(0)[1] - 5]
 		if session then
-			session:detach()
+			session:stop()
 			vim.defer_fn(function() M.select() end, 400)
 		end
 	end,

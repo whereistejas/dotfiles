@@ -82,7 +82,7 @@ M.select = function()
 		end,
 		detach = function(session)
 			if session then
-				session:detach()
+				session:stop()
 				vim.defer_fn(function() MiniPick.set_picker_items(get_sessions()) end, 500)
 			end
 		end,

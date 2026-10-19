@@ -90,7 +90,7 @@ local fzf_actions = {
 			for _, text in ipairs(selection) do
 				local session = get_session(text)
 				if session then
-					session:detach()
+					session:stop()
 					vim.uv.sleep(500)
 				end
 			end

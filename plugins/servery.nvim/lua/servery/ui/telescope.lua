@@ -87,7 +87,7 @@ M.select = function()
 		detach = function(prompt_bufnr)
 			local entry = action_state.get_selected_entry()
 			if entry then
-				entry.value:detach()
+				entry.value:stop()
 				local picker = action_state.get_current_picker(prompt_bufnr)
 				vim.defer_fn(function() picker:refresh(new_finder()) end, 500)
 			end
