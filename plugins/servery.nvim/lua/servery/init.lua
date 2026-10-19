@@ -6,8 +6,21 @@ local M = {}
 ---@alias servery.ui_provider "builtin" | "snacks" | "fzf" | "telescope" | "mini_pick"
 ---@alias servery.action "switch" | "switch_and_detach" | "spawn" | "detach"
 
+---Sessions with `:SvName` `name`, else those whose display name is `name`
+---@param sessions servery.Session[]
+---@param name string
+---@return servery.Session[]
+local find_by_name = function(sessions, name)
+	local named = vim.tbl_filter(function(s) return s.server ~= nil and s.server.name == name end, sessions)
+	if #named > 0 then
+		return named
+	end
+	return vim.tbl_filter(function(s) return s:display_name() == name end, sessions)
+end
+
 ---@param opts { count: integer?, name: string?, status: ("any" | "active" | "inactive")? }
 ---@return servery.Session?
+---@return boolean ambiguous whether `name` matched several sessions
 local get_session = function(opts)
 	local sessions = M.list_sessions(opts.status)
 
@@ -28,13 +41,26 @@ local get_session = function(opts)
 	end
 
 	if opts.name then
-		---@diagnostic disable-next-line: param-type-mismatch
-		for _, session in ipairs(sessions) do
-			if session:display_name() == opts.name then
-				return session
-			end
+		local found = find_by_name(sessions, opts.name)
+		if #found > 1 then
+			utils.notify_error(
+				"Session name '%s' is ambiguous: %d sessions match. Name them with :SvName",
+				opts.name,
+				#found
+			)
+			return nil, true
 		end
+		return found[1], false
 	end
+
+	return nil, false
+end
+
+---@param sessions servery.Session[]
+---@return string[]
+local complete_names = function(sessions)
+	local names = vim.tbl_map(function(session) return session:name() end, sessions)
+	return vim.fn.uniq(vim.fn.sort(names))
 end
 
 local setup_cmds = function()
@@ -46,10 +72,10 @@ local setup_cmds = function()
 		assert(not (count and arg), "Cannot combine forms `:[N]Sv` and `:Sv [dir]`")
 
 		if count or arg then
-			local session = get_session({ count = count, name = arg })
+			local session, ambiguous = get_session({ count = count, name = arg })
 			if session then
 				session:switch()
-			elseif arg then
+			elseif arg and not ambiguous then
 				local stat = vim.uv.fs_stat(vim.fs.normalize(arg))
 				if stat and stat.type == "directory" then
 					utils.switch_to(spawn_nvim(arg), bang)
@@ -64,9 +90,7 @@ local setup_cmds = function()
 		nargs = "?",
 		count = true,
 		bang = true,
-		complete = function()
-			return vim.tbl_map(function(session) return session:display_name() end, M.list_sessions())
-		end,
+		complete = function() return complete_names(M.list_sessions()) end,
 	})
 
 	vim.api.nvim_create_user_command("SvStop", function(args)
@@ -76,10 +100,10 @@ local setup_cmds = function()
 		assert(not (count and arg), "Cannot combine forms `:[N]SvStop` and `:SvStop [server]`")
 
 		if count or arg then
-			local session = get_session({ count = count, name = arg, only_running = true })
+			local session, ambiguous = get_session({ count = count, name = arg, status = "active" })
 			if session then
 				session:stop(args.bang)
-			elseif arg then
+			elseif arg and not ambiguous then
 				utils.notify_error("No such running server found '%s'", arg)
 			end
 		else
@@ -89,9 +113,7 @@ local setup_cmds = function()
 		nargs = "?",
 		count = true,
 		bang = true,
-		complete = function()
-			return vim.tbl_map(function(session) return session:display_name() end, M.list_sessions("active"))
-		end,
+		complete = function() return complete_names(M.list_sessions("active")) end,
 	})
 
 	vim.api.nvim_create_user_command("SvName", function(args)

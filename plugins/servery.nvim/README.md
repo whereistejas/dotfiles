@@ -120,7 +120,8 @@ require("servery").setup({
 * `:SvStop[!]`: Close the current session and move to the last visited one. Use `!` to
   close it despite unsaved changes.
 * `:[N]SvStop`: Close the nth last visited session.
-* `:SvStop [dir]`: Close the session in `[dir]`.
+* `:SvStop [name]`: Close the session with that `:SvName`, else the one in the folder
+  `[name]`. A name that matches several sessions is an error.
 * `:SvName [name]`: Name the current session in the ui (no argument clears it).
   Unnamed sessions show the title of a terminal running in them, or the
   focused file
