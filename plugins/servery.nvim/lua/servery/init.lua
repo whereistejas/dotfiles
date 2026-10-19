@@ -82,6 +82,11 @@ local setup_cmds = function()
 			elseif arg then
 				utils.notify_error("No such running server found '%s'", arg)
 			end
+		else
+			local ok, err = pcall(vim.cmd, { cmd = "qall", bang = args.bang })
+			if not ok then
+				utils.notify_error("%s", tostring(err):match("E%d+:.*") or err)
+			end
 		end
 	end, {
 		nargs = "?",
