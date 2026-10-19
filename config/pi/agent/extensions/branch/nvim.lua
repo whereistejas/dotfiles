@@ -27,13 +27,25 @@ local function show(buf, pids)
   return own
 end
 
+-- The text area of the window showing pi, else of the current window. A terminal
+-- started under nvim_buf_call gets the 5-row autocmd window's size otherwise, and
+-- pi's TUI fully redraws its whole history on every frame at that height.
+local function pi_size(pids)
+  local win = pi_window(pids) or vim.api.nvim_get_current_win()
+  local info = vim.fn.getwininfo(win)[1]
+  return info.width - info.textoff, info.height
+end
+
 function M.open(a)
+  local width, height = pi_size(a.pids)
   local buf = vim.api.nvim_create_buf(true, false)
   vim.bo[buf].bufhidden = "hide"
   vim.api.nvim_buf_call(buf, function()
     vim.fn.jobstart(a.cmd, {
       term = true,
       cwd = a.cwd,
+      width = width,
+      height = height,
       on_exit = a.exit_file and function(_, code)
         local tail = vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_get_lines(buf, -60, -1, false) or {}
         vim.fn.writefile({ vim.json.encode({ code = code, tail = tail }) }, a.exit_file)
