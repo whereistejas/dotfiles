@@ -531,6 +531,15 @@ local function servery_pick()
 				vim.cmd.Sv(vim.fn.fnameescape(item.path))
 			end
 		end,
+		actions = {
+			stop_session = function(picker, item)
+				if not (item and item.sv and not item.pi) then return end
+				if item.sv:status() == "Current" then picker:close() end
+				item.sv:stop()
+				if not picker.closed then picker:refresh() end
+			end,
+		},
+		win = { input = { keys = { ["<c-x>"] = { "stop_session", mode = { "n", "i" } } } } },
 	})
 end
 
