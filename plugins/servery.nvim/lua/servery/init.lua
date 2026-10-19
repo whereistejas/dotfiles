@@ -190,6 +190,8 @@ end
 ---@field title string?
 ---@field useractive integer?
 ---@field starttime integer?
+---@field name string?
+---@field pi servery.Pi[]
 
 ---A neovim session may move to a different cwd, e.g. using :cd. servery.nvim
 ---keeps a record of where the session originally started, e.g. session name
@@ -270,6 +272,9 @@ local get_server_info = function(server)
 	})
 	local title = vim.rpcrequest(chan, "nvim_exec_lua", title_code, {})
 	out.server.title = type(title) == "string" and title or nil
+	local info = vim.rpcrequest(chan, "nvim_exec_lua", require("servery.pi").remote_code, {})
+	out.server.name = info.name
+	out.server.pi = info.pi
 	vim.fn.chanclose(chan)
 	return out
 end
