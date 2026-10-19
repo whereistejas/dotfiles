@@ -60,6 +60,8 @@ require("servery").setup({
 		)
 	end,
 	session_dir = vim.fs.normalize(vim.fs.joinpath(vim.fn.stdpath("run"), "..", "servery")),
+	-- Where `:SvSave` keeps saved sessions.
+	saved_dir = vim.fs.joinpath(vim.fn.stdpath("state"), "servery", "saved"),
 	-- Command and additional argument(s) used to start a new session. servery appends
 	-- `--headless --listen {socket}`.
 	-- default uses `vim.v.progpath` / current running nvim, user can add
@@ -120,6 +122,9 @@ require("servery").setup({
 * `:SvName [name]`: Name the current session in the ui (no argument clears it).
   Unnamed sessions show the title of a terminal running in them, or the
   focused file
+* `:SvSave [name]`: Save the current session by name (defaults to its `:SvName`)
+  so it can be reopened later, including `pi` terminals (`pi --session`).
+* `:SvClosed`: Pick a saved session that isn't running and reopen it.
 
 Keymaps should be set up manually:
 

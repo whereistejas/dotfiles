@@ -95,6 +95,28 @@ local setup_cmds = function()
 	vim.api.nvim_create_user_command("SvName", function(args)
 		vim.g.servery_name = args.args ~= "" and args.args or nil
 	end, { nargs = "?" })
+
+	vim.api.nvim_create_user_command(
+		"SvSave",
+		function(args) require("servery.saved").save({ name = args.args ~= "" and args.args or nil }) end,
+		{ nargs = "?" }
+	)
+
+	vim.api.nvim_create_user_command("SvClosed", function()
+		local saved = require("servery.saved")
+		vim.ui.select(saved.list({ closed = true }), {
+			prompt = "Restore Closed Session",
+			format_item = function(item)
+				local pis = #item.pi > 0 and string.format(", %d pi", #item.pi) or ""
+				local when = os.date("%Y-%m-%d %H:%M", item.saved_at)
+				return string.format("%s (%s%s, saved %s)", item.name, vim.fn.fnamemodify(item.cwd, ":~"), pis, when)
+			end,
+		}, function(item)
+			if item then
+				saved.restore(item.name)
+			end
+		end)
+	end, {})
 end
 
 cfg_defaults = function()
@@ -112,6 +134,7 @@ cfg_defaults = function()
 			)
 		end,
 		session_dir = vim.fs.normalize(vim.fs.joinpath(vim.fn.stdpath("run") --[[@as string]], "..", "servery")),
+		saved_dir = vim.fs.joinpath(vim.fn.stdpath("state") --[[@as string]], "servery", "saved"),
 		---@type string[]
 		spawn_cmd = { vim.v.progpath },
 		ui = {
@@ -358,8 +381,10 @@ M.show_ui = function(provider)
 	require("servery.ui." .. provider).select()
 end
 
+---@param dir string
+---@param extra_args? string[]
 ---@return string
-spawn_nvim = function(dir)
+spawn_nvim = function(dir, extra_args)
 	dir = vim.fs.normalize(dir)
 	local stat = vim.uv.fs_stat(dir)
 	assert(stat and stat.type == "directory", string.format("`%s` is not a directory", dir))
@@ -367,6 +392,7 @@ spawn_nvim = function(dir)
 	local server_name = vim.fs.basename(dir):sub(1, 5) .. "-" .. os.date("%Y%m%d-%H%M%S") .. ".pipe"
 	local server_file = vim.fs.joinpath(M.get_cfg().session_dir, server_name)
 	local cmd = vim.list_extend(vim.deepcopy(M.get_cfg().spawn_cmd), { "--headless", "--listen", server_file })
+	vim.list_extend(cmd, extra_args or {})
 	local cmd_str = table.concat(cmd, " ")
 
 	local chan = vim.fn.jobstart(cmd, { detach = true, cwd = dir })
