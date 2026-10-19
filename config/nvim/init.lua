@@ -106,7 +106,6 @@ vim.pack.add({
 
 	-- Picker / QoL
 	"https://github.com/folke/snacks.nvim",
-	{ src = "https://github.com/whereistejas/servery.nvim", version = "session-titles" },
 
 	-- Treesitter
 	"https://github.com/nvim-treesitter/nvim-treesitter",
@@ -123,6 +122,8 @@ vim.pack.add({
 vim.opt.rtp:prepend(vim.fn.expand("~/build/jumanji.nvim"))
 -- pi.nvim (pi terminal helpers) — local checkout, likewise.
 vim.opt.rtp:prepend(vim.fn.expand("~/build/pi.nvim"))
+-- servery.nvim (per-directory nvim sessions) — local checkout, likewise.
+vim.opt.rtp:prepend(vim.fn.expand("~/build/git/servery.nvim"))
 
 -- Statusline — nvim's default, plus the jj workspace (unless default) and change
 -- id of the window's repo: the one a pi terminal runs in, else the file's or cwd's.

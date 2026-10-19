@@ -81,7 +81,7 @@ The Neovim config expects these external tools to be installed:
 Managed via `vim.pack` (Neovim's built-in package manager):
 
 - snacks.nvim (pickers, explorer, images)
-- servery.nvim (switch between per-directory nvim sessions)
+- servery.nvim (switch between per-directory nvim sessions; loaded from the local checkout `~/build/git/servery.nvim`, not vim.pack)
 - nvim-treesitter, nvim-treesitter-textobjects
 - nvim-lspconfig (completion via Neovim's built-in LSP client)
 - mini.diff, gitsigns.nvim (inline line blame only)
