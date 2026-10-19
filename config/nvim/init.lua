@@ -420,27 +420,66 @@ require("servery").setup({
 	ui = { provider = "snacks" },
 })
 
--- Session switcher: servery sessions/dirs first, then every folder under
--- ~/build streamed in from fd (gitignore-aware). Snacks fuzzy-ranks as you
--- type (score, then shortest path) and only renders the visible rows.
+-- One-time migration of running sessions to named saves (see lua/servery_migrate.lua).
+vim.api.nvim_create_user_command("SvMigrate", function() require("servery_migrate").run() end, {})
+
+local pi_status = {
+	running = { icon = "●", hl = "ServeryPiRunning", link = "DiagnosticWarn" },
+	idle = { icon = "○", hl = "ServeryPiIdle", link = "DiagnosticOk" },
+	unknown = { icon = "?", hl = "ServeryPiUnknown", link = "Comment" },
+	exited = { icon = "×", hl = "ServeryPiExited", link = "DiagnosticError" },
+}
+
+-- Session switcher: running sessions (with their pi terminals as children)
+-- first, then every folder under ~/build streamed in from fd (gitignore-aware).
+-- Snacks fuzzy-ranks the folders as you type (score, then shortest path) and
+-- only renders the visible rows; sessions keep their order, and a pi row that
+-- matches keeps its session row visible.
 local function servery_pick()
 	local servery = require("servery")
+	local pi = require("servery.pi")
 	local icons = servery.get_cfg().ui.icons
 	local root = vim.fs.normalize("~/build")
 	local seen = {}
+
+	for _, status in pairs(pi_status) do
+		vim.api.nvim_set_hl(0, status.hl, { link = status.link, default = true })
+	end
+
 	Snacks.picker.pick({
 		source = "servery",
 		title = "Switch Nvim Session",
 		layout = { preview = false },
+		tree = true,
+		matcher = { keep_parents = true },
+		sort = function(a, b)
+			local ra, rb = a.parent or a, b.parent or b
+			if ra == rb then return a.idx < b.idx end
+			if (ra.sv ~= nil) ~= (rb.sv ~= nil) then return ra.sv ~= nil end
+			if ra.sv then return ra.idx < rb.idx end
+			if a.score ~= b.score then return a.score > b.score end
+			if #a.text ~= #b.text then return #a.text < #b.text end
+			return a.idx < b.idx
+		end,
 		finder = {
 			function()
 				seen = {}
-				local items = {}
-				for _, sv in ipairs(servery.get_picker_items()) do
-					if not seen[sv.cwd] then
+				local items, sockets = {}, {}
+				for _, sv in ipairs(servery.list_sessions("active")) do
+					if not sockets[sv.server.socket] then
+						sockets[sv.server.socket] = true
 						seen[sv.cwd] = true
 						local dir, title = vim.fn.fnamemodify(sv.cwd, ":~"), sv:title()
-						items[#items + 1] = { text = title and (dir .. " " .. title) or dir, dir = dir, title = title, path = sv.cwd, sv = sv }
+						local item = { text = title and (dir .. " " .. title) or dir, dir = dir, title = title, path = sv.cwd, sv = sv }
+						items[#items + 1] = item
+
+						local last
+						for _, p in ipairs(sv.server.pi) do
+							local label = pi.label(p, sv.cwd)
+							last = { text = p.branch and (label .. " " .. p.branch) or label, label = label, pi = p, sv = sv, parent = item }
+							items[#items + 1] = last
+						end
+						if last then last.last = true end
 					end
 				end
 				return items
@@ -458,8 +497,18 @@ local function servery_pick()
 				}), ctx)
 			end,
 		},
-		format = function(item)
+		format = function(item, picker)
 			local sv = item.sv
+			if item.pi then
+				local status = pi_status[item.pi.status] or pi_status.unknown
+				local ret = Snacks.picker.format.tree(item, picker)
+				ret[#ret + 1] = { status.icon, status.hl }
+				ret[#ret + 1] = { "  " }
+				ret[#ret + 1] = { item.label }
+				if item.pi.branch then ret[#ret + 1] = { " [" .. item.pi.branch .. "]", "ServeryTitle" } end
+				if item.pi.win == nil then ret[#ret + 1] = { "  hidden", "SnacksPickerDimmed" } end
+				return ret
+			end
 			if not sv then return { { icons.inactive, "ServeryIconInactive" }, { "  " }, { item.text } } end
 			local status = sv:status()
 			return {
@@ -473,9 +522,78 @@ local function servery_pick()
 		end,
 		confirm = function(picker, item)
 			if not item then return end
-			if item.sv then item.sv:switch() else servery.switch({ dir = item.path }) end
 			picker:close()
+			if item.pi then
+				pi.jump(item.sv, item.pi)
+			elseif item.sv then
+				item.sv:switch()
+			else
+				vim.cmd.Sv(vim.fn.fnameescape(item.path))
+			end
 		end,
+	})
+end
+
+-- Closed-session picker: named saves (newest first) whose nvim isn't running,
+-- with the pi terminals they will resume as children.
+local function servery_closed_pick()
+	local saved = require("servery.saved")
+	local pi = require("servery.pi")
+
+	Snacks.picker.pick({
+		source = "servery_closed",
+		title = "Closed Nvim Sessions",
+		layout = { preview = false },
+		tree = true,
+		matcher = { keep_parents = true },
+		sort = { fields = { "idx" } },
+		finder = function()
+			local items = {}
+			for _, s in ipairs(saved.list({ closed = true })) do
+				local dir = vim.fn.fnamemodify(s.cwd, ":~")
+				local item = { text = s.name .. " " .. dir, name = s.name, dir = dir, saved = s }
+				items[#items + 1] = item
+
+				local last
+				for _, p in ipairs(s.pi) do
+					local label = pi.label(p, s.cwd)
+					last = { text = p.branch and (label .. " " .. p.branch) or label, label = label, branch = p.branch, saved = s, parent = item }
+					items[#items + 1] = last
+				end
+				if last then last.last = true end
+			end
+			return items
+		end,
+		format = function(item, picker)
+			if item.parent then
+				local ret = Snacks.picker.format.tree(item, picker)
+				ret[#ret + 1] = { item.label }
+				if item.branch then ret[#ret + 1] = { " [" .. item.branch .. "]", "ServeryTitle" } end
+				return ret
+			end
+			return {
+				{ item.name },
+				{ "  " },
+				{ item.dir, "ServeryLineInactive" },
+				{ "  " },
+				{ Snacks.picker.util.reltime(item.saved.saved_at), "ServeryTime" },
+			}
+		end,
+		confirm = function(picker, item)
+			if not item then return end
+			picker:close()
+			saved.restore(item.saved.name)
+		end,
+		actions = {
+			delete_saved = function(picker, item)
+				if not item then return end
+				local name = item.saved.name
+				if vim.fn.confirm(("Delete saved session '%s'?"):format(name), "&Yes\n&No", 2) ~= 1 then return end
+				saved.delete(name)
+				picker:refresh()
+			end,
+		},
+		win = { input = { keys = { ["<c-x>"] = { "delete_saved", mode = { "n", "i" } } } } },
 	})
 end
 
@@ -894,6 +1012,7 @@ end
 
 -- servery
 vim.keymap.set("n", "<space>s", servery_pick, { desc = "Switch nvim sessions" })
+vim.keymap.set("n", "<space>S", servery_closed_pick, { desc = "Closed nvim sessions" })
 vim.keymap.set("n", "ZV", "<cmd>1Sv<cr>", { desc = "Go to previous session" })
 
 -- snacks picker
