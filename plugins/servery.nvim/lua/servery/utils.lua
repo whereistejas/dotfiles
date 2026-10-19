@@ -32,7 +32,7 @@ M.switch_to = function(server, detach)
 		-- exists.
 		local ok = vim.wait(1000, function() return vim.uv.fs_stat(server) ~= nil end, 100)
 		assert(ok, "Failed to connect to session " .. server)
-		vim.cmd({ cmd = "connect", args = { server }, bang = detach ~= nil })
+		vim.cmd({ cmd = "connect", args = { server }, bang = detach == true })
 	end
 end
 
