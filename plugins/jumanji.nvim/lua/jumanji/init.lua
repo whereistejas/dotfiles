@@ -83,6 +83,17 @@ local function message_body(message)
 	return body
 end
 
+-- Graph characters with an edge running down out of them.
+local CONTINUES_DOWN = { ["│"] = true, ["├"] = true, ["┤"] = true, ["╭"] = true, ["╮"] = true, ["┼"] = true, ["┬"] = true }
+
+-- The graph prefix for lines below a description row: just the edges that
+-- carry on downward, so a merge's "├─╮" continues as "│ │".
+local function continuation(graph)
+	return (graph:gsub("[%z\1-\127\194-\244][\128-\191]*", function(ch)
+		return CONTINUES_DOWN[ch] and "│" or " "
+	end))
+end
+
 -- Display items, one per buffer line: jj's rows plus, under each expanded
 -- commit's description row, the rest of its message and its changed files.
 local function build_items(view)
@@ -93,7 +104,7 @@ local function build_items(view)
 
 		local files = row.kind == "description" and view.expanded[c.change_id] and file_cache[c.commit_id]
 		if files then
-			local graph = row.graph
+			local graph = continuation(row.graph)
 			local body = message_body(c.message)
 			for _, text in ipairs(body) do
 				items[#items + 1] = { kind = "message", graph = graph, commit = c, text = text }
