@@ -42,6 +42,12 @@ function M.start(root, on_change)
 	w.listeners[on_change] = (w.listeners[on_change] or 0) + 1
 end
 
+---@param root string
+---@return boolean
+function M.watching(root)
+	return watchers[root] ~= nil
+end
+
 --- Release one `start` of `on_change` on the root; the last one closes the watcher.
 ---@param root string
 ---@param on_change fun(root: string)
