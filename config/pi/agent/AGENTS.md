@@ -26,6 +26,11 @@ Ask for explicit confirmation before you:
 - Add a dependency
 - Start a long-running background process
 
+Exception: create and remove jj workspaces for your own or a subagent's work with
+`agent-workspace` (see Version control → Agent workspaces) without asking, including the
+warm-up build it starts and deleting a workspace's folder once its work is integrated or
+dropped.
+
 Never run `find /` or other filesystem-wide scans from the root; scope searches to the
 project or a known directory.
 
@@ -88,18 +93,27 @@ project or a known directory.
 
 Always use `jj` instead of `git` for VCS operations (status, diff, log, bookmarks, etc.).
 
-### Workspaces are always Git-colocated
+### Agent workspaces
 
-Create every jj workspace with `--colocate`, so it gets its own Git worktree and
-git-based tooling (editors, hooks, build scripts) works in it:
+Create and remove jj workspaces with `agent-workspace` (the dotfiles' `scripts/`, on
+`PATH`), never with raw `jj workspace add` / `forget` / `rm -rf`:
 
 ```bash
-jj workspace add --colocate --name <name> -r <parent> <path>
+agent-workspace add <name> [<revision>]  # sibling <repo>-<name>; prints dir=<path>, and brief=<line> in Rust
+agent-workspace remove <dir>             # stops its warm-up, forgets it (edits stay in its commit), deletes it
 ```
 
-This overrides any skill that says workspaces lack `.git/`. Remove one with
-`jj workspace forget <name>` (which also removes the Git worktree), then delete the
-directory.
+- It always passes `--colocate`, so the workspace gets its own Git worktree and
+  git-based tooling (editors, hooks, build scripts) works in it. This overrides any
+  skill that says workspaces lack `.git/`
+- In a Rust project, `add` clones the source workspace's `target/` (APFS clonefile:
+  instant, no extra disk) and starts a background warm-up build, so nobody waits
+  minutes on a cold build. Put its `brief=` line into the task of whoever works there,
+  and don't wait for the warm-up yourself: research and edit meanwhile
+- Clean up everything you created once the work is integrated or dropped:
+  `agent-workspace remove <dir>` for a `pi -p` subagent's workspace, `branch close` for
+  a branch (it also wipes the branch's Neovim buffer). A subagent never removes its own
+  workspace
 
 ### Avoiding interactive jj commands
 
