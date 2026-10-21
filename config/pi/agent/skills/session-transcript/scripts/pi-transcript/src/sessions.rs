@@ -57,32 +57,29 @@ pub fn default_sessions_dir() -> PathBuf {
     PathBuf::from(home).join(".pi/agent/sessions")
 }
 
-/// All `<sessions-dir>/*/*.jsonl` paths.
+/// Every `.jsonl` under `<sessions-dir>`, at any depth: sessions sit at
+/// `<cwd>/<session>.jsonl`, forks at `<cwd>/<session>/forks/<fork>.jsonl`.
 pub fn session_files(root: &Path) -> Result<Vec<PathBuf>, Error> {
     if !root.is_dir() {
         return Err(Error::NoSessionsDir(root.display().to_string()));
     }
     let mut files = Vec::new();
-    for dir in std::fs::read_dir(root).map_err(io(root))? {
-        let dir = match dir {
-            Ok(d) => d,
+    let mut dirs = vec![root.to_path_buf()];
+    while let Some(dir) = dirs.pop() {
+        let listing = match std::fs::read_dir(&dir) {
+            Ok(l) => l,
+            Err(err) if dir == root => return Err(io(root)(err)),
             Err(_) => continue,
         };
-        let p = dir.path();
-        if !p.is_dir() {
-            if p.extension().is_some_and(|e| e == "jsonl") {
+        for item in listing.flatten() {
+            let Ok(file_type) = item.file_type() else {
+                continue;
+            };
+            let p = item.path();
+            if file_type.is_dir() {
+                dirs.push(p);
+            } else if p.extension().is_some_and(|e| e == "jsonl") {
                 files.push(p);
-            }
-            continue;
-        }
-        let inner = match std::fs::read_dir(&p) {
-            Ok(i) => i,
-            Err(_) => continue,
-        };
-        for f in inner.flatten() {
-            let fp = f.path();
-            if fp.extension().is_some_and(|e| e == "jsonl") {
-                files.push(fp);
             }
         }
     }
