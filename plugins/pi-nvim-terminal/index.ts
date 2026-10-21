@@ -7,7 +7,7 @@
  * - renames the buffer to `term://<cwd>//<pid>:pi --session <file>`, so
  *   `:mksession` restores the terminal by resuming this session
  * - sets `b:pi_session = { id, file, cwd, name?, status, pid }`, with status
- *   "running" during a turn and "idle" otherwise
+ *   "running" until the agent settles, "blocked" during UI prompts, "idle" otherwise
  *
  * Outside the TUI (e.g. `pi -p` subagents, which would find their parent's
  * terminal), without $NVIM, or when the buffer can't be found, it does nothing.
@@ -22,7 +22,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 const LUA = path.join(path.dirname(fileURLToPath(import.meta.url)), "nvim.lua");
 const run = promisify(execFile);
 
-type Status = "idle" | "running";
+type Status = "idle" | "running" | "blocked";
 
 interface PiSession {
 	id: string;
@@ -47,6 +47,8 @@ const vimString = (s: string) => `'${s.replace(/'/g, "''")}'`;
 
 export default function (pi: ExtensionAPI) {
 	let enabled = false;
+	let blocked = false;
+	const status = (ctx: ExtensionContext): Status => blocked ? "blocked" : ctx.isIdle() ? "idle" : "running";
 	let pids: number[] | undefined;
 	let buf: number | undefined;
 	let queue: Promise<void> = Promise.resolve();
@@ -85,7 +87,7 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {
 		enabled = ctx.mode === "tui";
 		void enqueue("register", () => {
-			const info = session(ctx, ctx.isIdle() ? "idle" : "running");
+			const info = session(ctx, status(ctx));
 			return { file: info.file, session: info };
 		});
 	});
@@ -94,12 +96,22 @@ export default function (pi: ExtensionAPI) {
 		void enqueue("update", () => ({ status: "running", name: pi.getSessionName() }));
 	});
 
-	pi.on("agent_end", () => {
-		void enqueue("update", () => ({ status: "idle", name: pi.getSessionName() }));
+	pi.on("agent_settled", (_event, ctx) => {
+		void enqueue("update", () => ({ status: status(ctx), name: pi.getSessionName() }));
+	});
+
+	pi.on("ui_prompt_start", (_event, ctx) => {
+		blocked = true;
+		void enqueue("update", () => ({ status: status(ctx), name: pi.getSessionName() }));
+	});
+
+	pi.on("ui_prompt_end", (_event, ctx) => {
+		blocked = false;
+		void enqueue("update", () => ({ status: status(ctx), name: pi.getSessionName() }));
 	});
 
 	pi.on("session_info_changed", (event, ctx) => {
-		void enqueue("update", () => ({ status: ctx.isIdle() ? "idle" : "running", name: event.name }));
+		void enqueue("update", () => ({ status: status(ctx), name: event.name }));
 	});
 
 	pi.on("session_shutdown", async () => {

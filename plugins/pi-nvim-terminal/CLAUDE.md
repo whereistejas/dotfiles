@@ -11,8 +11,8 @@ pi loads `index.ts` through `jiti`, so there is no build step. After an edit, ru
 
 ## Tests
 
-No suite yet. `index.ts` has only type imports from pi, so it loads under
-`node --test`. `nvim.lua` is tested from a headless nvim that `dofile`s it.
+Run `node --test`. `index.test.ts` exercises lifecycle status updates with
+stubbed child processes, without contacting the user's Neovim session.
 
 ## Neovim side
 
