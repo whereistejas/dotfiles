@@ -119,11 +119,11 @@ vim.pack.add({
 })
 
 -- jumanji (jj UI) — local checkout, loaded straight from the working copy.
-vim.opt.rtp:prepend(vim.fn.expand("~/build/jumanji.nvim"))
+vim.opt.rtp:prepend(vim.fn.expand("~/build/plugins/jumanji.nvim"))
 -- pi.nvim (pi terminal helpers) — local checkout, likewise.
-vim.opt.rtp:prepend(vim.fn.expand("~/build/pi.nvim"))
+vim.opt.rtp:prepend(vim.fn.expand("~/build/plugins/pi.nvim"))
 -- servery.nvim (per-directory nvim sessions) — local checkout, likewise.
-vim.opt.rtp:prepend(vim.fn.expand("~/build/git/servery.nvim"))
+vim.opt.rtp:prepend(vim.fn.expand("~/build/plugins/servery.nvim"))
 
 -- Statusline — nvim's default, plus the jj workspace (unless default) and change
 -- id of the window's repo: the one a pi terminal runs in, else the file's or cwd's.
