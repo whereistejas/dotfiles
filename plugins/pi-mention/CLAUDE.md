@@ -11,9 +11,8 @@ pi loads `index.ts` through `jiti`, so there is no build step. After an edit, ru
 
 ## Tests
 
-No suite yet. `index.ts` imports `pi-tui` at runtime, so it can't load under
-`node --test`. Logic worth testing (parsing `@<path>:<query>`, matching
-bookmarks and commits) moves into a module of its own first.
+Run `node --test`. `index.test.ts` uses a Node module hook to stub `pi-tui`
+and exercises bounded subprocess output and truncation through autocomplete.
 
 ## pi runtime
 

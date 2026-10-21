@@ -65,6 +65,7 @@ type RepoData = {
 
 const FIELD = "\x1f"; // unit separator between fields in the jj template output
 const MAX_SUGGESTIONS = 20;
+const MAX_OUTPUT_BYTES = 1024 * 1024;
 const CACHE_TTL_MS = 5_000;
 const ROOT_CACHE_TTL_MS = 30_000;
 // Keeps details aligned with pi's file suggestions (32-col primary column incl. 2-col gap).
@@ -257,12 +258,13 @@ async function fetchBookmarks(pi: ExtensionAPI, cwd: string): Promise<Bookmark[]
 		result = await pi.exec("jj", ["bookmark", "list", "--all-remotes", "-T", template], {
 			cwd,
 			timeout: 5_000,
+			maxBuffer: MAX_OUTPUT_BYTES,
 		});
 	} catch {
 		return [];
 	}
 
-	if (result.code !== 0) {
+	if (result.code !== 0 || result.truncated) {
 		return [];
 	}
 
@@ -308,13 +310,13 @@ async function fetchCommits(pi: ExtensionAPI, cwd: string): Promise<Commit[]> {
 				"-T",
 				template,
 			],
-			{ cwd, timeout: 15_000 },
+			{ cwd, timeout: 15_000, maxBuffer: MAX_OUTPUT_BYTES },
 		);
 	} catch {
 		return [];
 	}
 
-	if (result.code !== 0) {
+	if (result.code !== 0 || result.truncated) {
 		return [];
 	}
 
@@ -348,9 +350,9 @@ function createRootResolver(pi: ExtensionAPI) {
 		}
 
 		const result = await pi
-			.exec("jj", ["root", "--ignore-working-copy"], { cwd: dir, timeout: 5_000 })
+			.exec("jj", ["root", "--ignore-working-copy"], { cwd: dir, timeout: 5_000, maxBuffer: MAX_OUTPUT_BYTES })
 			.catch(() => undefined);
-		if (!result || result.code !== 0) {
+		if (!result || result.code !== 0 || result.truncated) {
 			return undefined;
 		}
 		const root = result.stdout.trim();
@@ -585,8 +587,8 @@ export default function (pi: ExtensionAPI): void {
 		}
 
 		// Only activate when jj is installed; otherwise every path probe would shell out in vain.
-		const version = await pi.exec("jj", ["--version"], { timeout: 5_000 }).catch(() => undefined);
-		if (!version || version.code !== 0) {
+		const version = await pi.exec("jj", ["--version"], { timeout: 5_000, maxBuffer: MAX_OUTPUT_BYTES }).catch(() => undefined);
+		if (!version || version.code !== 0 || version.truncated) {
 			return;
 		}
 
