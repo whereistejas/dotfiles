@@ -13,6 +13,13 @@
     "git:github.com/mvzink/jj-hunk-tool",
     "npm:@ff-labs/pi-fff"
   ],
+  "extensions": [
+    "~/build/pi-branch",
+    "~/build/pi-nvim-terminal",
+    "~/build/pi-window-title",
+    "~/build/pi-minimal-footer",
+    "~/build/pi-jj-commit-mention"
+  ],
   "quietStartup": true,
   "tuiMode": "regular",
   "hideThinkingBlock": false,
