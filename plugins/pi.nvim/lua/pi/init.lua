@@ -1,5 +1,10 @@
 local M = {}
 
+local function runs_pi(cmd)
+	local program = cmd and cmd:match("^%S+")
+	return program ~= nil and vim.fs.basename(program) == "pi"
+end
+
 --- The directory pi runs in, if `buf` is a terminal running pi. Neovim names
 --- a terminal buffer term://<job cwd>//<pid>:<command>, with the command's
 --- program resolved to its path when started from an argument list.
@@ -10,9 +15,29 @@ function M.cwd(buf)
 	if vim.bo[buf].buftype ~= "terminal" then return nil end
 
 	local cwd, cmd = vim.api.nvim_buf_get_name(buf):match("^term://(.-)//%d+:(.*)$")
-	local program = cmd and cmd:match("^%S+")
-	if not program or vim.fs.basename(program) ~= "pi" then return nil end
+	if not runs_pi(cmd) then return nil end
 	return cwd
+end
+
+--- Start the pi terminals a session restored as unloaded buffers. :mksession
+--- saves a hidden terminal as a bare `badd term://…`, whose job only starts
+--- once the buffer is shown. A shown terminal leaves an unlisted, unloaded
+--- buffer behind when the session renames it back to its saved name.
+function M.resume_hidden()
+	local info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
+	for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+		local cwd, cmd = vim.api.nvim_buf_get_name(buf):match("^term://(.-)//%d+:(.*)$")
+		if vim.bo[buf].buflisted and not vim.api.nvim_buf_is_loaded(buf) and runs_pi(cmd) then
+			-- Loading runs nvim's term:// BufReadCmd, which would start the job in
+			-- the 5-row autocmd window; pi's TUI redraws its whole history on every
+			-- frame at that height. A b:term_title makes it skip the buffer.
+			vim.b[buf].term_title = cmd
+			vim.fn.bufload(buf)
+			vim.api.nvim_buf_call(buf, function()
+				vim.fn.jobstart(cmd, { term = true, cwd = cwd, width = info.width - info.textoff, height = info.height })
+			end)
+		end
+	end
 end
 
 --- The root of the jj workspace pi runs in, if `buf` is a terminal running pi.

@@ -1,13 +1,14 @@
 # pi.nvim
 
 Helpers for pi terminals in Neovim: finds the terminal pi runs in, its directory and
-jj workspace root, and `:Pi` types a slash command into it. The shared rules (tests
+jj workspace root, and `:Pi` types a slash command into it. After a session loads,
+it starts the pi terminals the session restored hidden. The shared rules (tests
 first, code hygiene, commits) are in `../CLAUDE.md`.
 
 ## Tests
 
-No suite yet. The first change that needs one adds `tests/run.lua`, modelled on
-`../servery.nvim/tests`.
+Run `nvim --clean -l tests/run.lua [filter]`. Tests spawn headless nvims with this
+plugin and a fake `pi` on their `PATH` (`tests/helpers.lua`).
 
 ## Conventions
 
