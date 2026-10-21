@@ -1,9 +1,8 @@
 # servery.nvim
 
-## Tests first
+The shared rules (tests first, code hygiene, commits) are in `../CLAUDE.md`.
 
-For every feature request or bug fix, first encode the requirements as tests in
-`tests/`, run them and watch the new ones fail, then implement until they pass.
+## Tests
 
 Run the suite with:
 
@@ -16,20 +15,13 @@ Tests spawn real headless nvims on sockets under `/tmp`. `:connect` and `:qall` 
 recorded rather than run (see `tests/helpers.lua`), so a test asserts on what servery
 *would* do to the attached UI and the current server.
 
-## Code hygiene
+## Conventions
 
-- **Abstractions over decision trees.** When a feature adds cases, extend or create a
-  small abstraction with a clean API (a method on `Session`, a function in the module
-  that owns the concept) instead of growing `if`/`elseif` chains in command handlers.
-  Command handlers parse arguments and delegate.
-- **One way to do a thing.** Reuse existing helpers (`utils.switch_to`,
-  `Session:switch`, `list_sessions`) rather than re-implementing their logic inline.
-  Duplicated logic (e.g. the unsaved-buffers check) belongs in one function.
-- **No bloat.** The smallest change that meets the requirement. No speculative options,
-  no dead code, no unused parameters, no defensive checks for states that can't occur.
-- **Sparse comments.** Comment only the *why* that the code can't say: a Neovim quirk,
-  a non-obvious constraint. Never narrate what the next line does.
+- Command handlers parse arguments and delegate to a method on `Session` or a
+  function in the module that owns the concept.
+- Reuse `utils.switch_to`, `Session:switch` and `list_sessions` rather than
+  re-implementing them. Checks used in several places, such as the unsaved-buffers
+  check, live in one function.
 - **Explicit booleans.** Compare optional flags with `== true`, never `~= nil`; `false`
   is not `nil`.
-- **Match the surrounding style.** Tabs, `stylua.toml`, existing naming, LuaLS
-  annotations on public functions.
+- Tabs, `stylua.toml`.
