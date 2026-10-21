@@ -90,6 +90,8 @@ Complements the `subagents` skill, which stays for parallel fan-out.
     clones the parent's `target/` and starts a background warm-up build, so the
     worker doesn't wait minutes on a cold build. The script prints a brief line
     about that build (its log, what not to do), which the worker's brief carries.
+  - The brief tells the worker the parent removes the workspace; it never removes
+    it itself.
 - **Model** (flow A): inherit the parent model unless `model` is given. Only pick
   `claude-haiku-4-5` when the fork fits comfortably within 200K tokens. Flow B keeps
   its model.
@@ -123,6 +125,20 @@ Complements the `subagents` skill, which stays for parallel fan-out.
   idle/exited), buffer, model, cwd.
 - `/fg <name>`: show that branch's buffer in the current window. The user can
   type into it directly (native pi steering). `:b#` goes back.
+
+## Closing a branch
+
+`branch({ action: "close", name })`, called by the receiver agent once the report
+is handled and the branch's commits are integrated (or dropped):
+
+- Refused while the worker is running.
+- Delivers any report still in the inbox, then stops tracking the branch.
+- Wipes the worker's terminal buffer, which ends its pi.
+- For a write branch, `agent-workspace remove`: stops the warm-up build, forgets
+  the jj workspace (snapshotting any uncommitted edits into its commit, which
+  stays in the repo) and deletes the folder.
+- Deletes `~/.pi/agent/branches/<branch-id>/`. A terminal that exits after that
+  writes no exit file.
 
 ## Lessons borrowed from pi-subagents
 
@@ -216,7 +232,8 @@ session files, nvim buffer, cwd, workspace, status), `to-receiver/`,
 6. **Writer branch.** "Port module X in the background." `branch start` with
    `write: true` creates the workspace `../dotfiles-port-x` and the worker edits
    there. The report lists change ids; integrating them is a normal jj step done
-   by the receiver agent (`jj-subagent-workspaces` skill).
+   by the receiver agent (`jj-subagent-workspaces` skill), which then calls
+   `branch close` to wipe the buffer and remove the workspace.
 7. **Receiver gone.** The user closes the receiver pi before the worker finishes.
    The report waits in the inbox and is delivered when that session is resumed.
 8. **Out of scope check.** pi isn't inside nvim → `/bg` and `branch start` fail

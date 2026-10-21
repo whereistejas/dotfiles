@@ -60,6 +60,7 @@ export function writeJson(file: string, data: unknown): void {
 }
 
 export const saveMeta = (meta: Meta) => writeJson(metaFile(meta.id), meta);
+export const removeBranch = (id: string) => fs.rmSync(branchDir(id), { recursive: true, force: true });
 export const loadMeta = (id: string) => readJson<Meta>(metaFile(id));
 
 export function listMetas(): Meta[] {

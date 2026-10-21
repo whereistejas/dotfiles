@@ -25,7 +25,7 @@ const TOOL_BRIEF_START = "You are a background branch of the conversation above"
 const BG_BRIEF_START = "You've been moved to the background.";
 
 const workspaceRules = ({ dir, brief }: Workspace) =>
-	`\n- Your cwd is the jj workspace ${dir}; make all changes there.${brief ? `\n- ${brief}` : ""}`;
+	`\n- Your cwd is the jj workspace ${dir}; make all changes there. The parent removes it when it closes this branch; don't remove it yourself.${brief ? `\n- ${brief}` : ""}`;
 
 export const toolBrief = (task: string, workspace?: Workspace, permissions?: Permissions) =>
 	`${TOOL_BRIEF_START}, started by the parent session to do the task below in your own pi session.

@@ -47,6 +47,10 @@ function M.open(a)
       width = width,
       height = height,
       on_exit = a.exit_file and function(_, code)
+        -- Closing a branch deletes its folder after wiping this buffer, so the job can exit after it's gone.
+        if vim.fn.isdirectory(vim.fs.dirname(a.exit_file)) == 0 then
+          return
+        end
         local tail = vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_get_lines(buf, -60, -1, false) or {}
         vim.fn.writefile({ vim.json.encode({ code = code, tail = tail }) }, a.exit_file)
       end,
@@ -62,6 +66,13 @@ function M.show(a)
     return { error = "its terminal buffer is gone" }
   end
   show(a.buf, a.pids)
+  return {}
+end
+
+function M.close(a)
+  if vim.api.nvim_buf_is_valid(a.buf) then
+    vim.api.nvim_buf_delete(a.buf, { force = true })
+  end
   return {}
 end
 

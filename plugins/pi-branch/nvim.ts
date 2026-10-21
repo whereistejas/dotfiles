@@ -49,3 +49,6 @@ export const openTerminal = (opts: OpenOptions) =>
 	call<{ buf: number; own?: number }>("open", { name: opts.name, cmd: opts.cmd, cwd: opts.cwd, exit_file: opts.exitFile, show: opts.show });
 
 export const showBuffer = (buf: number) => call<object>("show", { buf });
+
+/** Wipes the buffer, which stops the job running in it. */
+export const closeBuffer = (buf: number) => call<object>("close", { buf });

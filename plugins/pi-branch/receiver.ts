@@ -33,6 +33,11 @@ export class Receiver {
 		this.branches.push(meta);
 	}
 
+	remove(id: string) {
+		const at = this.branches.findIndex((m) => m.id === id);
+		if (at >= 0) this.branches.splice(at, 1);
+	}
+
 	onAgentStart() {
 		this.wakeUntil = 0;
 	}

@@ -3,11 +3,11 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { forkSession, TOOL_NAME, textOf } from "./fork.ts";
-import { openTerminal, requireNvim, showBuffer } from "./nvim.ts";
+import { closeBuffer, openTerminal, requireNvim, showBuffer } from "./nvim.ts";
 import { Receiver } from "./receiver.ts";
-import { exitFile, inbox, listMetas, type Meta, newId, post, readJson, type Status, saveMeta, statusFile } from "./store.ts";
+import { exitFile, inbox, listMetas, type Meta, newId, post, readJson, removeBranch, type Status, saveMeta, statusFile } from "./store.ts";
 import { BG_BRIEF, isBrief, toolBrief, Worker } from "./worker.ts";
-import { addWorkspace } from "./workspace.ts";
+import { addWorkspace, removeWorkspace } from "./workspace.ts";
 
 const POLL_MS = 1000;
 
@@ -112,6 +112,17 @@ export default function (pi: ExtensionAPI) {
 		return `Started branch "${name}" (nvim buffer ${meta.buf}, model ${meta.model}${workspace ? `, workspace ${workspace.dir}` : ""}). Its report will arrive as a message; don't wait for it.`;
 	}
 
+	async function close(ctx: ExtensionContext, name?: string): Promise<string> {
+		const meta = branchNamed(ctx, name);
+		if (stateOf(meta) === "running") throw new Error(`"${meta.name}" is still running; steer it to stop first`);
+		receiver?.poll(ctx);
+		receiver?.remove(meta.id);
+		if (meta.buf !== undefined) await closeBuffer(meta.buf);
+		if (meta.workspace) await removeWorkspace(meta.workspace);
+		removeBranch(meta.id);
+		return `Closed "${meta.name}": wiped its terminal buffer${meta.workspace ? ` and removed its workspace ${meta.workspace}; its commits stay in the repo` : ""}.`;
+	}
+
 	/** The running turn carries on here as a worker; the user continues in a fork that ends at their last message. */
 	async function background(ctx: ExtensionContext, wanted: string): Promise<void> {
 		requireNvim();
@@ -154,14 +165,16 @@ export default function (pi: ExtensionAPI) {
 		description: `Fork this conversation into a background pi session (a Neovim terminal buffer) that works on a task and reports back here.
 - start: needs name and task. The branch inherits the whole conversation, so the task can be short. Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 when this conversation is well under that). write: true gives it its own jj workspace (a Rust one starts warm, with a build running in the background); leave it off for read-only work. remote: true lets it push/force-push its branches and write MRs; subagents: true lets it start \`pi -p\` subagents — set them only when the user asked for that.
 - peek: the branch's progress so far. steer: send it a message; it lands after its current tool call finishes (a running command isn't interrupted). list: all branches of this session.
+- close: once you've integrated its work, or dropped it: wipes its terminal buffer and, for a write branch, stops its warm-up build, forgets its jj workspace (its commits stay) and deletes the folder. Refused while it's running.
 Reports arrive as messages on their own. After start, return control or keep working: never sleep or poll waiting for a report.`,
 		promptSnippet: "Fork the conversation into a background pi session that reports back",
 		promptGuidelines: [
 			"Use the branch tool only when the user asks for background or delegated work, directly or through their instructions; a task being big isn't a reason on its own.",
 			"One writer per working copy: branches that edit files need write: true.",
+			"Close a branch with branch close once its report is handled and any commits it made are integrated.",
 		],
 		parameters: Type.Object({
-			action: StringEnum(["start", "peek", "steer", "list"] as const),
+			action: StringEnum(["start", "peek", "steer", "list", "close"] as const),
 			name: Type.Optional(Type.String({ description: "Branch name, e.g. scout-auth" })),
 			task: Type.Optional(Type.String({ description: "start: what the branch should do" })),
 			message: Type.Optional(Type.String({ description: "steer: the message" })),
@@ -188,6 +201,9 @@ Reports arrive as messages on their own. After start, return control or keep wor
 				}
 				case "list":
 					text = listing(ctx);
+					break;
+				case "close":
+					text = await close(ctx, params.name);
 			}
 			return { content: [{ type: "text", text }], details: undefined };
 		},
