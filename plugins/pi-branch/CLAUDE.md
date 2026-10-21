@@ -1,60 +1,45 @@
 # pi-branch
 
 Forks the current pi conversation into a background pi session in a Neovim
-terminal buffer, and posts its result back when it settles.
+terminal buffer, and posts its result back when it settles. `SPEC.md` is the
+design. Update it in the same change when behaviour changes.
 
-A pi extension, loaded from this checkout through the `extensions` list in
-`~/.pi/agent/settings.json` (in the dotfiles repo). pi runs TypeScript through
-`jiti`, so there is no build step; `index.ts` is the entry point.
+The shared rules (tests first, code hygiene, commits) are in `../CLAUDE.md`.
 
-## Verify before handing over
+pi loads `index.ts` through `jiti`, so there is no build step. After an edit, run
+`/reload` in a running pi, or load only this extension into a fresh one with
+`pi --no-extensions --extension .`.
 
-There is no test suite, typecheck or linter set up here. Check each change by running
-it:
+## Tests
 
-- **Lua run inside Neovim** (`nvim.lua`): drive it from a throwaway headless nvim
-  that loads the file with `dofile` and asserts on the result:
+No suite yet. `policy.ts`, `store.ts` and `nvim.ts` load under `node --test`.
+`fork.ts`, `receiver.ts` and `index.ts` import pi at runtime, and `worker.ts` uses
+parameter properties, so they don't. `nvim.lua` is tested from a headless nvim
+that `dofile`s it; a real terminal works there, e.g. a job running `stty size`
+shows its size.
 
-  ```bash
-  nvim --clean --headless -l /tmp/check.lua
-  ```
+## Neovim side
 
-  A real terminal works there, e.g. a job running `stty size` shows its size.
-- **TypeScript**: load only this extension into a fresh pi with
-  `pi --no-extensions --extension .`, or run `/reload` in a running pi after an
-  edit.
-
-## How the Neovim side works
-
-- `nvim.ts` calls `nvim.lua` through `nvim --clean --headless --server $NVIM
-  --remote-expr`, which `dofile`s it on every call. The Lua is stateless: keep
-  state in the TypeScript or in buffer variables (`b:pi_branch`).
+- The TypeScript calls `nvim.lua` through `nvim --clean --headless --server $NVIM
+  --remote-expr`, which `dofile`s it on every call. The Lua is stateless: keep state
+  in the TypeScript or in buffer variables.
 - Lua runs in the user's editor. It must not steal focus, prompt or block.
 - A terminal started with `jobstart(…, { term = true })` under `nvim_buf_call` takes
   the size of nvim's 5-row autocmd window and keeps it while hidden. Always pass
   `width`/`height`. At 5 rows, pi's TUI reprints its whole history on every frame,
   which makes the whole editor lag.
+- `b:pi_branch` marks a branch's terminal buffer.
 
-## Runtime lifecycle
+## pi runtime
 
 - Don't start timers, watchers, processes or sockets in the factory: some
   invocations load extensions without starting a session. Start them in
-  `session_start` or in the command or tool that needs them.
-- Stop them in an idempotent `session_shutdown` handler.
+  `session_start` or in the command or tool that needs them, and stop them in an
+  idempotent `session_shutdown` handler.
 - Extensions also load in `pi -p` subagents and in branch sessions. Anything that
   assumes the user is watching a TUI must check `ctx.mode === "tui"` first.
 
-## Code hygiene
+## Style
 
-- **Abstractions over decision trees.** When a feature adds cases, extend or create a
-  small abstraction with a clean API instead of growing `if`/`else` chains in event
-  handlers. Handlers parse the event and delegate.
-- **One way to do a thing.** Reuse existing helpers (`call` in `nvim.ts`, `store.ts`)
-  rather than re-implementing their logic inline.
-- **No bloat.** The smallest change that meets the requirement. No speculative options,
-  no dead code, no unused parameters, no defensive checks for states that can't occur.
-- **Sparse comments.** Comment only the *why* that the code can't say: a pi or Neovim
-  quirk, a non-obvious constraint. Never narrate what the next line does.
-- **Match the surrounding style.** TypeScript uses tabs and `biome-ignore` comments
-  where a lint must be silenced. `nvim.lua` uses two spaces.
-- **Keep `SPEC.md` true.** Update it in the same change when behaviour changes.
+TypeScript uses tabs; `nvim.lua` uses two spaces. Reuse `call` in `nvim.ts` for
+every Neovim call and `store.ts` for every file under `~/.pi/agent/branches`.
