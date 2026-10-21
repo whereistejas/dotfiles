@@ -11,9 +11,8 @@ pi loads `index.ts` through `jiti`, so there is no build step. After an edit, ru
 
 ## Tests
 
-No suite yet. `index.ts` imports `pi-ai` at runtime, so it can't load under
-`node --test`. Logic worth testing (building the conversation text, cleaning up
-the label) moves into a module of its own first.
+Run `node --test`. `index.test.ts` uses a Node module hook to stub `pi-ai`
+and mock timers to exercise the spinner lifecycle without model requests.
 
 ## pi runtime
 

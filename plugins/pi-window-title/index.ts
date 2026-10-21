@@ -4,7 +4,7 @@
  * Sets the terminal (Ghostty) window title to a short, Haiku-generated
  * summary of what the current session is working on. Shows a braille
  * spinner while the agent is running, then refreshes the summary when
- * the turn finishes. The summary is saved in the session, so a resumed
+ * the full agent run settles. The summary is saved in the session, so a resumed
  * session gets its title back straight away; a session that has messages
  * but no saved summary gets one generated as it starts.
  *
@@ -184,7 +184,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("agent_start", async (_event, ctx) => startSpinner(ctx));
 
-	pi.on("agent_end", async (_event, ctx) => {
+	pi.on("agent_settled", async (_event, ctx) => {
 		stopSpinner();
 		paint(ctx);
 		await refreshSummary(ctx);
