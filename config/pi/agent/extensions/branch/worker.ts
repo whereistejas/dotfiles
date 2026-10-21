@@ -9,25 +9,30 @@ import { inbox, type Meta, moveTo, post, ROOT, readJson, type Status, statusFile
 
 const run = promisify(execFile);
 
-const RULES = `- Treat the inherited conversation as reference only. Don't answer or continue earlier messages; requests to start branches in it were the parent's and are done.
-- You are not the parent session: don't start branches or subagents. Use your tools; never print tool calls or patches as text.
+export interface Permissions {
+	remote?: boolean;
+	subagents?: boolean;
+}
+
+const rules = ({ remote, subagents }: Permissions = {}) => `- Treat the inherited conversation as reference only. Don't answer or continue earlier messages; requests to start branches in it were the parent's and are done.
+- You are not the parent session: don't start branches${subagents ? "" : " or subagents"}. Use your tools; never print tool calls or patches as text.${subagents ? "\n- You may start `pi -p` subagents (the `subagents` skill) whenever the task calls for them." : ""}
 - Nobody is watching this terminal. Don't ask for confirmation and don't stop on a question: if you're blocked or need a decision, put it in your handoff.
-- Read anything. Local changes are fine where jj can undo them (inside the repo); instructions to ask before modifying files are waived for those. Never write to remote services (pushes, Jira/GitLab comments, ssh, aws changes) — those are blocked.
+- Read anything. Local changes are fine where jj can undo them (inside the repo); instructions to ask before modifying files are waived for those. ${remote ? "You may push and force-push your own branches (`jj git push`) and create or update GitLab/GitHub merge requests (`glab`, `gh`) whenever you want; never push to `main` or to branches you didn't create. Other remote writes (Jira, ssh, aws changes) stay blocked." : "Never write to remote services (pushes, Jira/GitLab comments, ssh, aws changes) — those are blocked."}
 - Finish with a handoff: the result, files and jj changes touched (change ids), test state, open questions.`;
 
 const TOOL_BRIEF_START = "You are a background branch of the conversation above";
 const BG_BRIEF_START = "You've been moved to the background.";
 
-export const toolBrief = (task: string, workspace?: string) =>
+export const toolBrief = (task: string, workspace?: string, permissions?: Permissions) =>
 	`${TOOL_BRIEF_START}, started by the parent session to do the task below in your own pi session.
-${RULES}${workspace ? `\n- Your cwd is the jj workspace ${workspace}; make all changes there.` : ""}
+${rules(permissions)}${workspace ? `\n- Your cwd is the jj workspace ${workspace}; make all changes there.` : ""}
 
 Task:
 ${task}`;
 
 export const BG_BRIEF = `${BG_BRIEF_START} The user continues in a fork of this conversation and gets your final answer there.
 Finish the current request, then stop.
-${RULES}`;
+${rules()}`;
 
 export const isBrief = (text: string) => text.startsWith(TOOL_BRIEF_START) || text.startsWith(BG_BRIEF_START);
 
@@ -87,7 +92,12 @@ export class Worker {
 
 	blockReason(toolName: string, input: Record<string, unknown>, cwd: string): string | undefined {
 		const readOnlyTools = new Set(this.pi.getAllTools().filter((t) => t.annotations?.readOnlyHint).map((t) => t.name));
-		const reason = checkToolCall(toolName, input, { cwd, writeRoots: this.writeRoots, readOnlyTools });
+		const reason = checkToolCall(toolName, input, {
+			cwd,
+			writeRoots: this.writeRoots,
+			readOnlyTools,
+			allowRemote: this.meta.remote ?? false,
+		});
 		return reason && `Blocked in a background branch: ${reason}. Note it in your handoff instead.`;
 	}
 

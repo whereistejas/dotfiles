@@ -7,6 +7,8 @@ export interface PolicyContext {
 	writeRoots: string[];
 	/** Tools that only read, besides the built-in read tools. */
 	readOnlyTools: Set<string>;
+	/** Allows `git push`/`jj git push` and GitLab/GitHub CLI writes. Every other remote write stays blocked. */
+	allowRemote?: boolean;
 }
 
 const READ_TOOLS = new Set(["read", "grep", "find", "ls", "ffgrep", "fffind", "codemode", "tool_search"]);
@@ -65,13 +67,13 @@ export function checkBash(command: string, ctx: PolicyContext): string | undefin
 			}
 			continue;
 		}
-		const reason = checkProgram(program, args, cwd, ctx.writeRoots);
+		const reason = checkProgram(program, args, cwd, ctx.writeRoots, ctx.allowRemote ?? false);
 		if (reason) return `\`${segment.trim()}\`: ${reason}`;
 	}
 	return undefined;
 }
 
-function checkProgram(program: string, args: string[], cwd: string, roots: string[]): string | undefined {
+function checkProgram(program: string, args: string[], cwd: string, roots: string[], allowRemote: boolean): string | undefined {
 	if (REMOTE_SHELLS.has(program)) return `${program} reaches outside this machine or escalates privileges`;
 	if (PATH_WRITERS.has(program)) {
 		const outside = args.filter((a) => !a.startsWith("-")).find((a) => !insideRoots(resolvePath(a, cwd), roots));
@@ -95,11 +97,13 @@ function checkProgram(program: string, args: string[], cwd: string, roots: strin
 					? undefined
 					: `git ${sub} changes aren't jj-recoverable; use jj`;
 			}
+			if (sub === "push" && allowRemote) return undefined;
 			return sub && GIT_READ.has(sub) ? undefined : `git ${sub ?? ""} isn't a read; use jj (and never push)`;
 		}
 		case "jj": {
 			const rest = afterOptions(args, ["-R", "--repository", "--at-op", "--at-operation", "--color", "--config", "--config-file"]);
 			const [sub, sub2] = rest;
+			if (sub === "git" && sub2 === "push" && allowRemote) return undefined;
 			if (sub === "git" && (sub2 === "push" || sub2 === "remote")) return `jj git ${sub2} writes to or changes a remote`;
 			if (sub === "util" && sub2 === "gc") return "jj util gc can't be undone";
 			if (sub === "op" && sub2 === "abandon") return "jj op abandon can't be undone";
@@ -133,6 +137,7 @@ function checkProgram(program: string, args: string[], cwd: string, roots: strin
 		}
 		case "gh":
 		case "glab": {
+			if (allowRemote) return undefined;
 			const [noun, verb] = afterOptions(args, ["-R", "--repo"]);
 			if (noun === "api") {
 				const method = flagValue(args, ["-X", "--method"]);

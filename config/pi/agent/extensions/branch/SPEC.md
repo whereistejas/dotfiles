@@ -73,7 +73,10 @@ Complements the `subagents` skill, which stays for parallel fan-out.
   - **Reads**: allowed anywhere (files, `jj log/diff/show`, read-only CLI verbs).
   - **Local writes**: allowed only inside the jj repo's working copy, where `jj`
     can undo them (`jj op log`/`jj undo`). Writes outside the repo are blocked.
-  - **Remote writes**: always blocked. This covers `ssh`/`scp`/`rsync host:`,
+  - **Remote writes**: blocked unless the branch was started with `remote: true`,
+    which allows `git push`/`jj git push` (force included) and GitLab/GitHub CLI
+    writes, and nothing else remote. `subagents: true` drops the "no subagents"
+    rule from the brief. Both are off by default. Otherwise blocked: this covers `ssh`/`scp`/`rsync host:`,
     `git push`/`jj git push`, write verbs of `aws`, `jira-cli`, the GitLab CLI and
     `curl`/`wget` with a method or body, and any MCP tool not marked
     `readOnlyHint`. It's a best-effort command denylist with a read-verb allowlist

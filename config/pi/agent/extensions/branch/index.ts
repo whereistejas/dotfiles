@@ -19,6 +19,8 @@ interface StartParams {
 	task?: string;
 	model?: string;
 	write?: boolean;
+	remote?: boolean;
+	subagents?: boolean;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -102,9 +104,10 @@ export default function (pi: ExtensionAPI) {
 		const meta: Meta = {
 			id: newId(), name, flow: "tool", cwd, workspace, receiverFile: parentFile, model: p.model ?? modelOf(ctx),
 			workerFile: forkSession({ parentFile, leafId, cwd, forWorker: true }), createdAt: new Date().toISOString(),
+			remote: p.remote ?? false, subagents: p.subagents ?? false,
 		};
 		saveMeta(meta);
-		const cmd = piCommand(meta.workerFile, meta.model, toolBrief(p.task, workspace));
+		const cmd = piCommand(meta.workerFile, meta.model, toolBrief(p.task, workspace, meta));
 		meta.buf = (await openTerminal({ name, cmd, cwd, exitFile: exitFile(meta.id), show: false })).buf;
 		saveMeta(meta);
 		receiver?.add(meta);
@@ -152,7 +155,7 @@ export default function (pi: ExtensionAPI) {
 		name: TOOL_NAME,
 		label: "Branch",
 		description: `Fork this conversation into a background pi session (a Neovim terminal buffer) that works on a task and reports back here.
-- start: needs name and task. The branch inherits the whole conversation, so the task can be short. Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 when this conversation is well under that). write: true gives it its own jj workspace; leave it off for read-only work.
+- start: needs name and task. The branch inherits the whole conversation, so the task can be short. Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 when this conversation is well under that). write: true gives it its own jj workspace; leave it off for read-only work. remote: true lets it push/force-push its branches and write MRs; subagents: true lets it start \`pi -p\` subagents — set them only when the user asked for that.
 - peek: the branch's progress so far. steer: send it a message; it lands after its current tool call finishes (a running command isn't interrupted). list: all branches of this session.
 Reports arrive as messages on their own. After start, return control or keep working: never sleep or poll waiting for a report.`,
 		promptSnippet: "Fork the conversation into a background pi session that reports back",
@@ -167,6 +170,8 @@ Reports arrive as messages on their own. After start, return control or keep wor
 			message: Type.Optional(Type.String({ description: "steer: the message" })),
 			model: Type.Optional(Type.String({ description: "start: provider/id[:thinking]" })),
 			write: Type.Optional(Type.Boolean({ description: "start: give it its own jj workspace to edit in" })),
+			remote: Type.Optional(Type.Boolean({ description: "start: allow pushes/force-pushes and GitLab/GitHub MR writes" })),
+			subagents: Type.Optional(Type.Boolean({ description: "start: allow `pi -p` subagents" })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			let text: string;
