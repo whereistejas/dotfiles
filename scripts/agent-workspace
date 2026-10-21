@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Creates and removes the sibling jj workspaces that agents and their subagents work in.
+#
+#   agent-workspace add <name> [<revision>]   prints dir=<path>, and brief=<line> for the agent's task
+#   agent-workspace remove <dir>
+#
+# A new workspace has an empty target/, so a Rust build there starts cold and takes minutes.
+# `add` clones the source workspace's target/ (APFS clonefile: instant, no extra disk; cargo
+# rebuilds only the workspace's own crates) and warms it in the background. `remove` stops
+# that build, forgets the workspace (snapshotting its edits into its commit) and deletes it.
+set -euo pipefail
+
+warm_cmd='cargo clippy --workspace --all-targets --locked && cargo test --workspace --no-run --locked'
+
+die() {
+	echo "agent-workspace: $*" >&2
+	exit 1
+}
+
+add() {
+	local name=$1 rev=${2:-@} root dir log
+	root=$(jj root)
+	dir="$(dirname "$root")/$(basename "$root")-$name"
+	[ -e "$dir" ] && die "$dir already exists"
+	jj workspace add --colocate --name "$name" -r "$rev" "$dir" >&2
+	echo "dir=$dir"
+
+	[ -f "$dir/Cargo.toml" ] || return 0
+	if [ -d "$root/target" ]; then cp -c -R "$root/target" "$dir/target"; else mkdir "$dir/target"; fi
+	log=$dir/target/agent-warmup.log
+	(
+		cd "$dir"
+		# Job control puts the build in its own process group, so `remove` can stop cargo and every rustc under it.
+		set -m
+		nohup sh -c "$warm_cmd" </dev/null >"$log" 2>&1 &
+		echo $! >"$dir/target/agent-warmup.pid"
+	)
+	echo "brief=A warm-up build (\`cargo clippy --workspace --all-targets\`, then \`cargo test --workspace --no-run\`) is running in the background of this Rust workspace; its log is $log. Don't wait for it: research, plan and edit meanwhile. When you need the compiler, run cargo as usual: it waits for the warm-up's lock and carries on from there. Don't kill it, run \`cargo clean\`, or change features, profile or RUSTFLAGS, which would throw the warm build away."
+}
+
+stop_warmup() {
+	local pidfile=$1/target/agent-warmup.pid pgid
+	[ -f "$pidfile" ] || return 0
+	pgid=$(cat "$pidfile")
+	kill -TERM -- "-$pgid" 2>/dev/null || return 0
+	for _ in $(seq 50); do
+		kill -0 -- "-$pgid" 2>/dev/null || return 0
+		sleep 0.2
+	done
+	kill -KILL -- "-$pgid" 2>/dev/null || true
+}
+
+remove() {
+	local dir name
+	dir=$(cd "$1" && pwd -P)
+	name=$(jj -R "$dir" workspace list -T 'name ++ "\t" ++ root ++ "\n"' | awk -F'\t' -v dir="$dir" '$2 == dir { print $1 }')
+	[ -n "$name" ] || die "$dir is not a jj workspace root"
+	[ "$name" != default ] || die "refusing to remove the default workspace"
+
+	stop_warmup "$dir"
+	jj -R "$dir" workspace forget "$name"
+	rm -rf "$dir"
+}
+
+case "${1:-}" in
+add) [ $# -ge 2 ] && [ $# -le 3 ] || die "usage: agent-workspace add <name> [<revision>]"; add "${@:2}" ;;
+remove) [ $# -eq 2 ] || die "usage: agent-workspace remove <dir>"; remove "$2" ;;
+*) die "usage: agent-workspace add <name> [<revision>] | agent-workspace remove <dir>" ;;
+esac
