@@ -69,9 +69,7 @@ export class Receiver {
 			this.pi.sendMessage(message, { deliverAs: "steer" });
 			return;
 		}
-		// A turn started by sendMessage skips before_agent_start hooks, so wake with a user message instead.
-		this.pi.sendMessage(message, { triggerTurn: false });
-		this.pi.sendUserMessage(`Branch ${meta.name} reported (see above).`, { deliverAs: "steer" });
+		this.pi.sendMessage(message, { triggerTurn: true });
 		this.wakeUntil = Date.now() + WAKE_TIMEOUT_MS;
 	}
 }

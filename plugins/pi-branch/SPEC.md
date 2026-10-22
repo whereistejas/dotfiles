@@ -103,9 +103,9 @@ Complements the `subagents` skill, which stays for parallel fan-out.
 - The receiver polls its inbox. For each report it calls
   `pi.sendMessage({ customType: "branch-report", content, display: true })` and
   deletes the file only after delivery.
-  - **Idle wake**: if the receiver is idle, `sendMessage(triggerTurn: false)`,
-    then `sendUserMessage("Branch <name> reported.", { deliverAs: "steer" })`.
-  - This keeps `before_agent_start` hooks running (pi#5581 workaround).
+  - **Idle wake**: if the receiver is idle, `sendMessage(triggerTurn: true)`.
+    `before_agent_start` hooks run for it too (`messageType: "custom"`), and
+    no user message is added to the receiver's history.
 - `content` is a preview of at most about 4 KiB plus the worker session path, so
   the full answer stays readable on demand.
 - A worker that's steered or followed up and settles again reports again. Each
@@ -181,8 +181,8 @@ Steering:
 Reporting:
 - Delete an inbox file only after `sendMessage` accepts it. Every report has an
   id, and delivered ids are remembered, so `/reload` can't double-send.
-- Idle wake = `sendMessage(triggerTurn: false)` + `sendUserMessage(…, steer)`, so
-  `before_agent_start` hooks still run. Pending-wake state lives on `globalThis`
+- Idle wake = `sendMessage(triggerTurn: true)`, never a synthetic user message,
+  which would pollute the receiver's history. Pending-wake state lives on `globalThis`
   (survives `/reload`) and expires after 10 s.
 - Poll inboxes (about 1 s); don't use `fs.watch`, which hung reloads on macOS.
 - Preview at most about 4 KiB, cut on a UTF-8 boundary, plus the session path.
