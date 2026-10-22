@@ -6,6 +6,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { TOOL_NAME, textOf } from "./fork.ts";
 import { checkToolCall } from "./policy.ts";
 import { inbox, type Meta, moveTo, post, ROOT, readJson, type Status, statusFile, writeJson } from "./store.ts";
+import type { Workspace } from "./workspace.ts";
 
 const run = promisify(execFile);
 
@@ -23,9 +24,12 @@ const rules = ({ remote, subagents }: Permissions = {}) => `- Treat the inherite
 const TOOL_BRIEF_START = "You are a background branch of the conversation above";
 const BG_BRIEF_START = "You've been moved to the background.";
 
-export const toolBrief = (task: string, workspace?: string, permissions?: Permissions) =>
+const workspaceRules = ({ dir, brief }: Workspace) =>
+	`\n- Your cwd is the jj workspace ${dir}; make all changes there.${brief ? `\n- ${brief}` : ""}`;
+
+export const toolBrief = (task: string, workspace?: Workspace, permissions?: Permissions) =>
 	`${TOOL_BRIEF_START}, started by the parent session to do the task below in your own pi session.
-${rules(permissions)}${workspace ? `\n- Your cwd is the jj workspace ${workspace}; make all changes there.` : ""}
+${rules(permissions)}${workspace ? workspaceRules(workspace) : ""}
 
 Task:
 ${task}`;

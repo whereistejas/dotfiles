@@ -1,7 +1,4 @@
-import { execFile } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
-import { promisify } from "node:util";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -10,8 +7,8 @@ import { openTerminal, requireNvim, showBuffer } from "./nvim.ts";
 import { Receiver } from "./receiver.ts";
 import { exitFile, inbox, listMetas, type Meta, newId, post, readJson, type Status, saveMeta, statusFile } from "./store.ts";
 import { BG_BRIEF, isBrief, toolBrief, Worker } from "./worker.ts";
+import { addWorkspace } from "./workspace.ts";
 
-const run = promisify(execFile);
 const POLL_MS = 1000;
 
 interface StartParams {
@@ -100,9 +97,9 @@ export default function (pi: ExtensionAPI) {
 		if (!p.task?.trim()) throw new Error("start needs a task");
 		const name = uniqueName(ctx, p.name ?? "branch");
 		const workspace = p.write ? await addWorkspace(ctx.cwd, name) : undefined;
-		const cwd = workspace ?? ctx.cwd;
+		const cwd = workspace?.dir ?? ctx.cwd;
 		const meta: Meta = {
-			id: newId(), name, flow: "tool", cwd, workspace, receiverFile: parentFile, model: p.model ?? modelOf(ctx),
+			id: newId(), name, flow: "tool", cwd, workspace: workspace?.dir, receiverFile: parentFile, model: p.model ?? modelOf(ctx),
 			workerFile: forkSession({ parentFile, leafId, cwd, forWorker: true }), createdAt: new Date().toISOString(),
 			remote: p.remote ?? false, subagents: p.subagents ?? false,
 		};
@@ -112,7 +109,7 @@ export default function (pi: ExtensionAPI) {
 		saveMeta(meta);
 		receiver?.add(meta);
 		startPolling();
-		return `Started branch "${name}" (nvim buffer ${meta.buf}, model ${meta.model}${workspace ? `, workspace ${workspace}` : ""}). Its report will arrive as a message; don't wait for it.`;
+		return `Started branch "${name}" (nvim buffer ${meta.buf}, model ${meta.model}${workspace ? `, workspace ${workspace.dir}` : ""}). Its report will arrive as a message; don't wait for it.`;
 	}
 
 	/** The running turn carries on here as a worker; the user continues in a fork that ends at their last message. */
@@ -155,7 +152,7 @@ export default function (pi: ExtensionAPI) {
 		name: TOOL_NAME,
 		label: "Branch",
 		description: `Fork this conversation into a background pi session (a Neovim terminal buffer) that works on a task and reports back here.
-- start: needs name and task. The branch inherits the whole conversation, so the task can be short. Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 when this conversation is well under that). write: true gives it its own jj workspace; leave it off for read-only work. remote: true lets it push/force-push its branches and write MRs; subagents: true lets it start \`pi -p\` subagents — set them only when the user asked for that.
+- start: needs name and task. The branch inherits the whole conversation, so the task can be short. Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 when this conversation is well under that). write: true gives it its own jj workspace (a Rust one starts warm, with a build running in the background); leave it off for read-only work. remote: true lets it push/force-push its branches and write MRs; subagents: true lets it start \`pi -p\` subagents — set them only when the user asked for that.
 - peek: the branch's progress so far. steer: send it a message; it lands after its current tool call finishes (a running command isn't interrupted). list: all branches of this session.
 Reports arrive as messages on their own. After start, return control or keep working: never sleep or poll waiting for a report.`,
 		promptSnippet: "Fork the conversation into a background pi session that reports back",
@@ -246,14 +243,6 @@ function peek(meta: Meta): string {
 	const steers = (state: string) => inbox(meta.id, "to-worker", state).length;
 	const header = `${meta.name}: ${stateOf(meta)}; steers queued ${steers("json") + steers("sent")}, delivered ${steers("delivered")}`;
 	return [header, ...items.slice(-20)].join("\n");
-}
-
-async function addWorkspace(cwd: string, name: string): Promise<string> {
-	const root = (await run("jj", ["root"], { cwd })).stdout.trim();
-	const dir = path.join(path.dirname(root), `${path.basename(root)}-${name}`);
-	if (fs.existsSync(dir)) throw new Error(`${dir} already exists`);
-	await run("jj", ["workspace", "add", "--colocate", "--name", name, "-r", "@", dir], { cwd: root });
-	return dir;
 }
 
 function modelOf(ctx: ExtensionContext): string | undefined {
