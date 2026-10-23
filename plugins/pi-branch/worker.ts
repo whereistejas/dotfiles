@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { TOOL_NAME, textOf } from "./fork.ts";
 import { checkToolCall } from "./policy.ts";
-import { inbox, type Meta, moveTo, post, ROOT, readJson, type Status, statusFile, writeJson } from "./store.ts";
+import { inbox, type Meta, moveTo, newId, post, ROOT, readJson, type Status, statusFile, writeJson } from "./store.ts";
 import type { Workspace } from "./workspace.ts";
 
 const run = promisify(execFile);
@@ -46,6 +46,7 @@ const wrapSteer = (text: string) =>
 /** The session doing a branch's work: takes steers, obeys the background policy, reports when it settles. */
 export class Worker {
 	private settling = false;
+	private startAnswerId: string | undefined;
 
 	private constructor(
 		private readonly pi: ExtensionAPI,
@@ -58,12 +59,14 @@ export class Worker {
 		const repo = await run("jj", ["root"], { cwd: ctx.cwd }).then((r) => [r.stdout.trim()], () => []);
 		const writeRoots = [...repo, "/tmp", "/private/tmp", fs.realpathSync(os.tmpdir()), ROOT];
 		const worker = new Worker(pi, meta, writeRoots, readJson<Status>(statusFile(meta.id))?.lastReportId);
+		worker.startAnswerId = worker.lastAnswer(ctx)?.id;
 		pi.setActiveTools(pi.getActiveTools().filter((t) => t !== TOOL_NAME));
 		if (!ctx.isIdle()) worker.writeStatus("running");
 		return worker;
 	}
 
-	onAgentStart() {
+	onAgentStart(ctx: ExtensionContext) {
+		this.startAnswerId = this.lastAnswer(ctx)?.id;
 		this.settling = false;
 		this.writeStatus("running");
 	}
@@ -72,10 +75,10 @@ export class Worker {
 		this.settling = true;
 	}
 
-	onAgentSettled(ctx: ExtensionContext) {
+	onAgentSettled(ctx: ExtensionContext, aborted: boolean) {
 		this.settling = false;
-		this.report(ctx);
-		this.writeStatus("idle");
+		this.report(ctx, aborted);
+		this.writeStatus(aborted ? "cancelled" : "idle");
 	}
 
 	/** Steers arriving between agent_end and agent_settled wait: sent then, they'd fire as an early idle prompt. */
@@ -105,12 +108,19 @@ export class Worker {
 		return reason && `Blocked in a background branch: ${reason}. Note it in your handoff instead.`;
 	}
 
-	private report(ctx: ExtensionContext) {
-		const last = ctx.sessionManager.getBranch().findLast((e) => e.type === "message" && e.message.role === "assistant");
-		if (last?.type !== "message" || last.id === this.lastReportId) return;
-		const { content, stopReason } = last.message as { content?: unknown; stopReason?: string };
-		post(this.meta.id, "to-receiver", { id: last.id, text: textOf(content) || `(no text; stop reason: ${stopReason})` });
-		this.lastReportId = last.id;
+	private lastAnswer(ctx: ExtensionContext) {
+		return ctx.sessionManager.getBranch().findLast((e) => e.type === "message" && e.message.role === "assistant");
+	}
+
+	private report(ctx: ExtensionContext, aborted: boolean) {
+		const last = this.lastAnswer(ctx);
+		const fresh = last?.type === "message" && last.id !== this.lastReportId && last.id !== this.startAnswerId;
+		if (!aborted && !fresh) return;
+		const id = fresh ? last.id : newId();
+		const { content, stopReason } = fresh ? last.message as { content?: unknown; stopReason?: string } : {};
+		const text = fresh ? textOf(content) || `(no text; stop reason: ${stopReason})` : "";
+		post(this.meta.id, "to-receiver", { id, text: aborted ? `Cancelled; work may be incomplete.${text ? `\n\nPartial output:\n${text}` : ""}` : text });
+		this.lastReportId = id;
 	}
 
 	private writeStatus(state: Status["state"]) {

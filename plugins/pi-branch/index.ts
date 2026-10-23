@@ -53,13 +53,12 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("agent_start", (_event, ctx) => {
 		current = ctx;
-		worker?.onAgentStart();
-		receiver?.onAgentStart();
+		worker?.onAgentStart(ctx);
 	});
 
 	pi.on("agent_end", () => worker?.onAgentEnd());
 
-	pi.on("agent_settled", (_event, ctx) => worker?.onAgentSettled(ctx));
+	pi.on("agent_settled", (event, ctx) => worker?.onAgentSettled(ctx, event.aborted));
 
 	pi.on("message_end", (event) => {
 		if (event.message.role === "user") worker?.onUserMessage(textOf(event.message.content));

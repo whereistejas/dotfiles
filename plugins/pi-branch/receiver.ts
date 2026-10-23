@@ -3,14 +3,12 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { REPORT_TYPE } from "./fork.ts";
 import { type Exit, exitFile, inbox, listMetas, type Meta, readJson, type Status, statusFile } from "./store.ts";
 
-const WAKE_TIMEOUT_MS = 10_000;
 const PREVIEW_BYTES = 4096;
 
 /** The session a branch reports to: posts each report once, waking the agent if it's idle. */
 export class Receiver {
 	private readonly branches: Meta[];
 	private readonly delivered = new Set<string>();
-	private wakeUntil = 0;
 
 	constructor(
 		private readonly pi: ExtensionAPI,
@@ -38,10 +36,6 @@ export class Receiver {
 		if (at >= 0) this.branches.splice(at, 1);
 	}
 
-	onAgentStart() {
-		this.wakeUntil = 0;
-	}
-
 	poll(ctx: ExtensionContext) {
 		for (const meta of this.branches) {
 			for (const { file, message } of inbox(meta.id, "to-receiver")) {
@@ -65,12 +59,11 @@ export class Receiver {
 			display: true,
 			details: { branchId: meta.id, reportId },
 		};
-		if (!ctx.isIdle() || Date.now() < this.wakeUntil) {
+		if (!ctx.isIdle()) {
 			this.pi.sendMessage(message, { deliverAs: "steer" });
 			return;
 		}
 		this.pi.sendMessage(message, { triggerTurn: true });
-		this.wakeUntil = Date.now() + WAKE_TIMEOUT_MS;
 	}
 }
 

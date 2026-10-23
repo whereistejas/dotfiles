@@ -15,9 +15,9 @@ pi loads `index.ts` through `jiti`, so there is no build step. After an edit, ru
 Run `node --test`. `nvim.test.ts` drives `nvim.lua` through `nvim.ts` against a
 headless nvim it starts; `workspace.test.ts` runs `agent-workspace` (so it must be
 on `PATH`) on throwaway jj repos, including a tiny crate that `cargo` builds.
-`policy.ts` and `store.ts` load there too. `fork.ts`, `receiver.ts` and
-`index.ts` import pi at runtime, and `worker.ts` uses parameter properties, so
-they don't.
+`policy.ts` and `store.ts` load there too. `reporting.test.ts` uses Node module
+hooks to replace pi imports, transform worker parameter properties, and isolate
+branch storage in a temporary directory.
 
 ## Neovim side
 

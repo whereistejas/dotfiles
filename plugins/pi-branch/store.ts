@@ -23,7 +23,7 @@ export interface Meta {
 }
 
 export interface Status {
-	state: "running" | "idle";
+	state: "running" | "idle" | "cancelled";
 	lastReportId?: string;
 }
 

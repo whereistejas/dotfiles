@@ -99,13 +99,17 @@ Complements the `subagents` skill, which stays for parallel fan-out.
 ## Reporting
 
 - When a worker emits `agent_settled`, it writes its newest final assistant text
-  to the receiver's inbox as one JSON file per report.
+  to the receiver's inbox as one JSON file per report. An aborted run reports
+  cancellation, labels any new assistant text as partial output, and enters
+  `cancelled` status. It never reuses an answer from before that run.
 - The receiver polls its inbox. For each report it calls
   `pi.sendMessage({ customType: "branch-report", content, display: true })` and
   deletes the file only after delivery.
   - **Idle wake**: if the receiver is idle, `sendMessage(triggerTurn: true)`.
     `before_agent_start` hooks run for it too (`messageType: "custom"`), and
     no user message is added to the receiver's history.
+  - Pi marks the receiver busy during startup; further reports are steered into
+    that run without a timer-based pending-wake guard.
 - `content` is a preview of at most about 4 KiB plus the worker session path, so
   the full answer stays readable on demand.
 - A worker that's steered or followed up and settles again reports again. Each
@@ -122,7 +126,7 @@ Complements the `subagents` skill, which stays for parallel fan-out.
   follow-up turn if it's idle. The wrapper says: "Mid-run steering from the
   parent: … Incorporate at the next safe point; don't restart unless asked."
 - `branch({ action: "list" })` and `/branches`: name, role, status (starting/running/
-  idle/exited), buffer, model, cwd.
+  idle/cancelled/exited), buffer, model, cwd.
 - `/fg <name>`: show that branch's buffer in the current window. The user can
   type into it directly (native pi steering). `:b#` goes back.
 
@@ -182,8 +186,8 @@ Reporting:
 - Delete an inbox file only after `sendMessage` accepts it. Every report has an
   id, and delivered ids are remembered, so `/reload` can't double-send.
 - Idle wake = `sendMessage(triggerTurn: true)`, never a synthetic user message,
-  which would pollute the receiver's history. Pending-wake state lives on `globalThis`
-  (survives `/reload`) and expires after 10 s.
+  which would pollute the receiver's history. Pi's startup busy state prevents
+  duplicate starts; no pending-wake timeout is needed.
 - Poll inboxes (about 1 s); don't use `fs.watch`, which hung reloads on macOS.
 - Preview at most about 4 KiB, cut on a UTF-8 boundary, plus the session path.
 - If the worker's terminal exits before it reports, report that as a failure
