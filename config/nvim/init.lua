@@ -1010,6 +1010,13 @@ vim.api.nvim_create_autocmd("TextYankPost", {
 vim.keymap.set("n", "T", function() require("jumanji.annotate").line() end, { desc = "jj annotate line (float)" })
 vim.keymap.set("n", "<space>jb", function() Snacks.picker.jj_bookmarks() end, { desc = "jj bookmarks" })
 vim.keymap.set("n", "<space>jl", function() Snacks.picker.jj_log() end, { desc = "jj log" })
+-- `?` is Live grep everywhere else; in the log buffer it is plain backward search.
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = "jumanji",
+	callback = function(args)
+		vim.keymap.set("n", "?", "?", { buffer = args.buf, desc = "Search backward" })
+	end,
+})
 
 -- Lowercase names for :J (jumanji) and :Pi (pi.nvim): user commands must start
 -- uppercase, so expand `jj` / `pi` when they are the whole `:` command line so far.
