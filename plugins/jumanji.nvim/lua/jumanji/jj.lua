@@ -148,12 +148,13 @@ local BOOKMARK_TEMPLATE = table.concat({
 	"name", "remote", [[if(synced, "1")]], [[if(conflict, "1")]],
 	[[if(normal_target, normal_target.change_id().short(8))]],
 	[[if(normal_target, normal_target.description().first_line())]],
+	[[if(normal_target, normal_target.commit_id().short(8))]],
 }, [[ ++ "\x1f" ++ ]]) .. [[ ++ "\n"]]
 
 --- Local and remote bookmarks. A remote bookmark synced with its local one,
 --- and the git remote that mirrors the backing repo, are left out.
 ---@param root string
----@return table[]? bookmarks { name, remote?, conflict, change_id?, description? }, string? err
+---@return table[]? bookmarks { name, remote?, conflict, change_id?, description?, commit_id? }, string? err
 function M.bookmarks(root)
 	local cmd = {
 		"jj", "bookmark", "list", "--all-remotes", "--ignore-working-copy", "--color=never", "--no-pager",
@@ -171,10 +172,35 @@ function M.bookmarks(root)
 					conflict = f[4] == "1",
 					change_id = f[5] ~= "" and f[5] or nil,
 					description = f[6],
+					commit_id = f[7] ~= "" and f[7] or nil,
 				}
 			end
 		end
 		return list
+	end)
+end
+
+local PARENTS_TEMPLATE = [[commit_id.short(8) ++ "\x1f" ++ if(self.contained_in("trunk()"), "1") ++ "\x1f" ++ ]] ..
+	[[parents.map(|c| c.commit_id().short(8)).join(" ") ++ "\n"]]
+
+--- The parents of each commit in a revset, by short (8-char) commit id, and
+--- which of them is trunk().
+---@param root string
+---@param revset string
+---@return { trunk: string?, parents: table<string, string[]> }? graph, string? err
+function M.parents(root, revset)
+	local cmd = {
+		"jj", "log", "--ignore-working-copy", "--color=never", "--no-pager", "--no-graph",
+		"-r", revset, "-T", PARENTS_TEMPLATE,
+	}
+	return run(root, cmd, function(out)
+		local graph = { parents = {} }
+		for line in vim.gsplit(out, "\n", { plain = true, trimempty = true }) do
+			local f = vim.split(line, "\x1f", { plain = true })
+			graph.parents[f[1]] = vim.split(f[3], " ", { trimempty = true })
+			if f[2] == "1" then graph.trunk = f[1] end
+		end
+		return graph
 	end)
 end
 

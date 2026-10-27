@@ -14,52 +14,124 @@ local function fail(err)
 	return {}
 end
 
-local function pad(text, width)
-	return text .. string.rep(" ", width - vim.fn.strdisplaywidth(text))
-end
-
 -- A bookmark as a revset symbol, quoted so any name parses.
 local function symbol(b)
 	local name = vim.json.encode(b.name)
 	return b.remote and (name .. "@" .. vim.json.encode(b.remote)) or name
 end
 
--- The commits on a bookmark's branch, with the 10 commits up to where it
--- forked from trunk for context.
-local function branch_revset(sym)
-	return ("(trunk()..%s) | ancestors(fork_point(trunk() | %s), 10)"):format(sym, sym)
+local function bookmark_label(b)
+	return b.remote and (b.name .. "@" .. b.remote) or b.name
 end
 
+-- The stack a commit is on: from trunk up to the commit and everything
+-- stacked on it, with the 10 commits up to where it forked for context.
+local function stack_revset(rev)
+	return ("trunk()..(%s::) | ancestors(fork_point(trunk() | %s), 10)"):format(rev, rev)
+end
+
+-- Bookmarks grouped by the commit they point to, in the order jj lists them.
+-- A conflicted bookmark points to no one commit and gets a node of its own.
+local function bookmark_nodes(bookmarks)
+	local nodes, by_rev = {}, {}
+	for _, b in ipairs(bookmarks) do
+		local rev = b.commit_id or symbol(b)
+		if not by_rev[rev] then
+			by_rev[rev] = { rev = rev, commit = b, bookmarks = {}, children = {} }
+			nodes[#nodes + 1] = by_rev[rev]
+		end
+		table.insert(by_rev[rev].bookmarks, b)
+	end
+	return nodes, by_rev
+end
+
+local TRUNK = {}
+
+-- Where a bookmarked commit's own commits start: the node of its nearest
+-- bookmarked ancestor, or TRUNK once the walk leaves the stacks for trunk's
+-- history. Nil for trunk, and for a commit that isn't on a stack.
+local function fork_base(rev, graph, by_rev)
+	if rev == graph.trunk or not graph.parents[rev] then return nil end
+
+	local queue, seen = vim.list_extend({}, graph.parents[rev]), {}
+	while #queue > 0 do
+		local id = table.remove(queue, 1)
+		if by_rev[id] then return by_rev[id] end
+		if not graph.parents[id] then return TRUNK end
+		if not seen[id] then
+			seen[id] = true
+			vim.list_extend(queue, graph.parents[id])
+		end
+	end
+end
+
+-- Bookmarks as a tree: trunk's bookmarks at the root, each stack a branch of
+-- it, and a bookmark stacked on another a child of that one. Bookmarks that
+-- aren't on a stack (merged, or off unrelated history) are roots of their own.
 local function bookmark_items(opts)
 	if not opts.jj_root then return fail() end
 	local bookmarks, err = jj.bookmarks(opts.jj_root)
 	if not bookmarks then return fail(err) end
 
-	local items, width = {}, 0
-	for _, b in ipairs(bookmarks) do
-		local label = b.remote and (b.name .. "@" .. b.remote) or b.name
-		width = math.max(width, vim.fn.strdisplaywidth(label))
-		items[#items + 1] = {
-			text = label .. " " .. (b.description or ""),
-			label = label,
-			bookmark = b,
-			root = opts.jj_root,
-			revset = branch_revset(symbol(b)),
-		}
+	local nodes, by_rev = bookmark_nodes(bookmarks)
+	local ids = { "none()" }
+	for _, b in ipairs(bookmarks) do ids[#ids + 1] = b.commit_id end
+	local graph, graph_err = jj.parents(opts.jj_root, ("trunk() | trunk()..(%s)"):format(table.concat(ids, " | ")))
+	if not graph then return fail(graph_err) end
+
+	local trunk = by_rev[graph.trunk]
+	local roots = { trunk }
+	for _, node in ipairs(nodes) do
+		local base = fork_base(node.rev, graph, by_rev)
+		node.base = base == TRUNK and "trunk()" or base and base.rev
+		local parent = base == TRUNK and trunk or base
+		if parent then
+			table.insert(parent.children, node)
+		elseif node ~= trunk then
+			roots[#roots + 1] = node
+		end
 	end
-	for _, item in ipairs(items) do item.width = width end
+
+	local items, width = {}, 0
+	local function add(node, parent, last, depth)
+		local label = table.concat(vim.tbl_map(bookmark_label, node.bookmarks), " ")
+		local item = {
+			text = label .. " " .. (node.commit.description or ""),
+			label = label,
+			node = node,
+			root = opts.jj_root,
+			parent = parent,
+			last = last,
+			width = 2 * depth + vim.fn.strdisplaywidth(label),
+			revset = stack_revset(node.rev),
+			preview = node.base and ("%s..%s"):format(node.base, node.rev) or ("ancestors(%s, 10)"):format(node.rev),
+		}
+		items[#items + 1] = item
+		width = math.max(width, item.width)
+		for i, child in ipairs(node.children) do add(child, item, i == #node.children, depth + 1) end
+	end
+	for i, node in ipairs(roots) do add(node, nil, i == #roots, 0) end
+
+	for _, item in ipairs(items) do item.pad = string.rep(" ", width - item.width) end
 	return items
 end
 
-local function format_bookmark(item)
-	local b = item.bookmark
-	local ret = { { pad(item.label, item.width), b.remote and "JumanjiDim" or "JumanjiBookmark" }, { " " } }
-	if b.conflict then ret[#ret + 1] = { "(conflict) ", "JumanjiConflict" } end
-	if b.change_id then
-		ret[#ret + 1] = { b.change_id, "JumanjiChangeId" }
+local function format_bookmark(item, picker)
+	local node = item.node
+	local ret = Snacks.picker.format.tree(item, picker)
+	for i, b in ipairs(node.bookmarks) do
+		if i > 1 then ret[#ret + 1] = { " " } end
+		ret[#ret + 1] = { bookmark_label(b), b.remote and "JumanjiDim" or "JumanjiBookmark" }
+	end
+	ret[#ret + 1] = { item.pad .. " " }
+
+	local c = node.commit
+	if c.conflict then ret[#ret + 1] = { "(conflict) ", "JumanjiConflict" } end
+	if c.change_id then
+		ret[#ret + 1] = { c.change_id, "JumanjiChangeId" }
 		ret[#ret + 1] = { " " }
 	end
-	ret[#ret + 1] = { b.description ~= "" and b.description or "(no description set)", b.description == "" and "JumanjiDim" or nil }
+	ret[#ret + 1] = { c.description ~= "" and c.description or "(no description set)", c.description == "" and "JumanjiDim" or nil }
 	return ret
 end
 
@@ -116,17 +188,19 @@ local function preview_commit(ctx)
 end
 
 local function preview_branch(ctx)
-	local cmd = { "jj", "log", "--color=always", "--no-pager", "--ignore-working-copy", "-r", ctx.item.revset }
+	local cmd = { "jj", "log", "--color=always", "--no-pager", "--ignore-working-copy", "-r", ctx.item.preview }
 	return Snacks.picker.preview.cmd(cmd, ctx, { cwd = ctx.item.root })
 end
 
 M.sources = {
-	--- Bookmarks, local and remote. Confirm opens the log of the branch.
+	--- Bookmarks, local and remote, as a tree of stacks. The preview shows a
+	--- bookmark's own commits; confirm opens the log of its whole stack.
 	jj_bookmarks = {
 		title = "jj bookmarks",
 		config = with_root,
 		finder = bookmark_items,
 		format = format_bookmark,
+		matcher = { keep_parents = true, sort = false },
 		preview = preview_branch,
 		confirm = function(picker, item)
 			picker:close()
