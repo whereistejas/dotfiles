@@ -7,8 +7,10 @@ are in `../CLAUDE.md`.
 
 ## Tests
 
-No suite yet. The first change that needs one adds `tests/run.lua`, modelled on
-`../servery.nvim/tests`.
+`nvim --clean -l tests/run.lua [filter]`. Each test builds jj repos in a temporary
+dir and drives a real nvim over RPC (`tests/helpers.lua`). That nvim has had a UI
+attach and detach, as in a background servery session, so a message that needs a
+hit-enter prompt blocks it and fails the test instead of passing unnoticed.
 
 ## Conventions
 

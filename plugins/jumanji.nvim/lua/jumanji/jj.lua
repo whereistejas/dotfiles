@@ -128,6 +128,14 @@ function M.show_git(root, rev)
 	return run(root, cmd, function(out) return out end)
 end
 
+--- Whether jj failed because the working copy is stale, which
+--- `jj workspace update-stale` fixes.
+---@param err string jj's stderr
+---@return boolean
+function M.is_stale(err)
+	return err:find("working copy is stale", 1, true) ~= nil
+end
+
 --- Run a jj command that changes the repo; returns nil and jj's stderr on failure.
 ---@param root string
 ---@param args string[]

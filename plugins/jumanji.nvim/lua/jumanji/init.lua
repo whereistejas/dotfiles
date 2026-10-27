@@ -6,10 +6,12 @@ local M = {}
 
 local ns = vim.api.nvim_create_namespace("jumanji")
 local block_ns = vim.api.nvim_create_namespace("jumanji-block")
+local stale_ns = vim.api.nvim_create_namespace("jumanji-stale")
 
 -- Log buffers, keyed by bufnr:
 -- { root = string, revset = string?, rows = table, items = table, expanded = { [change_id] = true },
---   selected = { [change_id] = true }, stale = boolean? (the repo changed while no window showed it) }
+--   selected = { [change_id] = true }, stale = boolean? (the repo changed while no window showed it),
+--   wc_stale = boolean? (jj can't read the log until the working copy is updated) }
 local views = {}
 
 -- Changed files per commit id: { { status = string, path = string } }
@@ -181,6 +183,13 @@ local function render(buf)
 			vim.api.nvim_buf_set_extmark(buf, ns, i - 1, 0, { sign_text = "\u{25cf}", sign_hl_group = "JumanjiSelected" })
 		end
 	end
+
+	vim.api.nvim_buf_clear_namespace(buf, stale_ns, 0, -1)
+	if view.wc_stale then
+		vim.api.nvim_buf_set_extmark(buf, stale_ns, 0, 0, {
+			virt_text = { { "working copy stale: press U to update", "JumanjiStale" } },
+		})
+	end
 	highlight_block(buf)
 end
 
@@ -220,9 +229,22 @@ local function refresh(buf)
 	view.stale = nil
 	local rows, err = jj.log(view.root, view.revset)
 	if not rows then
-		vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+		if not jj.is_stale(err) then
+			vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+			return
+		end
+
+		-- Every jj operation in the repo refreshes the log, so warn only once, in
+		-- one line: a message longer than that waits for Enter, which blocks an
+		-- nvim with no UI attached.
+		if not view.wc_stale then
+			vim.notify("jumanji: the working copy is stale, press U in the log to update it", vim.log.levels.WARN)
+		end
+		view.wc_stale = true
+		render(buf)
 		return
 	end
+	view.wc_stale = nil
 
 	local cursors = {}
 	for _, win in ipairs(vim.fn.win_findbuf(buf)) do
@@ -385,6 +407,22 @@ function M.open_file(in_tab)
 	if not exec(view.root, { "edit", item.commit.commit_id }) then return end
 	local path = vim.fs.joinpath(view.root, item.file.path)
 	vim.cmd((in_tab and "tabedit " or "belowright split ") .. vim.fn.fnameescape(path))
+end
+
+--- Update the log's stale working copy (`jj workspace update-stale`) in the
+--- background.
+function M.update_stale()
+	local root = views[vim.api.nvim_get_current_buf()].root
+	jj.exec_async(root, { "workspace", "update-stale" }, function(_, err)
+		if err then
+			vim.notify("jumanji: " .. err, vim.log.levels.ERROR)
+			return
+		end
+
+		vim.cmd.checktime()
+		-- update-stale records no operation, so the watcher won't refresh the log.
+		M.refresh_root(root)
+	end)
 end
 
 --- Toggle the selection of the commit under the cursor, then move to the

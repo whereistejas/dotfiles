@@ -19,6 +19,7 @@ local function set_highlights()
 		JumanjiFileDeleted = "Removed",
 		JumanjiSelected = "Special",
 		JumanjiCursorBlock = "CursorLine",
+		JumanjiStale = "DiagnosticWarn",
 	}) do
 		vim.api.nvim_set_hl(0, name, { link = link, default = true })
 	end
