@@ -923,6 +923,8 @@ end
 -- Tab prev/next — mirror AeroSpace's alt-[ / alt-] for workspaces.
 vim.keymap.set({ "n", "i", "v", "t" }, "<D-[>", "<Cmd>tabprevious<CR>", { desc = "Previous tab" })
 vim.keymap.set({ "n", "i", "v", "t" }, "<D-]>", "<Cmd>tabnext<CR>", { desc = "Next tab" })
+vim.keymap.set({ "n", "i", "v", "t" }, "<D-t>", "<Cmd>tabnew<CR>", { desc = "New tab" })
+vim.keymap.set({ "n", "i", "v", "t" }, "<C-Tab>", "<Cmd>tabnext<CR>", { desc = "Next tab" })
 
 -- Quickfix prev/next — wraps at the ends instead of erroring with E553.
 local function qf_step(forward)

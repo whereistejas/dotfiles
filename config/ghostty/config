@@ -35,3 +35,5 @@ keybind = cmd+shift+l=csi:108;10u
 # NN with super; 91 = '[', 93 = ']'.
 keybind = cmd+[=csi:91;9u
 keybind = cmd+]=csi:93;9u
+keybind = cmd+t=csi:116;9u
+keybind = ctrl+tab=csi:9;5u
