@@ -8,9 +8,18 @@ description: Hand off work to faster models by running `pi -p` subagents, in par
 You plan and review; faster models do the work. A subagent is a plain `pi -p`
 process running in the current directory, starting with no context but its task.
 
-A `pi -p` run blocks the conversation until it finishes. For a single task that
-should run in the background with this conversation's context and report back,
-use the `branch` tool instead. This skill is for fanning out self-contained tasks.
+A foreground `pi -p` run blocks the conversation until it finishes. To keep working
+while it runs, start it in the background and read its log when asked:
+
+```bash
+(cd <dir> && nohup pi -p --model anthropic/claude-sonnet-5-5 "$(cat /tmp/<name>.task)" > /tmp/<name>.log 2>&1 &)
+```
+
+Prefer a subagent over the `branch` tool whenever the task fits in a written brief,
+and always once the conversation is long: a branch forks the whole conversation and
+re-reads it on every step, which makes each turn slow and can exceed a small model's
+context. Use `branch` only when the task needs this conversation's unwritten context or
+mid-run steering (see `AGENTS.md` → Workflow).
 
 ## Routing
 

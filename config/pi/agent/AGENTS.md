@@ -81,9 +81,29 @@ project or a known directory.
 
 - For non-trivial changes, briefly state the plan before executing
 - Run tests/typecheck/lint after edits when available and relevant
+- **Push first, check after, when the branch has CI.** Once an approved push or
+  force-push (a rebase, a restack, a lockfile bump) is ready and conflict-free, push it
+  and open or retarget the MR before running fmt, `cargo check`, clippy or tests
+  locally. CI runs them anyway; running them first serialises minutes of waiting in
+  front of the push. Run them locally afterwards, in parallel with CI, and fix forward.
+  The same goes for briefs you write for branches and subagents: never make a local
+  check a gate before their push
 - Don't block on long tasks. Tests, builds, and running scripts you created go to a
-  `branch` background task when they may take more than ~1 minute; return control
+  background task (a subagent or a `branch`, chosen as below) when they may take more
+  than ~1 minute; return control
   instead of waiting. Large scans and investigations may run in blocking mode
+- **Choose `branch` vs a `pi -p` subagent by context, not habit.**
+  - **Subagent** (the `subagents` skill) when the task fits in a written brief: base,
+    files, steps, checks, what to push. Mechanical refactors, rebases, lockfile bumps and
+    doc syncs are all of this kind. It starts with a fresh context, so every turn is fast
+    and you can pick the model (sonnet for code, haiku for ops). Give it its own
+    `agent-workspace`, run it with `nohup … &`, and read its log when asked
+  - **Branch** only when the task needs this conversation's unwritten context (open
+    judgement calls, nuance from the discussion) or will need steering mid-run, and the
+    conversation is still short
+  - Once the conversation is long, prefer subagents: a branch re-reads the whole fork on
+    every step, and the fork may not fit a small model at all
+  - Test: if you're writing a full brief anyway, that's a subagent
 - Don't fabricate APIs — verify by reading source or docs
 - Keep `AGENTS.md` in sync: when a change invalidates something it documents (moved or
   renamed paths, changed commands, env vars, workflows, conventions), update `AGENTS.md`
