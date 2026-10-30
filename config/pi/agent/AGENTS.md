@@ -174,6 +174,15 @@ ripgrep (`rg`) recurses by default — never use `-r` for recursion, that's a gr
 `.../lib/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js`, run with a
 `node` shebang. No bun install, no `~/.local/bin/pi` wrapper — bare `pi` works in any shell.
 
+### Pi gateway authentication
+
+`extensions/aigw/index.ts` supplies gateway authentication with a five-minute,
+process-local token cache and asynchronous `aigw token` lookups. Omit `apiKey` from
+that provider in `models.json`; a configured key overrides the extension and a
+`!command` restores synchronous per-request lookups. Cached tokens are refreshed
+30 seconds before their declared expiry when that is sooner than five minutes.
+Run `node --test tests/pi-token-cache.test.mjs` from the dotfiles root to test it.
+
 ## Editor / Neovim
 
 The editor is Neovim nightly (`v0.13.0-dev`, Homebrew). Assume built-in LSP and current
