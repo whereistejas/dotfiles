@@ -11,9 +11,7 @@ pi loads `index.ts` through `jiti`, so there is no build step. After an edit, ru
 
 ## Tests
 
-No suite yet. `index.ts` imports `pi-tui` at runtime, so it can't load under
-`node --test`. Logic worth testing (reading the work item, formatting the line)
-moves into a module of its own first.
+Run `node --test repo-watch.test.ts`. Revision watcher selection lives in `repo-watch.ts`, which loads without pi runtime dependencies. In jj repositories, watch only jj operation heads, never Git refs: even revision queries can rewrite Git refs and trigger a refresh loop.
 
 ## pi runtime
 

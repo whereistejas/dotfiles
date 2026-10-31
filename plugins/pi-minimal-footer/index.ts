@@ -21,6 +21,8 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
+import { revisionWatchPaths } from "./repo-watch.ts";
+
 const exec = promisify(execFile);
 
 type RepoInfo = {
@@ -139,11 +141,8 @@ function createWatchers(info: RepoInfo, onChange: () => void): FSWatcher[] {
 			watchers.push(w);
 		} catch {}
 	};
-	if (info.jjOpHeadsDir) safe(info.jjOpHeadsDir);
-	if (info.gitDir) {
-		safe(join(info.gitDir, "HEAD"));
-		safe(join(info.gitDir, "refs", "heads"), { recursive: true });
-		safe(join(info.gitDir, "packed-refs"));
+	for (const { path, recursive } of revisionWatchPaths(info)) {
+		safe(path, { recursive });
 	}
 	return watchers;
 }
