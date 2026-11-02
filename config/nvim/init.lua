@@ -74,6 +74,9 @@ vim.opt.relativenumber = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 
+vim.filetype.add({ extension = { avsc = "avsc", avpr = "json", avdl = "avdl" } })
+vim.treesitter.language.register("json", "avsc")
+
 -- =============================================================================
 -- Plugins
 -- =============================================================================
@@ -743,6 +746,7 @@ vim.lsp.enable("ty")
 vim.lsp.enable("bashls")
 vim.lsp.enable("marksman")
 vim.lsp.enable("zls")
+vim.lsp.enable("avro_ls")
 
 -- rust-analyzer's macro expansion is a custom request
 -- (`rust-analyzer/expandMacro`), not part of the LSP spec, so nothing calls it
