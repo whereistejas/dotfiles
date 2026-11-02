@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "backend": {
+    "type": "transcribe-cpp"
+  },
+  "shortcut": "ctrl+shift+alt+space",
+  "preferredLanguages": [
+    "en"
+  ],
+  "transcriptionLanguage": "en",
+  "chineseOutput": "simplified",
+  "microphone": {
+    "type": "system-default"
+  },
+  "voiceActivityDetection": true,
+  "longformChunking": true,
+  "model": {
+    "source": "catalog",
+    "id": "Qwen3-ASR-1.7B",
+    "path": "/Users/tejas.sanap/.cache/huggingface/hub/models--handy-computer--Qwen3-ASR-1.7B-gguf/snapshots/92282af1610a2db19d66f2bef1e260f5deca782d/Qwen3-ASR-1.7B-Q8_0.gguf"
+  }
+}

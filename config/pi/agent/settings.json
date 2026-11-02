@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.1.0",
+  "lastChangelogVersion": "1.5.0",
   "theme": "light-classic",
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-5-5",
@@ -11,7 +11,8 @@
   "packages": [
     "https://github.com/kepano/obsidian-skills",
     "git:github.com/mvzink/jj-hunk-tool",
-    "npm:@ff-labs/pi-fff"
+    "npm:@ff-labs/pi-fff",
+    "npm:@earendil-works/pi-voice"
   ],
   "extensions": [
     "~/build/plugins/pi-branch",
