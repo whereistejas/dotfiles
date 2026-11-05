@@ -2,6 +2,15 @@
 -- by vim.pack.add() (plugin/ files) are cached too.
 vim.loader.enable()
 
+if vim.fn.has("mac") == 1 then
+	vim.env.PATH = table.concat({
+		"/opt/homebrew/bin",
+		"/opt/homebrew/sbin",
+		vim.fn.expand("~/.pi/agent/bin"),
+		vim.env.PATH or "",
+	}, ":")
+end
+
 if vim.fn.has("nvim-0.12.3") ~= 1 then
 	vim.notify("init.lua requires nvim >= 0.12.3 (vim.treesitter.select)", vim.log.levels.ERROR)
 	return
