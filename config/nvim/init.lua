@@ -923,9 +923,6 @@ for key, desc in pairs({
 		{ desc = desc })
 end
 
--- Double-<Tab> cycles to the next window/split.
-vim.keymap.set("n", "<Tab><Tab>", "<C-w>w", { desc = "Cycle to next window" })
-
 -- Tabs — switch to tab N in every mode (insert/visual/terminal too).
 -- <Cmd> runs the command without leaving the current mode.
 for i = 1, 4 do
