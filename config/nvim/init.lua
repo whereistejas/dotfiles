@@ -83,6 +83,18 @@ vim.opt.relativenumber = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 
+vim.o.findfunc = function(cmdarg, cmdcomplete)
+	local result = vim.system({ "rg", "--files" }, { cwd = vim.fn.getcwd(), text = true }):wait()
+	if result.code ~= 0 then return {} end
+
+	local files = vim.split(result.stdout, "\n", { trimempty = true })
+	if not cmdcomplete and vim.tbl_contains(files, cmdarg) then return { cmdarg } end
+
+	return vim.tbl_filter(function(file)
+		return file:lower():find(cmdarg:lower(), 1, true) ~= nil
+	end, files)
+end
+
 vim.filetype.add({ extension = { avsc = "avsc", avpr = "json", avdl = "avdl" } })
 vim.treesitter.language.register("json", "avsc")
 
