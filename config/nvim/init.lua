@@ -1046,7 +1046,7 @@ vim.keymap.set("n", "ZV", "<cmd>1Sv<cr>", { desc = "Go to previous session" })
 -- snacks picker
 vim.keymap.set("n", "<space>p", function() Snacks.picker.pickers() end, { desc = "Pickers" })
 vim.keymap.set("n", "<space>t", function() Snacks.picker.lsp_workspace_symbols() end, { desc = "Workspace symbols" })
-vim.keymap.set("n", "<space>B", function() Snacks.picker.buffers() end, { desc = "Buffers" })
+vim.keymap.set("n", "<space>b", function() Snacks.picker.buffers() end, { desc = "Buffers" })
 vim.keymap.set("n", "<space>f", function() Snacks.picker.files() end, { desc = "Find files" })
 vim.keymap.set("n", "<space>F", function() Snacks.picker.files({ hidden = true, ignored = true }) end,
 	{ desc = "Find files (hidden + ignored)" })
