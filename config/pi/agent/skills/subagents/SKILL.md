@@ -100,6 +100,21 @@ A subagent can't ask follow-ups. Each task must state:
   - `research`: a Markdown report of at most N lines, organised by the questions
     asked, with `file:line` references and a yes/no/maybe verdict per finding.
 
+## Monitoring
+
+`pi -p` writes only its final answer to stdout, at exit, so its log stays empty while the
+subagent works. An empty log is not a stuck run. To follow a run while it works:
+
+- **Stream the log:** start long background runs with `--mode json` instead of `-p`. It
+  runs once and exits like `-p`, but writes JSONL events to stdout as they happen, so
+  `/tmp/<name>.log` grows live. The final answer is the last assistant message.
+- **Read the session:** every run saves its session as it goes, under
+  `~/.pi/agent/sessions/<escaped working directory>/`. Render the newest one with the
+  `session-transcript` skill's `pi-transcript read` to see what it has done so far.
+- **Watch the bookmark:** a `code` subagent that commits and pushes shows progress as
+  commits on its bookmark (`jj log -r '<base>..<bookmark>'`) and as uncommitted edits in
+  its workspace (`jj status` there).
+
 ## After
 
 Read each log, then review the result yourself (`jj diff`, `jj log`) before
