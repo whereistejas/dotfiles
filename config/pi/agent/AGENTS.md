@@ -92,17 +92,20 @@ project or a known directory.
   background task (a subagent or a `branch`, chosen as below) when they may take more
   than ~1 minute; return control
   instead of waiting. Large scans and investigations may run in blocking mode
-- **Choose `branch` vs a `pi -p` subagent by context, not habit.**
-  - **Subagent** (the `subagents` skill) when the task fits in a written brief: base,
-    files, steps, checks, what to push. Mechanical refactors, rebases, lockfile bumps and
-    doc syncs are all of this kind. It starts with a fresh context, so every turn is fast
-    and you can pick the model (sonnet for code, haiku for ops). Give it its own
-    `agent-workspace`, run it with `nohup … &`, and read its log when asked
-  - **Branch** only when the task needs this conversation's unwritten context (open
-    judgement calls, nuance from the discussion) or will need steering mid-run, and the
-    conversation is still short
-  - Once the conversation is long, prefer subagents: a branch re-reads the whole fork on
-    every step, and the fork may not fit a small model at all
+- **Choose a forked branch vs a subagent by context, not habit.** Both are `branch`
+  tool sessions: a pi TUI in a hidden Neovim terminal that the user can join from the
+  servery picker, and that reports back on its own. Never run headless `pi -p`
+  subagents
+  - **Subagent** (`branch` with `fresh: true`; the `subagents` skill) when the task fits
+    in a written brief: base, files, steps, checks, what to push. Mechanical refactors,
+    rebases, lockfile bumps and doc syncs are all of this kind. It starts with no
+    conversation, so every turn is fast and you can pick the model (sonnet for code,
+    haiku for ops)
+  - **Forked branch** (`branch` without `fresh`) only when the task needs this
+    conversation's unwritten context (open judgement calls, nuance from the discussion)
+    and the conversation is still short
+  - Once the conversation is long, prefer subagents: a forked branch re-reads the whole
+    fork on every step, and the fork may not fit a small model at all
   - Test: if you're writing a full brief anyway, that's a subagent
 - Don't fabricate APIs — verify by reading source or docs
 - Keep `AGENTS.md` in sync: when a change invalidates something it documents (moved or
@@ -130,10 +133,12 @@ agent-workspace remove <dir>             # stops its warm-up, forgets it (edits 
   instant, no extra disk) and starts a background warm-up build, so nobody waits
   minutes on a cold build. Put its `brief=` line into the task of whoever works there,
   and don't wait for the warm-up yourself: research and edit meanwhile
+- `branch` with `write: true` runs `agent-workspace add` itself and passes the `brief=`
+  line on, for forked branches and subagents alike
 - Clean up everything you created once the work is integrated or dropped:
-  `agent-workspace remove <dir>` for a `pi -p` subagent's workspace, `branch close` for
-  a branch (it also wipes the branch's Neovim buffer). A subagent never removes its own
-  workspace
+  `branch close` for a branch or subagent (it also wipes its Neovim buffer and removes
+  its workspace), `agent-workspace remove <dir>` for one you added by hand. A branch
+  never removes its own workspace
 
 ### Avoiding interactive jj commands
 

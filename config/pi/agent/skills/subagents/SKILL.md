@@ -1,126 +1,96 @@
 ---
 name: subagents
-description: Hand off work to faster models by running `pi -p` subagents, in parallel when subtasks are independent. Use once a plan exists and the remaining work is implementation (writing code to a spec), read-only research (scouting a large codebase or docs), or mechanical jj/VCS actions (`jj commit`, describe, split, bookmarks). Don't use for planning, design, debugging an unknown cause, when you are already a subagent, or for one long task the user wants in the background — use the `branch` tool for that.
+description: Hand off work to faster models as subagents — fresh `branch` sessions (`fresh: true`) that start with nothing but their brief, run as pi TUIs in hidden Neovim terminals the user can join, and report back on their own. Run them in parallel when subtasks are independent. Use once a plan exists and the remaining work is implementation (writing code to a spec), read-only research (scouting a large codebase or docs), or mechanical jj/VCS actions (`jj commit`, describe, split, bookmarks). Don't use for planning, design, debugging an unknown cause, or a task that needs this conversation's unwritten context — fork a branch (no `fresh`) for that.
 ---
 
 # Subagents
 
-You plan and review; faster models do the work. A subagent is a plain `pi -p`
-process running in the current directory, starting with no context but its task.
+You plan and review; faster models do the work. A subagent is a `branch` session
+started with `fresh: true`: it has no conversation but its brief.
 
-A foreground `pi -p` run blocks the conversation until it finishes. To keep working
-while it runs, start it in the background and read its log when asked:
+Like every branch, it runs as a pi TUI in a hidden Neovim terminal. The user can jump
+into it from the servery session picker and type into it, and its final answer arrives
+here as a message when it settles. Never run headless `pi -p` subagents: nobody can see
+or join them.
 
-```bash
-(cd <dir> && nohup pi -p --model anthropic/claude-sonnet-5-5 "$(cat /tmp/<name>.task)" > /tmp/<name>.log 2>&1 &)
+```
+branch({ action: "start", fresh: true, name: "<name>", model: "anthropic/claude-sonnet-5-5", task: "<brief>" })
 ```
 
-Prefer a subagent over the `branch` tool whenever the task fits in a written brief,
-and always once the conversation is long: a branch forks the whole conversation and
-re-reads it on every step, which makes each turn slow and can exceed a small model's
-context. Use `branch` only when the task needs this conversation's unwritten context or
-mid-run steering (see `AGENTS.md` → Workflow).
+`start` returns at once. Keep working or return control; never sleep or poll waiting
+for the report.
+
+Prefer a subagent over a forked branch whenever the task fits in a written brief, and
+always once the conversation is long: a fork re-reads the whole conversation on every
+step, which makes each turn slow and can exceed a small model's context (see
+`AGENTS.md` → Workflow).
 
 ## Routing
 
-| Task type | Examples | Model |
+| Task type | Examples | `model` / `tools` |
 |---|---|---|
 | `code` | implement a planned change, write tests, port a module | `anthropic/claude-sonnet-5-5` |
-| `research` | read-only scouting of a large codebase or docs | `anthropic/claude-sonnet-5-5:medium` with `--tools read,grep,find,ls` |
+| `research` | read-only scouting of a large codebase or docs | `anthropic/claude-sonnet-5-5:medium`, `tools: ["read", "ffgrep", "fffind"]` |
 | `ops` | `jj commit`/`describe`/`split`/`bookmark`, renames, formatting, boilerplate | `anthropic/claude-haiku-4-5` |
 | `reasoning` | planning, design, root-causing, review | don't hand off — do it yourself |
 
 - Context windows: haiku-4-5 has 200K tokens, sonnet-5-5 has 1M. A subagent that
   must read a lot shouldn't get haiku.
 - Append `:<thinking>` (`low`, `medium`, `high`) to a model to set its thinking level.
-- `--tools` restricts what a subagent can call, so read-only is enforced, not just
-  requested.
+- `tools` is an allowlist (`pi --tools`), so read-only is enforced, not just
+  requested. Name every tool it needs.
 
-## Running
+## Parallel
 
-Write each task to `/tmp/<name>.task`, then:
+Start up to 5 for independent subtasks, one `start` call each. Keep one writer per
+working copy:
 
-```bash
-pi -p --model anthropic/claude-sonnet-5-5 "$(cat /tmp/<name>.task)" > /tmp/<name>.log 2>&1
-```
+- Every subagent that edits files gets `write: true`, its own jj workspace (from
+  `agent-workspace`; in a Rust project it starts warm with a background build, and
+  the brief carries that build's `brief=` line automatically).
+- Read-only subagents share the current working copy and need no workspace.
 
-Parallel (independent subtasks only, up to 5) — one bash call, no timeout:
+## Permissions
 
-```bash
-pi -p --model anthropic/claude-sonnet-5-5 "$(cat /tmp/a.task)" > /tmp/a.log 2>&1 &
-pi -p --model anthropic/claude-sonnet-5-5 "$(cat /tmp/b.task)" > /tmp/b.log 2>&1 &
-wait
-```
+A subagent never asks for permission, so the `branch` tool enforces a policy:
 
-Parallel subagents share the working copy, so keep one writer per set of files:
+- It may write only inside its jj repo, where `jj undo` reverts it.
+- Remote writes are blocked. `remote: true` allows pushing its own branches and
+  GitLab/GitHub MR writes; set it only when the user approved pushing for this task.
+- `subagents: true` lets it start subagents of its own; it receives their reports.
 
-- Give each one a disjoint set of files. When the work can't be split cleanly by
-  file, give each writer its own jj workspace (below).
-- Only `code` and `research` subagents run in parallel, and they must not run `jj`
-  write commands. Commit afterwards with a single `ops` subagent (or yourself).
+## Brief
 
-## Own workspace
-
-Create it with `agent-workspace`, not raw `jj workspace add`. In a Rust project it
-starts the workspace from a clone of this one's `target/` and runs a warm-up build in
-the background, so the subagent researches and edits while the build catches up
-instead of waiting minutes on a cold one:
-
-```bash
-agent-workspace add <name> > /tmp/<name>.ws    # dir=<path>, and brief=<line> in Rust
-```
-
-Put the `brief=` line into the task file verbatim. Run the subagent from the
-workspace:
-
-```bash
-(cd <dir> && pi -p --model anthropic/claude-sonnet-5-5 "$(cat /tmp/<name>.task)") > /tmp/<name>.log 2>&1
-```
-
-The `jj-subagent-workspaces` skill covers the brief's jj ground rules and how to
-integrate the commits afterwards; replace its cleanup step with
-`agent-workspace remove <dir>` (below).
-
-## Task file
-
-A subagent can't ask follow-ups. Each task must state:
+A subagent can't see this conversation. The brief (`task`) must state:
 
 - The exact files (or revisions, for `ops`) it may touch, as repo-relative paths.
 - Concrete instructions — the plan, not a goal.
 - How to check it's done (tests to run, expected `jj log` output).
-- Prohibitions: no `jj git push` or other writes to remote services, no edits
-  outside its files, no spawning subagents.
-- In its own workspace: the workspace's absolute path, the `brief=` line, and "don't
-  remove this workspace".
-- Behaviour: "Use your tools; never print tool calls or patches as text. Don't end
-  with a question: if you're blocked, say what decision you need."
+- What not to do: edits outside its files, and any remote write you didn't allow.
 - The output it must end with:
   - `code`/`ops`: a handoff — result, files and jj change ids touched, test state,
     open questions.
   - `research`: a Markdown report of at most N lines, organised by the questions
     asked, with `file:line` references and a yes/no/maybe verdict per finding.
 
+The tool adds the rest itself: that nobody is watching, not to stop on a question,
+to use tools rather than print them, and the workspace rules.
+
 ## Monitoring
 
-`pi -p` writes only its final answer to stdout, at exit, so its log stays empty while the
-subagent works. An empty log is not a stuck run. To follow a run while it works:
-
-- **Stream the log:** start long background runs with `--mode json` instead of `-p`. It
-  runs once and exits like `-p`, but writes JSONL events to stdout as they happen, so
-  `/tmp/<name>.log` grows live. The final answer is the last assistant message.
-- **Read the session:** every run saves its session as it goes, under
-  `~/.pi/agent/sessions/<escaped working directory>/`. Render the newest one with the
-  `session-transcript` skill's `pi-transcript read` to see what it has done so far.
-- **Watch the bookmark:** a `code` subagent that commits and pushes shows progress as
-  commits on its bookmark (`jj log -r '<base>..<bookmark>'`) and as uncommitted edits in
-  its workspace (`jj status` there).
+- `branch({ action: "peek", name })`: its tool calls and latest text so far.
+- `branch({ action: "steer", name, message })`: a correction or answer; it lands
+  after the current tool call.
+- `branch({ action: "list" })`: every branch and subagent of this session, with its
+  status.
 
 ## After
 
-Read each log, then review the result yourself (`jj diff`, `jj log`) before
-reporting back.
+Read each report, then review the result yourself (`jj diff`, `jj log`) before
+reporting back. The `jj-subagent-workspaces` skill covers integrating a writer's
+commits; skip its cleanup step.
 
-Once a workspace's commits are integrated (or dropped), run
-`agent-workspace remove <dir>`. It stops the warm-up build, forgets the workspace
+Once the work is integrated (or dropped), `branch({ action: "close", name })`. It
+wipes the terminal and, for a writer, stops the warm-up build, forgets the workspace
 (snapshotting any uncommitted edits into its commit, which stays in the repo) and
 deletes the folder.
