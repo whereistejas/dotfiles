@@ -140,6 +140,30 @@ starts, so every delegated session is a TUI the user can join.
 - `/fg <name>`: show that branch's buffer in the current window. The user can
   type into it directly (native pi steering). `:b#` goes back.
 
+## Messaging other sessions
+
+Any two running pi sessions can message each other, but only when the user asks
+for it. The tool guidelines forbid sending on the agent's own initiative.
+
+- Each session with a session file registers itself in `presence.json` with its
+  id, name, cwd and pid. The name is the pi session name (`/name`), or
+  `<cwd basename>-<last 8 characters of the id>`. A session counts as live while
+  its pid exists.
+- `branch({ action: "list" })` also lists the other live sessions.
+- `branch({ action: "send", name, message })` resolves `name` among the other live
+  sessions by name, full id or short id, and refuses ambiguous or unknown targets.
+  It writes the message to the target's inbox.
+- Every session polls its inbox with the branch poll. A message is posted as a
+  `session-message` custom message that names the sender. It starts a turn if
+  the session is idle and lands as a steer if it's busy. The receiving agent is
+  told to act on the message and to reply only when asked, so two agents don't
+  keep acknowledging each other.
+- Delivered message ids are recorded in the message's details, so `/reload`
+  can't deliver a message twice. A file is deleted only after `sendMessage`
+  accepts it.
+- On `session_shutdown` the session unregisters. Its directory is removed unless
+  messages are still waiting; those are delivered when the session runs again.
+
 ## Closing a branch
 
 `branch({ action: "close", name })`, called by the receiver agent once the report
@@ -224,6 +248,9 @@ caching is prefix-based, so forks already share it).
 `~/.pi/agent/branches/<branch-id>/`: `meta.json` (name, worker and receiver
 session files, nvim buffer, cwd, workspace, status), `to-receiver/`,
 `to-worker/`. Session files stay where pi puts them.
+
+`~/.pi/agent/branches/sessions/<session-id>/`: `presence.json` while the session
+runs, and `inbox/` for messages from other sessions.
 
 ## Scenarios
 

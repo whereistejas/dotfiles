@@ -4,7 +4,7 @@ import path from "node:path";
 import { registerHooks, stripTypeScriptTypes } from "node:module";
 import test from "node:test";
 
-/** Lets tests load worker.ts, receiver.ts and store.ts: stubs fork.ts's pi import and keeps branch storage in a temporary directory. */
+/** Lets tests load worker.ts, receiver.ts, mailbox.ts and store.ts: stubs fork.ts's pi import and keeps branch storage in a temporary directory. */
 export const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-branch-test-"));
 
 registerHooks({
@@ -15,7 +15,7 @@ registerHooks({
 		return next(specifier, context);
 	},
 	load(url, context, next) {
-		if (/\/(worker|receiver|store)\.ts$/.test(url)) {
+		if (/\/(worker|receiver|mailbox|store)\.ts$/.test(url)) {
 			let source = fs.readFileSync(new URL(url), "utf8");
 			if (url.endsWith("/store.ts")) source = source.replace('path.join(os.homedir(), ".pi", "agent", "branches")', JSON.stringify(root));
 			return { format: "module", source: stripTypeScriptTypes(source, { mode: "transform" }), shortCircuit: true };

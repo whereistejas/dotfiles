@@ -42,6 +42,7 @@ export interface Message {
 export type Box = "to-receiver" | "to-worker";
 
 export const branchDir = (id: string) => path.join(ROOT, id);
+export const sessionDir = (id: string) => path.join(ROOT, "sessions", id);
 const metaFile = (id: string) => path.join(branchDir(id), "meta.json");
 export const statusFile = (id: string) => path.join(branchDir(id), "status.json");
 export const exitFile = (id: string) => path.join(branchDir(id), "exit.json");
@@ -73,13 +74,16 @@ export function listMetas(): Meta[] {
 		.filter((m): m is Meta => m !== undefined);
 }
 
-export function post(id: string, box: Box, message: Message): void {
-	writeJson(path.join(branchDir(id), box, `${message.id}.json`), message);
+export const post = (id: string, box: Box, message: Message) => postTo(path.join(branchDir(id), box), message);
+
+export function postTo(dir: string, message: Message): void {
+	writeJson(path.join(dir, `${message.id}.json`), message);
 }
 
+export const inbox = (id: string, box: Box, state = "json") => messagesIn(path.join(branchDir(id), box), state);
+
 /** Messages a box holds in `state`, oldest first. A message moves through states by renaming its file. */
-export function inbox(id: string, box: Box, state = "json"): { file: string; message: Message }[] {
-	const dir = path.join(branchDir(id), box);
+export function messagesIn(dir: string, state = "json"): { file: string; message: Message }[] {
 	if (!fs.existsSync(dir)) return [];
 	return fs
 		.readdirSync(dir)

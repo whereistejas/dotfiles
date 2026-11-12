@@ -1,8 +1,10 @@
 import fs from "node:fs";
+import path from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { forkSession, freshSessionFile, TOOL_NAME, textOf } from "./fork.ts";
+import { findSession, liveSessions, Mailbox, type Presence, register, send, shortId, unregister } from "./mailbox.ts";
 import { closeTerminal, openTerminal, requireNvim, showBuffer } from "./nvim.ts";
 import { Receiver } from "./receiver.ts";
 import { exitFile, inbox, listMetas, type Meta, newId, post, readJson, removeBranch, type Status, saveMeta, statusFile } from "./store.ts";
@@ -26,6 +28,8 @@ export default function (pi: ExtensionAPI) {
 	let current: ExtensionContext | undefined;
 	let worker: Worker | undefined;
 	let receiver: Receiver | undefined;
+	let mailbox: Mailbox | undefined;
+	let self: Presence | undefined;
 	let timer: NodeJS.Timeout | undefined;
 
 	function startPolling() {
@@ -34,6 +38,7 @@ export default function (pi: ExtensionAPI) {
 			try {
 				worker?.takeSteers(current);
 				receiver?.poll(current);
+				mailbox?.poll(current);
 			} catch (error) {
 				current.ui.notify(`branch: ${(error as Error).message}`, "error");
 			}
@@ -45,13 +50,28 @@ export default function (pi: ExtensionAPI) {
 		receiver = new Receiver(pi, ctx);
 		const mine = listMetas().find((m) => m.workerFile === ctx.sessionManager.getSessionFile());
 		worker = mine && (await Worker.attach(pi, mine, ctx));
-		if (worker || receiver.waiting) startPolling();
+		if (ctx.sessionManager.getSessionFile()) {
+			const id = ctx.sessionManager.getSessionId();
+			self = { id, name: sessionName(id, ctx.cwd), cwd: ctx.cwd, pid: process.pid };
+			register(self);
+			mailbox = new Mailbox(pi, ctx, id);
+		}
+		if (worker || receiver.waiting || mailbox) startPolling();
+	});
+
+	pi.on("session_info_changed", () => {
+		if (!self) return;
+		self.name = sessionName(self.id, self.cwd);
+		register(self);
 	});
 
 	pi.on("session_shutdown", () => {
 		clearInterval(timer);
-		timer = current = worker = receiver = undefined;
+		if (self) unregister(self.id);
+		timer = current = worker = receiver = mailbox = self = undefined;
 	});
+
+	const sessionName = (id: string, cwd: string) => pi.getSessionName() ?? `${path.basename(cwd)}-${shortId(id)}`;
 
 	pi.on("agent_start", (_event, ctx) => {
 		current = ctx;
@@ -150,14 +170,25 @@ export default function (pi: ExtensionAPI) {
 
 	function listing(ctx: ExtensionContext): string {
 		const file = ctx.sessionManager.getSessionFile();
-		const metas = related(ctx);
-		if (metas.length === 0) return "No branches.";
-		return metas
-			.map((m) => {
-				const role = m.workerFile === file ? "this session is its worker" : "reports here";
-				return `${m.name}: ${stateOf(m)}, ${role}, buffer ${m.buf ?? "?"}, ${m.model ?? "default model"}, ${m.workspace ?? m.cwd}`;
-			})
-			.join("\n");
+		const branches = related(ctx).map((m) => {
+			const role = m.workerFile === file ? "this session is its worker" : "reports here";
+			return `${m.name}: ${stateOf(m)}, ${role}, buffer ${m.buf ?? "?"}, ${m.model ?? "default model"}, ${m.workspace ?? m.cwd}`;
+		});
+		const sessions = liveSessions()
+			.filter((s) => s.id !== self?.id)
+			.map((s) => `${s.name} (id ${shortId(s.id)}): ${s.cwd}`);
+		return [
+			branches.length ? branches.join("\n") : "No branches.",
+			sessions.length ? `Other live sessions:\n${sessions.join("\n")}` : "No other live sessions.",
+		].join("\n\n");
+	}
+
+	function sendTo(target: string | undefined, text: string | undefined): string {
+		if (!self) throw new Error("messaging needs a saved session");
+		if (!target || !text?.trim()) throw new Error("send needs a name and a message");
+		const to = findSession(target, liveSessions().filter((s) => s.id !== self?.id));
+		send(self, to, text);
+		return `Sent to "${to.name}". It lands as a steer if that session is busy, or starts a turn there if it's idle.`;
 	}
 
 	pi.registerTool({
@@ -165,7 +196,8 @@ export default function (pi: ExtensionAPI) {
 		label: "Branch",
 		description: `Fork this conversation, or start a fresh one, in a background pi session (a Neovim terminal buffer) that works on a task and reports back here.
 - start: needs name and task. By default the branch inherits the whole conversation, so the task can be short. fresh: true starts it with no conversation (a subagent): the task must then be a complete brief. tools restricts what it can call (e.g. ["read", "ffgrep", "fffind"] for read-only research). Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 for a fresh branch or when this conversation is well under that). write: true gives it its own jj workspace (a Rust one starts warm, with a build running in the background); leave it off for read-only work. remote: true lets it push/force-push its branches and write MRs (the default for a fresh branch; pass remote: false to block it); subagents: true lets it start its own branches — set it only when the user asked for that.
-- peek: the branch's progress so far. steer: send it a message; it lands after its current tool call finishes (a running command isn't interrupted). list: all branches of this session.
+- peek: the branch's progress so far. steer: send it a message; it lands after its current tool call finishes (a running command isn't interrupted). list: all branches of this session, and the other live pi sessions.
+- send: message any other live pi session (name: its session name or id, from list). Only when the user asks you to message another session.
 - close: once you've integrated its work, or dropped it: wipes its terminal buffer and, for a write branch, stops its warm-up build, forgets its jj workspace (its commits stay) and deletes the folder. Refused while it's running.
 Reports arrive as messages on their own. After start, return control or keep working: never sleep or poll waiting for a report.`,
 		promptSnippet: "Fork the conversation into a background pi session that reports back",
@@ -173,12 +205,13 @@ Reports arrive as messages on their own. After start, return control or keep wor
 			"Use the branch tool only when the user asks for background or delegated work, directly or through their instructions; a task being big isn't a reason on its own.",
 			"One writer per working copy: branches that edit files need write: true.",
 			"Close a branch with branch close once its report is handled and any commits it made are integrated.",
+			"Use branch send only when the user asks you to message another session; never on your own initiative.",
 		],
 		parameters: Type.Object({
-			action: StringEnum(["start", "peek", "steer", "list", "close"] as const),
-			name: Type.Optional(Type.String({ description: "Branch name, e.g. scout-auth" })),
+			action: StringEnum(["start", "peek", "steer", "list", "close", "send"] as const),
+			name: Type.Optional(Type.String({ description: "Branch name, e.g. scout-auth; send: the target session's name or id" })),
 			task: Type.Optional(Type.String({ description: "start: what the branch should do" })),
-			message: Type.Optional(Type.String({ description: "steer: the message" })),
+			message: Type.Optional(Type.String({ description: "steer, send: the message" })),
 			model: Type.Optional(Type.String({ description: "start: provider/id[:thinking]" })),
 			write: Type.Optional(Type.Boolean({ description: "start: give it its own jj workspace to edit in" })),
 			remote: Type.Optional(Type.Boolean({ description: "start: allow pushes/force-pushes and GitLab/GitHub MR writes (default: true when fresh, else false)" })),
@@ -207,6 +240,9 @@ Reports arrive as messages on their own. After start, return control or keep wor
 					break;
 				case "close":
 					text = await close(ctx, params.name);
+					break;
+				case "send":
+					text = sendTo(params.name, params.message);
 			}
 			return { content: [{ type: "text", text }], details: undefined };
 		},
