@@ -19,7 +19,7 @@
     "~/build/plugins/pi-nvim-terminal",
     "~/build/plugins/pi-window-title",
     "~/build/plugins/pi-minimal-footer",
-    "~/build/plugins/pi-jj-commit-mention"
+    "~/build/plugins/pi-mention"
   ],
   "quietStartup": true,
   "tuiMode": "regular",
