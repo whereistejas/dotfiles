@@ -55,8 +55,9 @@ working copy:
 A subagent never asks for permission, so the `branch` tool enforces a policy:
 
 - It may write only inside its jj repo, where `jj undo` reverts it.
-- Remote writes are blocked. `remote: true` allows pushing its own branches and
-  GitLab/GitHub MR writes; set it only when the user approved pushing for this task.
+- It may push and force-push its own branches and write GitLab/GitHub MRs (never
+  `main`); other remote writes are blocked. Pass `remote: false` for a subagent
+  that mustn't push.
 - `subagents: true` lets it start subagents of its own; it receives their reports.
 
 ## Brief
@@ -66,7 +67,8 @@ A subagent can't see this conversation. The brief (`task`) must state:
 - The exact files (or revisions, for `ops`) it may touch, as repo-relative paths.
 - Concrete instructions — the plan, not a goal.
 - How to check it's done (tests to run, expected `jj log` output).
-- What not to do: edits outside its files, and any remote write you didn't allow.
+- What to push (bookmark, MR target), or that it mustn't push.
+- What not to do: edits outside its files.
 - The output it must end with:
   - `code`/`ops`: a handoff — result, files and jj change ids touched, test state,
     open questions.
