@@ -204,6 +204,20 @@ function M.parents(root, revset)
 	end)
 end
 
+--- The URL of a git remote, or nil if the repo has no such remote.
+---@param root string
+---@param name string
+---@return string?
+function M.remote_url(root, name)
+	local cmd = { "jj", "git", "remote", "list", "--ignore-working-copy", "--color=never", "--no-pager" }
+	return run(root, cmd, function(out)
+		for line in vim.gsplit(out, "\n", { plain = true, trimempty = true }) do
+			local remote, url = line:match("^(%S+)%s+(%S+)")
+			if remote == name then return url end
+		end
+	end)
+end
+
 -- Run jj in the background. `on_done` runs on the main loop with the parsed
 -- stdout, or nil and jj's stderr.
 local function run_async(root, cmd, parser, on_done)

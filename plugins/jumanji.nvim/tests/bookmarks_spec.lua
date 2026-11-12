@@ -77,3 +77,54 @@ h.test("confirming a bookmark opens its whole stack", function()
 	end
 	h.truthy(not vim.tbl_contains(stack, "b1"), "the other stack leaked in: " .. vim.inspect(stack))
 end)
+
+-- A glab on PATH that records its arguments and lists one open MR, for a.
+local function fake_glab(nvim, dir)
+	local bin = vim.fs.joinpath(vim.fs.dirname(dir), "fake-bin")
+	vim.fn.mkdir(bin, "p")
+	local script = vim.fs.joinpath(bin, "glab")
+	vim.fn.writefile({
+		"#!/bin/sh",
+		'echo "$@" > ' .. vim.fn.shellescape(vim.fs.joinpath(bin, "args")),
+		[[echo '[{"iid": 12, "source_branch": "a"}, {"iid": 13, "source_branch": "gone"}]']],
+	}, script)
+	vim.uv.fs_chmod(script, 493)
+	h.lua(nvim, "vim.env.PATH = ... .. ':' .. vim.env.PATH", { bin })
+	return vim.fs.joinpath(bin, "args")
+end
+
+local fetch_mrs = [[
+	local done = false
+	require("jumanji.mr").fetch(..., function() done = true end)
+	vim.wait(5000, function() return done end, 20)
+	return { done = done, mrs = require("jumanji.mr").get(...) }
+]]
+
+h.test("open GitLab MRs are fetched by source branch from origin", function()
+	local dir = stacks()
+	h.jj(dir, { "git", "remote", "add", "origin", "https://gitlab.com/g/p.git" })
+	local nvim = h.nvim(dir)
+	local args = fake_glab(nvim, dir)
+
+	local out = h.lua(nvim, fetch_mrs, { dir })
+
+	h.truthy(out.done, "the fetch never finished")
+	h.eq({ a = 12, gone = 13 }, out.mrs)
+	h.truthy(vim.fn.readfile(args)[1]:find("-R https://gitlab.com/g/p.git", 1, true), "glab wasn't pointed at origin")
+end)
+
+h.test("a repo without origin has no MRs and doesn't run glab", function()
+	local dir = stacks()
+	local nvim = h.nvim(dir)
+	local args = fake_glab(nvim, dir)
+
+	local out = h.lua(nvim, [[
+		require("jumanji.mr").fetch(..., function() error("called back") end)
+		vim.wait(300)
+		return require("jumanji.mr").get(...)
+	]], { dir })
+
+	h.eq({}, out)
+	h.eq(nil, vim.uv.fs_stat(args))
+	h.not_blocked(nvim)
+end)

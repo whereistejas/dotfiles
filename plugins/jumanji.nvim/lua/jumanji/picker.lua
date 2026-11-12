@@ -1,4 +1,5 @@
 local jj = require("jumanji.jj")
+local mr = require("jumanji.mr")
 
 local M = {}
 
@@ -131,6 +132,13 @@ local function format_bookmark(item, picker)
 		ret[#ret + 1] = { c.change_id, "JumanjiChangeId" }
 		ret[#ret + 1] = { " " }
 	end
+	local mrs = mr.get(item.root)
+	for _, b in ipairs(node.bookmarks) do
+		if not b.remote and mrs[b.name] then
+			ret[#ret + 1] = { "!" .. mrs[b.name], "JumanjiMergeRequest" }
+			ret[#ret + 1] = { " " }
+		end
+	end
 	ret[#ret + 1] = { c.description ~= "" and c.description or "(no description set)", c.description == "" and "JumanjiDim" or nil }
 	return ret
 end
@@ -193,14 +201,21 @@ local function preview_branch(ctx)
 end
 
 M.sources = {
-	--- Bookmarks, local and remote, as a tree of stacks. The preview shows a
-	--- bookmark's own commits; confirm opens the log of its whole stack.
+	--- Bookmarks, local and remote, as a tree of stacks, with the numbers of
+	--- your open GitLab MRs. The preview shows a bookmark's own commits;
+	--- confirm opens the log of its whole stack.
 	jj_bookmarks = {
 		title = "jj bookmarks",
 		config = with_root,
 		finder = bookmark_items,
 		format = format_bookmark,
 		matcher = { keep_parents = true, sort = false },
+		on_show = function(picker)
+			if not picker.opts.jj_root then return end
+			mr.fetch(picker.opts.jj_root, function()
+				if not picker.closed then picker.list:update({ force = true }) end
+			end)
+		end,
 		preview = preview_branch,
 		confirm = function(picker, item)
 			picker:close()
