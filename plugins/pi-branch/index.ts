@@ -102,7 +102,7 @@ export default function (pi: ExtensionAPI) {
 		const meta: Meta = {
 			id: newId(), name, flow: "tool", cwd, workspace: workspace?.dir, receiverFile: parentFile, model: p.model ?? modelOf(ctx),
 			workerFile: p.fresh ? freshSessionFile(parentFile) : forkSession({ parentFile, leafId, cwd, forWorker: true }),
-			createdAt: new Date().toISOString(), remote: p.remote ?? false, subagents: p.subagents ?? false, fresh: p.fresh ?? false,
+			createdAt: new Date().toISOString(), remote: p.remote ?? p.fresh ?? false, subagents: p.subagents ?? false, fresh: p.fresh ?? false,
 		};
 		saveMeta(meta);
 		const cmd = piCommand(meta.workerFile, meta.model, toolBrief(p.task, workspace, meta), p.tools);
@@ -164,7 +164,7 @@ export default function (pi: ExtensionAPI) {
 		name: TOOL_NAME,
 		label: "Branch",
 		description: `Fork this conversation, or start a fresh one, in a background pi session (a Neovim terminal buffer) that works on a task and reports back here.
-- start: needs name and task. By default the branch inherits the whole conversation, so the task can be short. fresh: true starts it with no conversation (a subagent): the task must then be a complete brief. tools restricts what it can call (e.g. ["read", "ffgrep", "fffind"] for read-only research). Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 for a fresh branch or when this conversation is well under that). write: true gives it its own jj workspace (a Rust one starts warm, with a build running in the background); leave it off for read-only work. remote: true lets it push/force-push its branches and write MRs; subagents: true lets it start its own branches — set them only when the user asked for that.
+- start: needs name and task. By default the branch inherits the whole conversation, so the task can be short. fresh: true starts it with no conversation (a subagent): the task must then be a complete brief. tools restricts what it can call (e.g. ["read", "ffgrep", "fffind"] for read-only research). Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 for a fresh branch or when this conversation is well under that). write: true gives it its own jj workspace (a Rust one starts warm, with a build running in the background); leave it off for read-only work. remote: true lets it push/force-push its branches and write MRs (the default for a fresh branch; pass remote: false to block it); subagents: true lets it start its own branches — set it only when the user asked for that.
 - peek: the branch's progress so far. steer: send it a message; it lands after its current tool call finishes (a running command isn't interrupted). list: all branches of this session.
 - close: once you've integrated its work, or dropped it: wipes its terminal buffer and, for a write branch, stops its warm-up build, forgets its jj workspace (its commits stay) and deletes the folder. Refused while it's running.
 Reports arrive as messages on their own. After start, return control or keep working: never sleep or poll waiting for a report.`,
@@ -181,7 +181,7 @@ Reports arrive as messages on their own. After start, return control or keep wor
 			message: Type.Optional(Type.String({ description: "steer: the message" })),
 			model: Type.Optional(Type.String({ description: "start: provider/id[:thinking]" })),
 			write: Type.Optional(Type.Boolean({ description: "start: give it its own jj workspace to edit in" })),
-			remote: Type.Optional(Type.Boolean({ description: "start: allow pushes/force-pushes and GitLab/GitHub MR writes" })),
+			remote: Type.Optional(Type.Boolean({ description: "start: allow pushes/force-pushes and GitLab/GitHub MR writes (default: true when fresh, else false)" })),
 			subagents: Type.Optional(Type.Boolean({ description: "start: allow it to start its own branches and subagents" })),
 			fresh: Type.Optional(Type.Boolean({ description: "start: begin with no conversation instead of a fork of this one" })),
 			tools: Type.Optional(Type.Array(Type.String(), { description: "start: the only tools it may call" })),

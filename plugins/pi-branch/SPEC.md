@@ -17,7 +17,8 @@ starts, so every delegated session is a TUI the user can join.
 4. **Attach and detach, like nvim.** Every branch is a pi TUI in an nvim terminal
    buffer. Foreground means showing that buffer; background means hiding it.
 5. **jj-first and safe unattended.** A branch never asks for permission. It can do
-   anything `jj` can undo. It can never write to a remote service.
+   anything `jj` can undo. It never writes to a remote service, except pushing
+   its own branches and MRs when allowed (by default only for fresh branches).
 
 ## Non-goals (v1)
 
@@ -82,10 +83,10 @@ starts, so every delegated session is a TUI the user can join.
   - **Reads**: allowed anywhere (files, `jj log/diff/show`, read-only CLI verbs).
   - **Local writes**: allowed only inside the jj repo's working copy, where `jj`
     can undo them (`jj op log`/`jj undo`). Writes outside the repo are blocked.
-  - **Remote writes**: blocked unless the branch was started with `remote: true`,
-    which allows `git push`/`jj git push` (force included) and GitLab/GitHub CLI
+  - **Remote writes**: blocked unless the branch was started with `remote: true`
+    (the default for a fresh branch; `remote: false` overrides it), which allows `git push`/`jj git push` (force included) and GitLab/GitHub CLI
     writes, and nothing else remote. `subagents: true` drops the "no subagents"
-    rule from the brief and keeps the `branch` tool. Both are off by default. Otherwise blocked: this covers `ssh`/`scp`/`rsync host:`,
+    rule from the brief and keeps the `branch` tool. It's off by default. Otherwise blocked: this covers `ssh`/`scp`/`rsync host:`,
     `git push`/`jj git push`, write verbs of `aws`, `jira-cli`, the GitLab CLI and
     `curl`/`wget` with a method or body, and any MCP tool not marked
     `readOnlyHint`. It's a best-effort command denylist with a read-verb allowlist
