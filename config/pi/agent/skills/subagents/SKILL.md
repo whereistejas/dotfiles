@@ -1,6 +1,7 @@
 ---
 name: subagents
-description: Hand off work to faster models as subagents — fresh `branch` sessions (`fresh: true`) that start with nothing but their brief, run as pi TUIs in hidden Neovim terminals the user can join, and report back on their own. Run them in parallel when subtasks are independent. Use once a plan exists and the remaining work is implementation (writing code to a spec), read-only research (scouting a large codebase or docs), or mechanical jj/VCS actions (`jj commit`, describe, split, bookmarks). Don't use for planning, design, debugging an unknown cause, or a task that needs this conversation's unwritten context — fork a branch (no `fresh`) for that.
+description: >-
+  Hand off work to faster models as subagents — fresh `branch` sessions (`fresh: true`) that start with nothing but their brief, run as pi TUIs in hidden Neovim terminals the user can join, and report back on their own. Run them in parallel when subtasks are independent. Use once a plan exists and the remaining work is implementation (writing code to a spec), read-only research (scouting a large codebase or docs), or mechanical jj/VCS actions (`jj commit`, describe, split, bookmarks). Don't use for planning, design, debugging an unknown cause, or a task that needs this conversation's unwritten context — fork a branch (no `fresh`) for that.
 ---
 
 # Subagents
