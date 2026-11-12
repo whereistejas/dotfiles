@@ -147,7 +147,10 @@ is handled and the branch's commits are integrated (or dropped):
 
 - Refused while the worker is running.
 - Delivers any report still in the inbox, then stops tracking the branch.
-- Wipes the worker's terminal buffer, which ends its pi.
+- Wipes the worker's terminal buffer, which ends its pi. After an nvim restart
+  restores the worker into a new buffer, that buffer is found by its
+  `b:pi_session.file`; the recorded buffer number is only trusted while it still
+  carries the branch's `b:pi_branch`.
 - For a write branch, `agent-workspace remove`: stops the warm-up build, forgets
   the jj workspace (snapshotting any uncommitted edits into its commit, which
   stays in the repo) and deletes the folder.

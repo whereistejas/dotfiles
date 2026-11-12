@@ -69,9 +69,24 @@ function M.show(a)
   return {}
 end
 
+-- The terminal the branch started in, or one its pi was restored into after nvim
+-- restarted. A restart reuses buffer numbers, so a.buf alone may be another buffer.
+local function runs_branch(buf, a)
+  if vim.bo[buf].buftype ~= "terminal" then
+    return false
+  end
+  if buf == a.buf and vim.b[buf].pi_branch == a.name then
+    return true
+  end
+  local session = vim.b[buf].pi_session
+  return type(session) == "table" and session.file == a.file
+end
+
 function M.close(a)
-  if vim.api.nvim_buf_is_valid(a.buf) then
-    vim.api.nvim_buf_delete(a.buf, { force = true })
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if runs_branch(buf, a) then
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end
   end
   return {}
 end

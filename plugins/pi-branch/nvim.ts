@@ -50,5 +50,13 @@ export const openTerminal = (opts: OpenOptions) =>
 
 export const showBuffer = (buf: number) => call<object>("show", { buf });
 
-/** Wipes the buffer, which stops the job running in it. */
-export const closeBuffer = (buf: number) => call<object>("close", { buf });
+export interface CloseOptions {
+	name: string;
+	/** The buffer the branch started in. */
+	buf?: number;
+	/** The worker's session file, which identifies its terminal after nvim restored it. */
+	file: string;
+}
+
+/** Wipes the branch's terminal buffers, which stops the pi running in them. */
+export const closeTerminal = (opts: CloseOptions) => call<object>("close", opts);

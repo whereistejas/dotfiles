@@ -3,7 +3,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { forkSession, freshSessionFile, TOOL_NAME, textOf } from "./fork.ts";
-import { closeBuffer, openTerminal, requireNvim, showBuffer } from "./nvim.ts";
+import { closeTerminal, openTerminal, requireNvim, showBuffer } from "./nvim.ts";
 import { Receiver } from "./receiver.ts";
 import { exitFile, inbox, listMetas, type Meta, newId, post, readJson, removeBranch, type Status, saveMeta, statusFile } from "./store.ts";
 import { BG_BRIEF, isBrief, toolBrief, Worker } from "./worker.ts";
@@ -118,7 +118,7 @@ export default function (pi: ExtensionAPI) {
 		if (stateOf(meta) === "running") throw new Error(`"${meta.name}" is still running; steer it to stop first`);
 		receiver?.poll(ctx);
 		receiver?.remove(meta.id);
-		if (meta.buf !== undefined) await closeBuffer(meta.buf);
+		await closeTerminal({ name: meta.name, buf: meta.buf, file: meta.workerFile });
 		if (meta.workspace) await removeWorkspace(meta.workspace);
 		removeBranch(meta.id);
 		return `Closed "${meta.name}": wiped its terminal buffer${meta.workspace ? ` and removed its workspace ${meta.workspace}; its commits stay in the repo` : ""}.`;

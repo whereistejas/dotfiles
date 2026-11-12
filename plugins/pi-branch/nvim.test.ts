@@ -4,7 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
-import { closeBuffer, openTerminal } from "./nvim.ts";
+import { closeTerminal, openTerminal } from "./nvim.ts";
+
+const NAME = "doomed";
+const FILE = "/sessions/doomed.jsonl";
 
 let nvim: ChildProcess;
 let tmp: string;
@@ -34,10 +37,10 @@ after(() => {
 });
 
 test("closing a branch wipes its terminal buffer and stops what runs in it", async () => {
-	const { buf } = await openTerminal({ name: "doomed", cmd: ["sleep", "60"], cwd: tmp, show: false });
+	const { buf } = await openTerminal({ name: NAME, cmd: ["sleep", "60"], cwd: tmp, show: false });
 	const pid = Number(expr(`jobpid(getbufvar(${buf}, '&channel'))`));
 
-	await closeBuffer(buf);
+	await closeTerminal({ name: NAME, buf, file: FILE });
 
 	await new Promise((r) => setTimeout(r, 300));
 	assert.deepEqual({ exists: expr(`bufexists(${buf})`), alive: alive(pid) }, { exists: "0", alive: false });
@@ -46,18 +49,40 @@ test("closing a branch wipes its terminal buffer and stops what runs in it", asy
 test("a terminal that exits after its branch's folder is gone writes no exit file and raises no error", async () => {
 	const branchDir = fs.mkdtempSync(path.join(tmp, "branch-"));
 	const exitFile = path.join(branchDir, "exit.json");
-	const { buf } = await openTerminal({ name: "late", cmd: ["sleep", "60"], cwd: tmp, exitFile, show: false });
+	const { buf } = await openTerminal({ name: NAME, cmd: ["sleep", "60"], cwd: tmp, exitFile, show: false });
 	fs.rmSync(branchDir, { recursive: true });
 
-	await closeBuffer(buf);
+	await closeTerminal({ name: NAME, buf, file: FILE });
 
 	await new Promise((r) => setTimeout(r, 300));
 	assert.deepEqual({ exitFile: fs.existsSync(exitFile), errmsg: expr("v:errmsg") }, { exitFile: false, errmsg: "" });
 });
 
 test("closing a buffer that is already gone succeeds", async () => {
-	const { buf } = await openTerminal({ name: "twice", cmd: ["sleep", "60"], cwd: tmp, show: false });
-	await closeBuffer(buf);
+	const { buf } = await openTerminal({ name: NAME, cmd: ["sleep", "60"], cwd: tmp, show: false });
+	await closeTerminal({ name: NAME, buf, file: FILE });
 
-	await closeBuffer(buf);
+	await closeTerminal({ name: NAME, buf, file: FILE });
+});
+
+/** A terminal running `sleep`, as nvim recreates one when it restores a session. */
+function plainTerminal(): number {
+	return Number(expr(`luaeval('(function() local b = vim.api.nvim_create_buf(true, false) vim.api.nvim_buf_call(b, function() vim.fn.jobstart({ "sleep", "60" }, { term = true }) end) return b end)()')`));
+}
+
+test("closing a branch wipes the terminal its pi was restored into", async () => {
+	const restored = plainTerminal();
+	expr(`luaeval('(function() vim.b[${restored}].pi_session = { file = "${FILE}" } end)()')`);
+
+	await closeTerminal({ name: NAME, buf: restored + 100, file: FILE });
+
+	assert.equal(expr(`bufexists(${restored})`), "0");
+});
+
+test("closing a branch leaves another terminal that took its old buffer number alone", async () => {
+	const other = plainTerminal();
+
+	await closeTerminal({ name: NAME, buf: other, file: FILE });
+
+	assert.equal(expr(`bufexists(${other})`), "1");
 });
