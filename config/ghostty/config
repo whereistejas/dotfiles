@@ -5,6 +5,10 @@ theme = "Gruvbox Light"
 command="/opt/homebrew/bin/bash"
 macos-option-as-alt = true
 
+window-padding-x = 0
+window-padding-y = 0
+window-padding-color = extend
+
 # Forward cmd+hjkl and cmd+shift+hjkl to the app so neovim's <D-hjkl> split-focus
 # and <D-S-hjkl> split-move mappings receive them. Letters (not arrows) so the
 # arrow keys stay free for macOS text nav. csi:NN;<mod>u = codepoint NN;
