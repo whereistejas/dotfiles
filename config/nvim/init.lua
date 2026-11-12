@@ -381,6 +381,18 @@ local function mermaid_puppeteer_config()
 	return cfg
 end
 
+-- Sort key that lists a directory's files before its subdirectories, each
+-- alphabetically: \2 marks the file name, \3 a directory, \1 separates.
+local function files_first_key(item)
+	if not item.files_first_key then
+		local parts = vim.split(item.file, "/", { plain = true })
+		for i = 1, #parts - 1 do parts[i] = "\3" .. parts[i] end
+		parts[#parts] = "\2" .. parts[#parts]
+		item.files_first_key = table.concat(parts, "\1")
+	end
+	return item.files_first_key
+end
+
 -- snacks (picker + explorer + image)
 -- Guarded: snacks.nvim throws "already setup" on a second setup() call, which
 -- would abort `:source $MYVIMRC`.
@@ -404,6 +416,10 @@ if not vim.g.snacks_did_setup then
 							return not item.text:match("^git_") and not item.text:match("^gh_")
 						end, require("snacks.picker.source.meta").pickers(opts, ctx))
 					end,
+				},
+				files = {
+					sort = function(a, b) return files_first_key(a) < files_first_key(b) end,
+					matcher = { sort_empty = true },
 				},
 				lsp_workspace_symbols = {
 					sort = function(a, b)
