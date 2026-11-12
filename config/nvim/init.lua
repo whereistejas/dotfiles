@@ -155,10 +155,12 @@ function _G.jj_statusline()
 	local root = require("pi").root() or vim.fs.root(0, ".jj") or vim.fs.root(vim.fn.getcwd(), ".jj")
 	return root and require("jumanji.status").get(root) or ""
 end
+-- A terminal window shows its label (see term_label) in place of the file name.
 if not vim.o.statusline:find("jj_statusline", 1, true) then
 	local stl = vim.o.statusline
 	local split = assert(stl:find("%=", 1, true), "the default statusline has a %= separator")
 	vim.o.statusline = stl:sub(1, split + 1) .. "%(%{v:lua.jj_statusline()} %)" .. stl:sub(split + 2)
+	vim.o.statusline = vim.o.statusline:gsub("%%f", "%%{%% v:lua.stl_name() %%}", 1)
 end
 
 -- =============================================================================
@@ -454,6 +456,74 @@ local pi_status = {
 	exited = { icon = "×", hl = "ServeryPiExited", link = "DiagnosticError" },
 }
 
+local function set_pi_status_hl()
+	for _, status in pairs(pi_status) do
+		vim.api.nvim_set_hl(0, status.hl, { link = status.link, default = true })
+	end
+end
+set_pi_status_hl()
+vim.api.nvim_create_autocmd("ColorScheme", {
+	group = vim.api.nvim_create_augroup("pi-status-hl", { clear = true }),
+	callback = set_pi_status_hl,
+})
+
+-- Terminal labels. A terminal's name stays term://<cwd>//<pid>:<command>, since
+-- :mksession restores it by running that command (pi's is `pi --session <file>`),
+-- so the buffers picker and the statusline show this instead: what it's doing,
+-- its status (pi's, or exited), and the directory it runs in.
+local function term_label(buf)
+	local cwd, cmd = vim.api.nvim_buf_get_name(buf):match("^term://(.-)//%d+:(.*)$")
+	local title = vim.b[buf].term_title
+	title = type(title) == "string" and title ~= "" and not vim.startswith(title, "term://") and title or nil
+	local session = vim.b[buf].pi_session
+	local channel = vim.bo[buf].channel
+	local alive = channel > 0 and vim.fn.jobwait({ channel }, 0)[1] == -1
+
+	local label = { dir = cwd and vim.fs.basename(cwd) }
+	if type(session) == "table" or require("pi").cwd(buf) then
+		session = type(session) == "table" and session or {}
+		label.text = require("servery.pi").label({ title = title, name = session.name, file = session.file }, cwd)
+		label.status = pi_status[alive and session.status or "exited"] or pi_status.unknown
+	else
+		label.text = title or cmd or "terminal"
+		label.status = not alive and pi_status.exited or nil
+	end
+	return label
+end
+
+function _G.stl_name()
+	if vim.bo.buftype ~= "terminal" then return "%f" end
+
+	local label = term_label(0)
+	local text = label.text:gsub("%%", "%%%%") .. (label.dir and (" — " .. label.dir:gsub("%%", "%%%%")) or "")
+	if not label.status then return text end
+	return ("%%#%s#%s%%* %s"):format(label.status.hl, label.status.icon, text)
+end
+
+-- <space>b: terminals by their label, searchable, instead of their term:// name.
+local function buffer_item(item)
+	if item.buftype ~= "terminal" then return end
+	item.term = term_label(item.buf)
+	item.text = item.text .. " " .. item.term.text
+end
+
+local function buffer_format(item, picker)
+	if not item.term then return Snacks.picker.format.buffer(item, picker) end
+
+	local align, status = Snacks.picker.util.align, item.term.status
+	local ret = {
+		{ align(tostring(item.buf), 3), "SnacksPickerBufNr" },
+		{ " " },
+		{ align(item.flags, 2, { align = "right" }), "SnacksPickerBufFlags" },
+		{ " " },
+		{ status and status.icon or " ", status and status.hl },
+		{ " " },
+		{ item.term.text },
+	}
+	if item.term.dir then ret[#ret + 1] = { "  " .. item.term.dir, "SnacksPickerDir" } end
+	return ret
+end
+
 -- Session switcher: running sessions (with their pi terminals as children)
 -- first, then every folder under ~/build streamed in from fd (gitignore-aware).
 -- Snacks fuzzy-ranks the folders as you type (score, then shortest path) and
@@ -465,10 +535,6 @@ local function servery_pick()
 	local icons = servery.get_cfg().ui.icons
 	local root = vim.fs.normalize("~/build")
 	local seen = {}
-
-	for _, status in pairs(pi_status) do
-		vim.api.nvim_set_hl(0, status.hl, { link = status.link, default = true })
-	end
 
 	Snacks.picker.pick({
 		source = "servery",
@@ -1058,7 +1124,9 @@ vim.keymap.set("n", "ZV", "<cmd>1Sv<cr>", { desc = "Go to previous session" })
 -- snacks picker
 vim.keymap.set("n", "<space>p", function() Snacks.picker.pickers() end, { desc = "Pickers" })
 vim.keymap.set("n", "<space>t", function() Snacks.picker.lsp_workspace_symbols() end, { desc = "Workspace symbols" })
-vim.keymap.set("n", "<space>b", function() Snacks.picker.buffers() end, { desc = "Buffers" })
+vim.keymap.set("n", "<space>b", function()
+	Snacks.picker.buffers({ transform = buffer_item, format = buffer_format })
+end, { desc = "Buffers" })
 vim.keymap.set("n", "<space>f", function() Snacks.picker.files() end, { desc = "Find files" })
 vim.keymap.set("n", "<space>F", function() Snacks.picker.files({ hidden = true, ignored = true }) end,
 	{ desc = "Find files (hidden + ignored)" })
