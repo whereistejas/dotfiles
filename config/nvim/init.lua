@@ -1099,6 +1099,21 @@ vim.api.nvim_create_autocmd("BufWinEnter", {
 		end
 	end,
 })
+-- Leaving a live terminal parks the cursor on its last line, so the window keeps
+-- following output; pi clears the scrollback on every resize and would otherwise
+-- strand the cursor at the top.
+vim.api.nvim_create_autocmd("WinLeave", {
+	group = "term-ui",
+	callback = function()
+		if vim.bo.buftype ~= "terminal" then
+			return
+		end
+		local last = vim.fn.line("$")
+		if vim.api.nvim_get_mode().mode == "t" or vim.fn.line("w$") == last then
+			vim.api.nvim_win_set_cursor(0, { last, 0 })
+		end
+	end,
+})
 -- Re-strip terminal windows after (re)sourcing, since :set clobbers the current
 -- window's local options.
 vim.api.nvim_create_autocmd("SourcePost", {
