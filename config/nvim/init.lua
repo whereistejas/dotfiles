@@ -1089,6 +1089,11 @@ vim.api.nvim_create_autocmd("SourcePost", {
 	end,
 })
 
+-- Drop the default TermRequest handlers (OSC 133 prompt marks, OSC 10/11 colour
+-- replies). pi wraps every message in OSC 133 and redraws whole transcripts, so
+-- each handler call queues behind the next and the session stops taking input.
+vim.api.nvim_clear_autocmds({ event = "TermRequest", group = "nvim.terminal" })
+
 -- Terminal jobs (pi's Ctrl-G, jj, git) edit in this session instead of nesting an
 -- nvim, even when started without an interactive bash (e.g. `:term pi`).
 vim.env.VISUAL = vim.fs.joinpath(
