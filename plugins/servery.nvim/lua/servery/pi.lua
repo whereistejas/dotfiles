@@ -129,6 +129,22 @@ local focus_code = [[
 	return true
 ]]
 
+-- Runs in the server to delete pi terminals, skipping any whose job came back
+-- to life since they were listed
+local prune_code = [[
+	local deleted = 0
+	for _, buf in ipairs(...) do
+		if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == "terminal" then
+			local channel = vim.bo[buf].channel
+			if channel == 0 or vim.fn.jobwait({ channel }, 0)[1] ~= -1 then
+				vim.api.nvim_buf_delete(buf, { force = true })
+				deleted = deleted + 1
+			end
+		end
+	end
+	return deleted
+]]
+
 -- Spinner frames are braille characters
 local spinner = "^\xE2[\xA0-\xA3][\x80-\xBF]%s+"
 
@@ -189,6 +205,32 @@ M.focus = function(session, pi)
 	end
 
 	return true
+end
+
+---Delete the session's exited pi terminals.
+---@param session servery.SessionActive
+---@return integer deleted
+M.prune = function(session)
+	local bufs = vim.iter(session.server.pi)
+		:filter(function(pi) return pi.status == "exited" end)
+		:map(function(pi) return pi.buf end)
+		:totable()
+	if #bufs == 0 then
+		return 0
+	end
+
+	local chan = vim.fn.sockconnect("pipe", session.server.socket, { rpc = true })
+	assert(chan ~= 0, "Could not connect to server at " .. session.server.socket)
+
+	local ok, deleted = pcall(vim.rpcrequest, chan, "nvim_exec_lua", prune_code, { bufs })
+	vim.fn.chanclose(chan)
+
+	if not ok then
+		utils.notify_error("Failed to prune pi terminals: %s", deleted)
+		return 0
+	end
+
+	return deleted
 end
 
 ---Go to the pi terminal, switching to its nvim session if it's not this one.

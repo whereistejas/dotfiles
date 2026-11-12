@@ -106,3 +106,26 @@ h.test("jumping to a pi in another session switches there and keeps the current 
 	h.eq({ { server = other, bang = false } }, h.connects())
 	h.eq("terminal", h.remote(other, "return vim.bo.buftype"))
 end)
+
+h.test("pruning deletes exited pi terminals and keeps live ones", function()
+	local other = h.spawn(h.dir("other"))
+	local exited = h.open_pi(other, { cmd = "true", session = { status = "idle" } })
+	local live = h.open_pi(other, { session = { status = "idle" } })
+	vim.wait(500)
+
+	h.eq(1, pi.prune(servery.list_sessions("active")[1]))
+
+	local valid = "local a, b = ... return { vim.api.nvim_buf_is_valid(a), vim.api.nvim_buf_is_valid(b) }"
+	h.eq({ false, true }, h.remote(other, valid, { exited, live }))
+	h.eq({ live }, vim.iter(pis_of(other)):map(function(p) return p.buf end):totable())
+end)
+
+h.test("pruning keeps a pi whose job is alive even if it was listed as exited", function()
+	local other = h.spawn(h.dir("other"))
+	h.open_pi(other, { session = { status = "idle" } })
+	local session = servery.list_sessions("active")[1]
+	session.server.pi[1].status = "exited"
+
+	h.eq(0, pi.prune(session))
+	h.eq(1, #pis_of(other))
+end)
