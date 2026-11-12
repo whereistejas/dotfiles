@@ -1,6 +1,7 @@
 #!/usr/bin/env -S nvim --clean -l
 -- Edit FILE in the parent nvim session ($NVIM) in a new tab, and block until its buffer is wiped (:wq, :q!, :bd). For $VISUAL
--- inside nvim terminals, so pi's Ctrl-G, jj and git don't nest an nvim.
+-- inside nvim terminals, so pi's Ctrl-G, jj and git don't nest an nvim. From a pi terminal, FILE opens in a float centred on
+-- the screen instead of a tab, so the prompt is written at eye level.
 
 vim.fn.serverstop(vim.v.servername)
 
@@ -25,7 +26,35 @@ end
 local REMOTE = [[
 local file, client = ...
 local term_win = vim.api.nvim_get_current_win()
-vim.cmd.tabedit(vim.fn.fnameescape(file))
+local ok, pi = pcall(require, "pi")
+if ok and pi.cwd(vim.api.nvim_win_get_buf(term_win)) then
+	local width = math.min(100, math.floor(vim.o.columns * 0.6))
+	local height = math.floor(vim.o.lines * 0.4)
+	local placeholder = vim.api.nvim_create_buf(false, true)
+	vim.bo[placeholder].bufhidden = "wipe"
+	vim.api.nvim_open_win(placeholder, true, {
+		relative = "editor",
+		row = math.floor((vim.o.lines - height) / 2) - 1,
+		col = math.floor((vim.o.columns - width) / 2),
+		width = width,
+		height = height,
+		border = "rounded",
+		title = " pi prompt ",
+		title_pos = "center",
+	})
+	vim.cmd.edit(vim.fn.fnameescape(file))
+	vim.cmd.normal({ "G", bang = true })
+	local function insert() vim.schedule(function() vim.cmd.startinsert({ bang = true }) end) end
+	-- Leaving terminal mode cancels a pending :startinsert; it only leaves once an event wakes it.
+	if vim.api.nvim_get_mode().mode == "t" then
+		vim.api.nvim_create_autocmd("TermLeave", { once = true, callback = insert })
+		vim.defer_fn(function() end, 0)
+	else
+		insert()
+	end
+else
+	vim.cmd.tabedit(vim.fn.fnameescape(file))
+end
 local buf = vim.api.nvim_get_current_buf()
 vim.bo[buf].bufhidden = "wipe"
 vim.api.nvim_create_autocmd("BufWipeout", {
