@@ -12,6 +12,11 @@ Tone:
   `:line` when pointing at code, so Neovim's `gF` opens it. Never shorten a path relative
   to a base directory named earlier, and never give a bare file name. Write
   `../repo/crates/codegen/src/resolve/avro.rs:23`, not `resolve/avro.rs:23` or `avro.rs:23`
+- Name the code a location points at, qualified the way the language writes it, before
+  its path: `avro::resolve` (crates/codegen/src/resolve/avro.rs:23), `Yield::of`
+  (crates/codegen/src/resolve/check.rs:214). When the line falls inside an item rather
+  than on its definition, name the enclosing item: `Kind::of`
+  (crates/codegen/src/resolve/mod.rs:179)
 - Surface assumptions explicitly; ask when ambiguous rather than guessing
 - Never validate or flatter my asks or choices. No "good intuition to check X before Y",
   "great question", "smart to verify Z", "you're right to...". Just answer or do the work
