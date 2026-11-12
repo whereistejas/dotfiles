@@ -524,8 +524,39 @@ local function buffer_format(item, picker)
 	return ret
 end
 
--- Session switcher: running sessions (with their pi terminals as children)
--- first, then every folder under ~/build streamed in from fd (gitignore-aware).
+-- Appends pi terminals to items as a tree under parent. A branch's session
+-- file lives in <parent session>/forks/, so it nests under the pi whose
+-- session spawned it when that pi is in the list too.
+local function add_pi_tree(items, pis, parent, make)
+	local by_file, children, roots = {}, {}, {}
+	for _, p in ipairs(pis) do
+		if p.file then by_file[p.file] = p end
+	end
+	for _, p in ipairs(pis) do
+		local dir = p.file and p.file:match("^(.+)/forks/[^/]+%.jsonl$")
+		local up = dir and by_file[dir .. ".jsonl"]
+		if up then
+			children[up] = children[up] or {}
+			table.insert(children[up], p)
+		else
+			roots[#roots + 1] = p
+		end
+	end
+
+	local function add(list, up)
+		for i, p in ipairs(list) do
+			local item = make(p)
+			item.parent, item.last = up, i == #list
+			items[#items + 1] = item
+			add(children[p] or {}, item)
+		end
+	end
+	add(roots, parent)
+end
+
+-- Session switcher: running sessions (with their pi terminals as a tree of
+-- who spawned whom) first, then every folder under ~/build streamed in from fd
+-- (gitignore-aware).
 -- Snacks fuzzy-ranks the folders as you type (score, then shortest path) and
 -- only renders the visible rows; sessions keep their order, and a pi row that
 -- matches keeps its session row visible.
@@ -543,10 +574,8 @@ local function servery_pick()
 		tree = true,
 		matcher = { keep_parents = true },
 		sort = function(a, b)
-			local ra, rb = a.parent or a, b.parent or b
-			if ra == rb then return a.idx < b.idx end
-			if (ra.sv ~= nil) ~= (rb.sv ~= nil) then return ra.sv ~= nil end
-			if ra.sv then return ra.idx < rb.idx end
+			if (a.sv ~= nil) ~= (b.sv ~= nil) then return a.sv ~= nil end
+			if a.sv then return a.idx < b.idx end
 			if a.score ~= b.score then return a.score > b.score end
 			if #a.text ~= #b.text then return #a.text < #b.text end
 			return a.idx < b.idx
@@ -563,13 +592,10 @@ local function servery_pick()
 						local item = { text = title and (dir .. " " .. title) or dir, dir = dir, title = title, path = sv.cwd, sv = sv }
 						items[#items + 1] = item
 
-						local last
-						for _, p in ipairs(sv.server.pi) do
+						add_pi_tree(items, sv.server.pi, item, function(p)
 							local label = pi.label(p, sv.cwd)
-							last = { text = p.branch and (label .. " " .. p.branch) or label, label = label, pi = p, sv = sv, parent = item }
-							items[#items + 1] = last
-						end
-						if last then last.last = true end
+							return { text = p.branch and (label .. " " .. p.branch) or label, label = label, pi = p, sv = sv }
+						end)
 					end
 				end
 				return items
@@ -645,7 +671,7 @@ local function servery_pick()
 end
 
 -- Closed-session picker: named saves (newest first) whose nvim isn't running,
--- with the pi terminals they will resume as children.
+-- with the pi terminals they will resume as a tree of who spawned whom.
 local function servery_closed_pick()
 	local saved = require("servery.saved")
 	local pi = require("servery.pi")
@@ -664,13 +690,10 @@ local function servery_closed_pick()
 				local item = { text = s.name .. " " .. dir, name = s.name, dir = dir, saved = s }
 				items[#items + 1] = item
 
-				local last
-				for _, p in ipairs(s.pi) do
+				add_pi_tree(items, s.pi, item, function(p)
 					local label = pi.label(p, s.cwd)
-					last = { text = p.branch and (label .. " " .. p.branch) or label, label = label, branch = p.branch, saved = s, parent = item }
-					items[#items + 1] = last
-				end
-				if last then last.last = true end
+					return { text = p.branch and (label .. " " .. p.branch) or label, label = label, branch = p.branch, saved = s }
+				end)
 			end
 			return items
 		end,
