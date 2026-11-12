@@ -9,7 +9,6 @@
     "anthropic/claude-sonnet-5:high"
   ],
   "packages": [
-    "https://github.com/kepano/obsidian-skills",
     "git:github.com/mvzink/jj-hunk-tool",
     "npm:@ff-labs/pi-fff",
     "npm:@earendil-works/pi-voice"
