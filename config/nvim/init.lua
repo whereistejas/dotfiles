@@ -968,6 +968,7 @@ vim.keymap.set("n", "9", "$", { desc = "End of line" })
 vim.keymap.set("n", "j", "gj", { desc = "Down (display line)" })
 vim.keymap.set("n", "k", "gk", { desc = "Up (display line)" })
 vim.keymap.set({ "n", "x" }, ";", ":", { noremap = true, desc = "Command-line mode" })
+vim.keymap.set("n", "gV", "<Cmd>vertical wincmd F<CR>", { desc = "Go to file:line in a vsplit" })
 
 -- Native completion popup: <Tab>/<S-Tab> cycle items, <CR> accepts the
 -- selected item (plain <CR> when nothing is selected).
