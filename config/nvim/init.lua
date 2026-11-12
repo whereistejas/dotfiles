@@ -853,7 +853,9 @@ vim.lsp.config("ty", {
 })
 
 vim.lsp.config("rust_analyzer", {
-	settings = { ["rust-analyzer"] = { workspace = { symbol = { search = { limit = 10000 } } } } },
+	settings = {
+		["rust-analyzer"] = { workspace = { symbol = { search = { kind = "all_symbols", limit = 10000 } } } },
+	},
 })
 
 vim.lsp.enable("lua_ls")
