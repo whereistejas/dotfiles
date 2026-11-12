@@ -134,7 +134,7 @@ local function format_bookmark(item, picker)
 	end
 	local mrs = mr.get(item.root)
 	for _, b in ipairs(node.bookmarks) do
-		if not b.remote and mrs[b.name] then
+		if (not b.remote or b.remote == "origin") and mrs[b.name] then
 			ret[#ret + 1] = { "!" .. mrs[b.name], "JumanjiMergeRequest" }
 			ret[#ret + 1] = { " " }
 		end
