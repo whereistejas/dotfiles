@@ -1001,13 +1001,6 @@ for key, desc in pairs({
 		{ desc = desc })
 end
 
--- Tabs — switch to tab N in every mode (insert/visual/terminal too).
--- <Cmd> runs the command without leaving the current mode.
-for i = 1, 4 do
-	vim.keymap.set({ "n", "i", "v", "t" }, "<D-" .. i .. ">", "<Cmd>tabnext " .. i .. "<CR>",
-		{ desc = "Go to tab " .. i })
-end
-
 -- Tab prev/next — mirror AeroSpace's alt-[ / alt-] for workspaces.
 vim.keymap.set({ "n", "i", "v", "t" }, "<D-[>", "<Cmd>tabprevious<CR>", { desc = "Previous tab" })
 vim.keymap.set({ "n", "i", "v", "t" }, "<D-]>", "<Cmd>tabnext<CR>", { desc = "Next tab" })
