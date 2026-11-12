@@ -15,8 +15,10 @@ export interface Meta {
 	model?: string;
 	/** May push and write to GitLab/GitHub (MRs, comments). Off by default. */
 	remote?: boolean;
-	/** May start `pi -p` subagents. Off by default. */
+	/** May start its own branches. Off by default. */
 	subagents?: boolean;
+	/** Started with no conversation instead of a fork of the receiver's. */
+	fresh?: boolean;
 	/** nvim buffer of the worker's terminal. */
 	buf?: number;
 	createdAt: string;

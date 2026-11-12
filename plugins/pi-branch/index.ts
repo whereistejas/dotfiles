@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { forkSession, TOOL_NAME, textOf } from "./fork.ts";
+import { forkSession, freshSessionFile, TOOL_NAME, textOf } from "./fork.ts";
 import { closeBuffer, openTerminal, requireNvim, showBuffer } from "./nvim.ts";
 import { Receiver } from "./receiver.ts";
 import { exitFile, inbox, listMetas, type Meta, newId, post, readJson, removeBranch, type Status, saveMeta, statusFile } from "./store.ts";
@@ -18,6 +18,8 @@ interface StartParams {
 	write?: boolean;
 	remote?: boolean;
 	subagents?: boolean;
+	fresh?: boolean;
+	tools?: string[];
 }
 
 export default function (pi: ExtensionAPI) {
@@ -99,11 +101,11 @@ export default function (pi: ExtensionAPI) {
 		const cwd = workspace?.dir ?? ctx.cwd;
 		const meta: Meta = {
 			id: newId(), name, flow: "tool", cwd, workspace: workspace?.dir, receiverFile: parentFile, model: p.model ?? modelOf(ctx),
-			workerFile: forkSession({ parentFile, leafId, cwd, forWorker: true }), createdAt: new Date().toISOString(),
-			remote: p.remote ?? false, subagents: p.subagents ?? false,
+			workerFile: p.fresh ? freshSessionFile(parentFile) : forkSession({ parentFile, leafId, cwd, forWorker: true }),
+			createdAt: new Date().toISOString(), remote: p.remote ?? false, subagents: p.subagents ?? false, fresh: p.fresh ?? false,
 		};
 		saveMeta(meta);
-		const cmd = piCommand(meta.workerFile, meta.model, toolBrief(p.task, workspace, meta));
+		const cmd = piCommand(meta.workerFile, meta.model, toolBrief(p.task, workspace, meta), p.tools);
 		meta.buf = (await openTerminal({ name, cmd, cwd, exitFile: exitFile(meta.id), show: false })).buf;
 		saveMeta(meta);
 		receiver?.add(meta);
@@ -161,8 +163,8 @@ export default function (pi: ExtensionAPI) {
 	pi.registerTool({
 		name: TOOL_NAME,
 		label: "Branch",
-		description: `Fork this conversation into a background pi session (a Neovim terminal buffer) that works on a task and reports back here.
-- start: needs name and task. The branch inherits the whole conversation, so the task can be short. Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 when this conversation is well under that). write: true gives it its own jj workspace (a Rust one starts warm, with a build running in the background); leave it off for read-only work. remote: true lets it push/force-push its branches and write MRs; subagents: true lets it start \`pi -p\` subagents — set them only when the user asked for that.
+		description: `Fork this conversation, or start a fresh one, in a background pi session (a Neovim terminal buffer) that works on a task and reports back here.
+- start: needs name and task. By default the branch inherits the whole conversation, so the task can be short. fresh: true starts it with no conversation (a subagent): the task must then be a complete brief. tools restricts what it can call (e.g. ["read", "ffgrep", "fffind"] for read-only research). Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 for a fresh branch or when this conversation is well under that). write: true gives it its own jj workspace (a Rust one starts warm, with a build running in the background); leave it off for read-only work. remote: true lets it push/force-push its branches and write MRs; subagents: true lets it start its own branches — set them only when the user asked for that.
 - peek: the branch's progress so far. steer: send it a message; it lands after its current tool call finishes (a running command isn't interrupted). list: all branches of this session.
 - close: once you've integrated its work, or dropped it: wipes its terminal buffer and, for a write branch, stops its warm-up build, forgets its jj workspace (its commits stay) and deletes the folder. Refused while it's running.
 Reports arrive as messages on their own. After start, return control or keep working: never sleep or poll waiting for a report.`,
@@ -180,7 +182,9 @@ Reports arrive as messages on their own. After start, return control or keep wor
 			model: Type.Optional(Type.String({ description: "start: provider/id[:thinking]" })),
 			write: Type.Optional(Type.Boolean({ description: "start: give it its own jj workspace to edit in" })),
 			remote: Type.Optional(Type.Boolean({ description: "start: allow pushes/force-pushes and GitLab/GitHub MR writes" })),
-			subagents: Type.Optional(Type.Boolean({ description: "start: allow `pi -p` subagents" })),
+			subagents: Type.Optional(Type.Boolean({ description: "start: allow it to start its own branches and subagents" })),
+			fresh: Type.Optional(Type.Boolean({ description: "start: begin with no conversation instead of a fork of this one" })),
+			tools: Type.Optional(Type.Array(Type.String(), { description: "start: the only tools it may call" })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			let text: string;
@@ -236,7 +240,7 @@ type LoggedBlock = { type: string; text?: string; name?: string; arguments?: unk
 
 /** The worker's own work: everything from its brief onwards. */
 function peek(meta: Meta): string {
-	const messages = fs
+	const messages = !fs.existsSync(meta.workerFile) ? [] : fs
 		.readFileSync(meta.workerFile, "utf8")
 		.split("\n")
 		.filter(Boolean)
@@ -265,8 +269,11 @@ function modelOf(ctx: ExtensionContext): string | undefined {
 	return `${ctx.model.provider}/${ctx.model.id}${ctx.thinkingLevel ? `:${ctx.thinkingLevel}` : ""}`;
 }
 
-function piCommand(sessionFile: string, model: string | undefined, prompt?: string): string[] {
-	return [process.execPath, process.argv[1], "--session", sessionFile, ...(model ? ["--model", model] : []), ...(prompt ? [prompt] : [])];
+function piCommand(sessionFile: string, model: string | undefined, prompt?: string, tools?: string[]): string[] {
+	return [
+		process.execPath, process.argv[1], "--session", sessionFile, ...(model ? ["--model", model] : []),
+		...(tools?.length ? ["--tools", tools.join(",")] : []), ...(prompt ? [prompt] : []),
+	];
 }
 
 function clip(text: string, max: number): string {

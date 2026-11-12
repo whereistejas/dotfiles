@@ -1,15 +1,17 @@
 # branch — spec
 
-Fork the current pi conversation into a second pi session that runs in a Neovim
-terminal buffer, and post its result back into a conversation when it settles.
-Complements the `subagents` skill, which stays for parallel fan-out.
+Fork the current pi conversation, or start a fresh one, in a second pi session
+that runs in a Neovim terminal buffer, and post its result back into a
+conversation when it settles. Fresh branches are what the `subagents` skill
+starts, so every delegated session is a TUI the user can join.
 
 ## Goals
 
 1. **Never block the conversation.** Delegated work, and work already in flight,
    runs in another session while the user keeps talking.
-2. **Full context, no re-briefing.** A branch is a fork of the session, so it
-   already knows everything the parent knew.
+2. **Full context, no re-briefing, unless asked.** A branch is a fork of the
+   session, so it already knows everything the parent knew. A fresh branch
+   starts empty and gets a complete brief instead, which keeps every turn small.
 3. **Results come back on their own.** When a branch settles, its final answer is
    posted into its receiver session, waking the agent there if it's idle.
 4. **Attach and detach, like nvim.** Every branch is a pi TUI in an nvim terminal
@@ -35,10 +37,13 @@ Complements the `subagents` skill, which stays for parallel fan-out.
 
 ### A. `branch` tool — the agent delegates up front
 
-1. The agent calls `branch({ action: "start", name, task, model?, write? })`.
+1. The agent calls `branch({ action: "start", name, task, model?, write?, fresh?, tools? })`.
 2. The extension forks the current session at the current leaf into a new file.
-3. It opens a hidden nvim terminal running `pi --session <fork> <brief>`, where
-   the brief is the worker preamble plus `task`.
+   With `fresh: true` it forks nothing: it picks a new file path next to the
+   forks, which pi creates at the worker's first message.
+3. It opens a hidden nvim terminal running `pi --session <file> <brief>`, where
+   the brief is the worker preamble plus `task`. `tools` becomes `--tools`, an
+   allowlist (e.g. read-only research).
 4. The tool returns immediately: "started branch `<name>` in buffer N".
 5. The current session is the **receiver**; the new pi is the **worker**.
 
@@ -61,13 +66,17 @@ Complements the `subagents` skill, which stays for parallel fan-out.
 - **Preamble**, sent as the first user text (flow A) or a steer (flow B). It's
   borrowed from pi-subagents:
   - "You are a background branch of the conversation above. Treat the inherited
-    conversation as reference only; your job is only the task below."
+    conversation as reference only; your job is only the task below." A fresh
+    worker is "a background subagent" instead, with no inherited-conversation
+    rule.
   - "Nobody is watching this terminal: don't ask for confirmation, don't end with
     a question you need answered to continue — report it instead."
   - "Finish with a handoff: result, files/changes touched (jj change ids), test
     state, open questions."
-- **No nesting.** The worker sees no `branch` tool, and `/bg` is disabled inside a
-  worker (env `PI_BRANCH_WORKER=1`).
+- **No nesting, unless allowed.** The worker sees no `branch` tool, and `/bg` is
+  disabled inside a worker (env `PI_BRANCH_WORKER=1`). A worker started with
+  `subagents: true` keeps the `branch` tool, so it can start fresh branches of
+  its own; it's their receiver.
 - **Permission policy.** It's enforced by a `tool_call` hook, not only by the
   prompt, and blocked calls return a reason the worker can report:
   - **Reads**: allowed anywhere (files, `jj log/diff/show`, read-only CLI verbs).
@@ -76,7 +85,7 @@ Complements the `subagents` skill, which stays for parallel fan-out.
   - **Remote writes**: blocked unless the branch was started with `remote: true`,
     which allows `git push`/`jj git push` (force included) and GitLab/GitHub CLI
     writes, and nothing else remote. `subagents: true` drops the "no subagents"
-    rule from the brief. Both are off by default. Otherwise blocked: this covers `ssh`/`scp`/`rsync host:`,
+    rule from the brief and keeps the `branch` tool. Both are off by default. Otherwise blocked: this covers `ssh`/`scp`/`rsync host:`,
     `git push`/`jj git push`, write verbs of `aws`, `jira-cli`, the GitLab CLI and
     `curl`/`wget` with a method or body, and any MCP tool not marked
     `readOnlyHint`. It's a best-effort command denylist with a read-verb allowlist
@@ -93,8 +102,8 @@ Complements the `subagents` skill, which stays for parallel fan-out.
   - The brief tells the worker the parent removes the workspace; it never removes
     it itself.
 - **Model** (flow A): inherit the parent model unless `model` is given. Only pick
-  `claude-haiku-4-5` when the fork fits comfortably within 200K tokens. Flow B keeps
-  its model.
+  `claude-haiku-4-5` for a fresh branch or when the fork fits comfortably within
+  200K tokens. Flow B keeps its model.
 
 ## Reporting
 

@@ -15,21 +15,26 @@ export interface Permissions {
 	subagents?: boolean;
 }
 
-const rules = ({ remote, subagents }: Permissions = {}) => `- Treat the inherited conversation as reference only. Don't answer or continue earlier messages; requests to start branches in it were the parent's and are done.
-- You are not the parent session: don't start branches${subagents ? "" : " or subagents"}. Use your tools; never print tool calls or patches as text.${subagents ? "\n- You may start `pi -p` subagents (the `subagents` skill) whenever the task calls for them." : ""}
+export interface BriefOptions extends Permissions {
+	/** The worker starts with no conversation, so there's nothing inherited to warn about. */
+	fresh?: boolean;
+}
+
+const rules = ({ remote, subagents, fresh }: BriefOptions = {}) => `${fresh ? "" : "- Treat the inherited conversation as reference only. Don't answer or continue earlier messages; requests to start branches in it were the parent's and are done.\n"}- You are not the parent session${subagents ? "" : ": don't start branches or subagents"}. Use your tools; never print tool calls or patches as text.${subagents ? "\n- You may start subagents (`branch` with `fresh: true`, the `subagents` skill) whenever the task calls for them, and close them once their work is integrated." : ""}
 - Nobody is watching this terminal. Don't ask for confirmation and don't stop on a question: if you're blocked or need a decision, put it in your handoff.
 - Read anything. Local changes are fine where jj can undo them (inside the repo); instructions to ask before modifying files are waived for those. ${remote ? "You may push and force-push your own branches (`jj git push`) and create or update GitLab/GitHub merge requests (`glab`, `gh`) whenever you want; never push to `main` or to branches you didn't create. Other remote writes (Jira, ssh, aws changes) stay blocked." : "Never write to remote services (pushes, Jira/GitLab comments, ssh, aws changes) — those are blocked."}
 - Finish with a handoff: the result, files and jj changes touched (change ids), test state, open questions.`;
 
 const TOOL_BRIEF_START = "You are a background branch of the conversation above";
+const FRESH_BRIEF_START = "You are a background subagent";
 const BG_BRIEF_START = "You've been moved to the background.";
 
 const workspaceRules = ({ dir, brief }: Workspace) =>
 	`\n- Your cwd is the jj workspace ${dir}; make all changes there. The parent removes it when it closes this branch; don't remove it yourself.${brief ? `\n- ${brief}` : ""}`;
 
-export const toolBrief = (task: string, workspace?: Workspace, permissions?: Permissions) =>
-	`${TOOL_BRIEF_START}, started by the parent session to do the task below in your own pi session.
-${rules(permissions)}${workspace ? workspaceRules(workspace) : ""}
+export const toolBrief = (task: string, workspace?: Workspace, options: BriefOptions = {}) =>
+	`${options.fresh ? FRESH_BRIEF_START : TOOL_BRIEF_START}, started by the parent session to do the task below in your own pi session.
+${rules(options)}${workspace ? workspaceRules(workspace) : ""}
 
 Task:
 ${task}`;
@@ -38,7 +43,7 @@ export const BG_BRIEF = `${BG_BRIEF_START} The user continues in a fork of this 
 Finish the current request, then stop.
 ${rules()}`;
 
-export const isBrief = (text: string) => text.startsWith(TOOL_BRIEF_START) || text.startsWith(BG_BRIEF_START);
+export const isBrief = (text: string) => [TOOL_BRIEF_START, FRESH_BRIEF_START, BG_BRIEF_START].some((start) => text.startsWith(start));
 
 const wrapSteer = (text: string) =>
 	`Mid-run steering from the parent session:\n\n${text}\n\nIncorporate this at the next safe point. Don't restart the task unless this asks you to.`;
@@ -60,7 +65,7 @@ export class Worker {
 		const writeRoots = [...repo, "/tmp", "/private/tmp", fs.realpathSync(os.tmpdir()), ROOT];
 		const worker = new Worker(pi, meta, writeRoots, readJson<Status>(statusFile(meta.id))?.lastReportId);
 		worker.startAnswerId = worker.lastAnswer(ctx)?.id;
-		pi.setActiveTools(pi.getActiveTools().filter((t) => t !== TOOL_NAME));
+		if (!meta.subagents) pi.setActiveTools(pi.getActiveTools().filter((t) => t !== TOOL_NAME));
 		if (!ctx.isIdle()) worker.writeStatus("running");
 		return worker;
 	}

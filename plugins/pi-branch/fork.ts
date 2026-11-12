@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
+import { newId } from "./store.ts";
 
 export const REPORT_TYPE = "branch-report";
 export const MARKER_TYPE = "branch-marker";
@@ -46,6 +47,9 @@ export function forkSession(opts: ForkOptions): string {
 	fs.writeFileSync(file, `${[header, ...kept].map((e) => JSON.stringify(e)).join("\n")}\n`);
 	return file;
 }
+
+/** A path for a new, empty session next to the parent's forks. pi creates the file when the worker gets its first message. */
+export const freshSessionFile = (parentFile: string) => path.join(forksDir(parentFile), `fresh-${newId()}.jsonl`);
 
 export function textOf(content: unknown): string {
 	if (typeof content === "string") return content;

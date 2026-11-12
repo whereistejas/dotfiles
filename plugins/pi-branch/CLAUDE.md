@@ -1,7 +1,7 @@
 # pi-branch
 
-Forks the current pi conversation into a background pi session in a Neovim
-terminal buffer, and posts its result back when it settles. `SPEC.md` is the
+Forks the current pi conversation, or starts a fresh one, in a background pi
+session in a Neovim terminal buffer, and posts its result back when it settles. `SPEC.md` is the
 design. Update it in the same change when behaviour changes.
 
 The shared rules (tests first, code hygiene, commits) are in `../CLAUDE.md`.
@@ -12,12 +12,14 @@ pi loads `index.ts` through `jiti`, so there is no build step. After an edit, ru
 
 ## Tests
 
-Run `node --test`. `nvim.test.ts` drives `nvim.lua` through `nvim.ts` against a
+Run `node --test` with Node 22 (the nvm default, which pi runs on); Homebrew's
+Node 26 can't load the worker tests. `nvim.test.ts` drives `nvim.lua` through `nvim.ts` against a
 headless nvim it starts; `workspace.test.ts` runs `agent-workspace` (so it must be
 on `PATH`) on throwaway jj repos, including a tiny crate that `cargo` builds.
-`policy.ts` and `store.ts` load there too. `reporting.test.ts` uses Node module
-hooks to replace pi imports, transform worker parameter properties, and isolate
-branch storage in a temporary directory.
+`policy.ts` and `store.ts` load there too. `reporting.test.ts` and
+`brief.test.ts` import `test-hooks.ts`, whose Node module hooks replace pi
+imports, transform worker parameter properties, and isolate branch storage in a
+temporary directory.
 
 ## Neovim side
 

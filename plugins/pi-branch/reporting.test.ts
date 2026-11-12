@@ -1,32 +1,11 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { registerHooks, stripTypeScriptTypes } from "node:module";
 import test from "node:test";
+import "./test-hooks.ts";
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "pi-reporting-"));
-registerHooks({
-	resolve(specifier, context, next) {
-		if (specifier === "./fork.ts") {
-			return { url: "data:text/javascript,export const REPORT_TYPE='branch-report'; export const TOOL_NAME='branch'; export const textOf=c=>typeof c==='string'?c:(c??[]).filter(b=>b.type==='text').map(b=>b.text).join('\\n');", shortCircuit: true };
-		}
-		return next(specifier, context);
-	},
-	load(url, context, next) {
-		if (/\/(worker|receiver|store)\.ts$/.test(url)) {
-			let source = fs.readFileSync(new URL(url), "utf8");
-			if (url.endsWith("/store.ts")) source = source.replace('path.join(os.homedir(), ".pi", "agent", "branches")', JSON.stringify(root));
-			return { format: "module", source: stripTypeScriptTypes(source, { mode: "transform" }), shortCircuit: true };
-		}
-		return next(url, context);
-	},
-});
 const { Worker } = await import("./worker.ts");
 const { Receiver } = await import("./receiver.ts");
 const { inbox, post, saveMeta, readJson, statusFile } = await import("./store.ts");
 
-test.after(() => fs.rmSync(root, { recursive: true, force: true }));
 const meta = (id: string) => ({ id, name: id, flow: "tool", cwd: process.cwd(), workerFile: `${id}.jsonl`, receiverFile: "parent.jsonl", createdAt: "now" });
 const assistant = (id: string, text: string) => ({ type: "message", id, message: { role: "assistant", content: [{ type: "text", text }], stopReason: "stop" } });
 const pi = { getActiveTools: () => [], setActiveTools: () => {}, getAllTools: () => [] };
