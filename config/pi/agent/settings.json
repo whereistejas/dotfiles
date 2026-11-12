@@ -1,6 +1,6 @@
 {
   "lastChangelogVersion": "1.5.0",
-  "theme": "light-classic",
+  "theme": "gruvbox-light",
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-5-5",
   "defaultThinkingLevel": "high",
