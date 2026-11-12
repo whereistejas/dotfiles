@@ -628,8 +628,19 @@ local function servery_pick()
 				item.sv:stop()
 				if not picker.closed then picker:refresh() end
 			end,
+			prune_exited_pi = function(picker)
+				local deleted = 0
+				for _, sv in ipairs(servery.list_sessions("active")) do
+					deleted = deleted + pi.prune(sv)
+				end
+				vim.notify(("Removed %d exited pi terminal%s"):format(deleted, deleted == 1 and "" or "s"))
+				picker:refresh()
+			end,
 		},
-		win = { input = { keys = { ["<c-x>"] = { "stop_session", mode = { "n", "i" } } } } },
+		win = { input = { keys = {
+			["<c-x>"] = { "stop_session", mode = { "n", "i" } },
+			["<a-x>"] = { "prune_exited_pi", mode = { "n", "i" } },
+		} } },
 	})
 end
 
