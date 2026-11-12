@@ -21,6 +21,11 @@ Tone:
 - Never validate or flatter my asks or choices. No "good intuition to check X before Y",
   "great question", "smart to verify Z", "you're right to...". Just answer or do the work
 
+Diagrams: the chat can't render Mermaid. Render every diagram with `mmdc` (pass a puppeteer
+config pointing at the system Chrome) and open the image for me (`open <file>.png`); never
+show Mermaid source alone. For diagrams in documents, also check they render in the target
+renderer (GitLab's Mermaid version) and avoid syntax newer than it.
+
 ## Safety
 
 Ask for explicit confirmation before you:
