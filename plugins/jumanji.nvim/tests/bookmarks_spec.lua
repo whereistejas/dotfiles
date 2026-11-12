@@ -78,6 +78,32 @@ h.test("confirming a bookmark opens its whole stack", function()
 	h.truthy(not vim.tbl_contains(stack, "b1"), "the other stack leaked in: " .. vim.inspect(stack))
 end)
 
+h.test("a branch on a remote shares its local bookmark's entry, starred when out of sync", function()
+	local dir = stacks()
+	local remote = vim.fs.joinpath(vim.fs.dirname(dir), "remote.git")
+	vim.system({ "git", "init", "--bare", "-q", remote }):wait()
+	h.jj(dir, { "git", "remote", "add", "origin", remote })
+	for _, name in ipairs({ "b", "old" }) do
+		if name == "old" then h.jj(dir, { "bookmark", "create", "old", "-r", "a" }) end
+		h.jj(dir, { "bookmark", "track", name, "--remote=origin" })
+		h.jj(dir, { "git", "push", "-b", name })
+	end
+	h.jj(dir, { "bookmark", "forget", "old" })
+	h.jj(dir, { "new", "b", "-m", "b2" })
+	h.jj(dir, { "bookmark", "set", "b", "-r", "@" })
+	local nvim = h.nvim(dir)
+
+	local items = h.lua(nvim, tree, { dir })
+
+	h.eq({
+		{ "main", "" },
+		{ "a old@origin", "main" },
+		{ "a-top", "a old@origin" },
+		{ "b*", "main" },
+	}, vim.tbl_map(function(i) return { i.label, i.parent } end, items))
+	h.eq({ "b1", "b2" }, descriptions(dir, by_label(items)["b*"].preview))
+end)
+
 -- A glab on PATH that records its arguments and lists one open MR, for a.
 local function fake_glab(nvim, dir)
 	local bin = vim.fs.joinpath(vim.fs.dirname(dir), "fake-bin")

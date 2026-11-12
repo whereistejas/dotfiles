@@ -149,26 +149,36 @@ local BOOKMARK_TEMPLATE = table.concat({
 	[[if(normal_target, normal_target.change_id().short(8))]],
 	[[if(normal_target, normal_target.description().first_line())]],
 	[[if(normal_target, normal_target.commit_id().short(8))]],
+	[[if(present, "1")]],
 }, [[ ++ "\x1f" ++ ]]) .. [[ ++ "\n"]]
 
---- Local and remote bookmarks. A remote bookmark synced with its local one,
---- and the git remote that mirrors the backing repo, are left out.
+--- Local and remote bookmarks, one per branch: a remote bookmark is left out
+--- when there's a local one of its name, which is `out_of_sync` when it
+--- differs from a tracked remote. So are the git remote that mirrors the
+--- backing repo, and local bookmarks deleted but not yet pushed.
 ---@param root string
----@return table[]? bookmarks { name, remote?, conflict, change_id?, description?, commit_id? }, string? err
+---@return table[]? bookmarks { name, remote?, out_of_sync, conflict, change_id?, description?, commit_id? }, string? err
 function M.bookmarks(root)
 	local cmd = {
 		"jj", "bookmark", "list", "--all-remotes", "--ignore-working-copy", "--color=never", "--no-pager",
 		"-T", BOOKMARK_TEMPLATE,
 	}
 	return run(root, cmd, function(out)
-		local list = {}
+		local rows, has_local = {}, {}
 		for line in vim.gsplit(out, "\n", { plain = true, trimempty = true }) do
 			local f = vim.split(line, "\x1f", { plain = true })
+			if f[2] == "" and f[8] == "1" then has_local[f[1]] = true end
+			rows[#rows + 1] = f
+		end
+
+		local list = {}
+		for _, f in ipairs(rows) do
 			local remote = f[2] ~= "" and f[2] or nil
-			if not (remote and (remote == "git" or f[3] == "1")) then
+			if remote and remote ~= "git" and not has_local[f[1]] or not remote and has_local[f[1]] then
 				list[#list + 1] = {
 					name = f[1],
 					remote = remote,
+					out_of_sync = not remote and f[3] ~= "1",
 					conflict = f[4] == "1",
 					change_id = f[5] ~= "" and f[5] or nil,
 					description = f[6],

@@ -22,7 +22,7 @@ local function symbol(b)
 end
 
 local function bookmark_label(b)
-	return b.remote and (b.name .. "@" .. b.remote) or b.name
+	return b.remote and (b.name .. "@" .. b.remote) or b.out_of_sync and (b.name .. "*") or b.name
 end
 
 -- The stack a commit is on: from trunk up to the commit and everything
