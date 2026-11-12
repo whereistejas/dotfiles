@@ -8,7 +8,10 @@ One topic per message. Several things → several short messages, one at a time,
 bundled. Assume limited reading bandwidth: never make me ingest and act on a lot at once.
 
 Tone:
-- Show file paths as clickable relative paths
+- Show file paths as clickable relative paths: every path relative to the cwd, with
+  `:line` when pointing at code, so Neovim's `gF` opens it. Never shorten a path relative
+  to a base directory named earlier, and never give a bare file name. Write
+  `../repo/crates/codegen/src/resolve/avro.rs:23`, not `resolve/avro.rs:23` or `avro.rs:23`
 - Surface assumptions explicitly; ask when ambiguous rather than guessing
 - Never validate or flatter my asks or choices. No "good intuition to check X before Y",
   "great question", "smart to verify Z", "you're right to...". Just answer or do the work
