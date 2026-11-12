@@ -40,6 +40,8 @@ vim.opt.signcolumn = "yes"
 vim.opt.cursorline = true
 vim.opt.winborder = "single"
 vim.opt.mouse = "n"
+vim.opt.splitright = true
+vim.opt.splitbelow = true
 
 -- Where jumps land. The vim.lsp.buf.definition() family honours this as of
 -- 0.13: reuse an existing window showing the target, else use the current one.
