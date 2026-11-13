@@ -1,10 +1,10 @@
 /**
- * jj-commit-mention extension.
+ * mention extension.
  *
  * Adds autocomplete for Jujutsu (jj) bookmarks and commits, merged with pi's built-in
- * `@` file completion.
+ * `@` file completion, and for LSP symbols from the Neovim session pi runs in.
  *
- * Two forms are supported:
+ * These forms are supported:
  *
  *   @<query>              bookmarks/commits of the repo containing the session cwd,
  *                         merged with file suggestions. Filter by bookmark name,
@@ -17,6 +17,11 @@
  *
  *   @[<path>/]bb:<query>  bookmarks only (of the repo at `<path>`, else the cwd repo).
  *   @[<path>/]ff:<query>  files only, as if `@[<path>/]<query>` had been typed.
+ *
+ *   @@<query>             workspace symbols from the LSP clients of the Neovim session in
+ *                         $NVIM whose workspace overlaps the cwd. Selecting one inserts
+ *                         `<path>:<line>:<col> (<Container.name>)`, the path relative to
+ *                         the cwd. Results are cached per query for 30 seconds.
  *
  * Cost control (repos with a lot of changes):
  *   - jj is only run for a path once the token contains `:` and the path resolves to an
@@ -35,10 +40,11 @@
  */
 
 import { homedir } from "node:os";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { stat } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
 	type AutocompleteItem,
 	type AutocompleteProvider,
@@ -46,6 +52,8 @@ import {
 	fuzzyFilter,
 	visibleWidth,
 } from "@earendil-works/pi-tui";
+
+import { type NvimCall, type SymbolLookup, createSymbolCache, extractSymbolQuery, querySymbols, symbolRow } from "./lsp.ts";
 
 type Bookmark = {
 	name: string;
@@ -70,6 +78,8 @@ const CACHE_TTL_MS = 5_000;
 const ROOT_CACHE_TTL_MS = 30_000;
 // Keeps details aligned with pi's file suggestions (32-col primary column incl. 2-col gap).
 const MIN_TAG_COLUMN = 30;
+const SYMBOL_CACHE_TTL_MS = 30_000;
+const LUA = join(dirname(fileURLToPath(import.meta.url)), "nvim.lua");
 const DIM = "\x1b[2m";
 const UNDIM = "\x1b[22m";
 
@@ -111,9 +121,9 @@ type JjToken = {
 
 // Matches `@<token>` at the cursor, anchored on a whitespace/start boundary
 // (same boundary rule pi uses for `@` file mentions). Explicitly excludes the old
-// `@jj:` format to avoid confusion.
+// `@jj:` format to avoid confusion, and `@@` symbol mentions.
 function extractJjToken(textBeforeCursor: string): JjToken | undefined {
-	const match = textBeforeCursor.match(/(?:^|\s)@(?!jj:)([^\s]*)$/);
+	const match = textBeforeCursor.match(/(?:^|\s)@(?!jj:|@)([^\s]*)$/);
 	const raw = match?.[1];
 	if (raw === undefined) {
 		return undefined;
@@ -579,12 +589,77 @@ function createCommitProvider(
 	};
 }
 
+const vimString = (s: string) => `'${s.replace(/'/g, "''")}'`;
+
+function nvimCall(pi: ExtensionAPI, server: string): NvimCall {
+	return async (fn, args, signal) => {
+		const expr = `luaeval('vim.json.encode(dofile(_A[1])[_A[2]](vim.json.decode(_A[3])))', [${[LUA, fn, JSON.stringify(args)].map(vimString).join(", ")}])`;
+		const result = await pi.exec("nvim", ["--clean", "--headless", "--server", server, "--remote-expr", expr], {
+			signal,
+			timeout: 2_000,
+			maxBuffer: MAX_OUTPUT_BYTES,
+		});
+		if (result.code !== 0 || result.truncated) {
+			return undefined;
+		}
+		return JSON.parse(result.stdout);
+	};
+}
+
+function createSymbolProvider(current: AutocompleteProvider, cwd: string, lookup: SymbolLookup): AutocompleteProvider {
+	return {
+		async getSuggestions(lines, cursorLine, cursorCol, options): Promise<AutocompleteSuggestions | null> {
+			const query = extractSymbolQuery((lines[cursorLine] ?? "").slice(0, cursorCol));
+			if (query === undefined) {
+				return current.getSuggestions(lines, cursorLine, cursorCol, options);
+			}
+			if (!query) {
+				return null;
+			}
+
+			const symbols = await lookup(query, options.signal);
+			if (!symbols?.length || options.signal.aborted) {
+				return null;
+			}
+			return {
+				items: rowsToItems(symbols.slice(0, MAX_SUGGESTIONS).map((symbol) => symbolRow(symbol, cwd))),
+				prefix: `@@${query}`,
+			};
+		},
+
+		applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
+			return current.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
+		},
+
+		shouldTriggerFileCompletion(lines, cursorLine, cursorCol) {
+			return current.shouldTriggerFileCompletion?.(lines, cursorLine, cursorCol) ?? true;
+		},
+	};
+}
+
+function registerSymbolMentions(pi: ExtensionAPI, ctx: ExtensionContext): void {
+	const server = process.env.NVIM;
+	if (!server) {
+		return;
+	}
+
+	const call = nvimCall(pi, server);
+	let requests = 0;
+	const lookup = createSymbolCache(
+		(query, signal) => querySymbols(call, { id: `${process.pid}-${++requests}`, cwd: ctx.cwd, query }, signal),
+		SYMBOL_CACHE_TTL_MS,
+	);
+	ctx.ui.addAutocompleteProvider((current) => createSymbolProvider(current, ctx.cwd, lookup));
+}
+
 export default function (pi: ExtensionAPI): void {
 	pi.on("session_start", async (_event, ctx) => {
 		// Autocomplete providers only matter in the interactive TUI.
 		if (ctx.mode !== "tui") {
 			return;
 		}
+
+		registerSymbolMentions(pi, ctx);
 
 		// Only activate when jj is installed; otherwise every path probe would shell out in vain.
 		const version = await pi.exec("jj", ["--version"], { timeout: 5_000, maxBuffer: MAX_OUTPUT_BYTES }).catch(() => undefined);

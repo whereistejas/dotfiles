@@ -36,3 +36,30 @@ for (const truncated of [false, true]) {
 		else assert.deepEqual(result.items.map(item => item.value), ["@topic", "@ijklmnop"]);
 	});
 }
+
+test("@@<query> lists LSP symbols from Neovim and stays out of jj completion", async (t) => {
+	const previous = process.env.NVIM;
+	process.env.NVIM = "test-socket";
+	t.after(() => { if (previous === undefined) delete process.env.NVIM; else process.env.NVIM = previous; });
+
+	let start;
+	const providers = [];
+	const pi = {
+		on: (name, handler) => { if (name === "session_start") start = handler; },
+		async exec(command, args) {
+			if (command === "nvim") {
+				const symbols = [{ name: "bar", kind: "Method", container: "Foo", file: `${process.cwd()}/src/a.rs`, line: 3, col: 5 }];
+				return { code: 0, stdout: JSON.stringify({ done: true, symbols }), stderr: "", truncated: false };
+			}
+			return { code: 0, stdout: args[0] === "root" ? process.cwd() : "", stderr: "", truncated: false };
+		},
+	};
+	const fallback = { getSuggestions: async () => ({ items: [{ value: "file", label: "file" }], prefix: "@" }), applyCompletion: () => {}, shouldTriggerFileCompletion: () => true };
+	extension(pi);
+	await start({}, { mode: "tui", cwd: process.cwd(), ui: { addAutocompleteProvider: (factory) => { providers.push(factory); } } });
+	const provider = providers.reduce((current, factory) => factory(current), fallback);
+
+	const result = await provider.getSuggestions(["see @@bar"], 0, 9, { signal: new AbortController().signal });
+	assert.equal(result.prefix, "@@bar");
+	assert.deepEqual(result.items.map(item => item.value), ["src/a.rs:3:5 (Foo.bar)"]);
+});
