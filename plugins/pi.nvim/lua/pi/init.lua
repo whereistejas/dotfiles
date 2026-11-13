@@ -23,11 +23,17 @@ end
 --- saves a hidden terminal as a bare `badd term://…`, whose job only starts
 --- once the buffer is shown. A shown terminal leaves an unlisted, unloaded
 --- buffer behind when the session renames it back to its saved name.
+--- Terminals whose directory is gone stay unstarted, with one short warning:
+--- a long or failing message here blocks the session on a hit-enter prompt.
 function M.resume_hidden()
 	local info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
+	local gone = 0
 	for _, buf in ipairs(vim.api.nvim_list_bufs()) do
 		local cwd, cmd = vim.api.nvim_buf_get_name(buf):match("^term://(.-)//%d+:(.*)$")
-		if vim.bo[buf].buflisted and not vim.api.nvim_buf_is_loaded(buf) and runs_pi(cmd) then
+		local hidden_pi = vim.bo[buf].buflisted and not vim.api.nvim_buf_is_loaded(buf) and runs_pi(cmd)
+		if hidden_pi and vim.fn.isdirectory(vim.fs.normalize(cwd)) == 0 then
+			gone = gone + 1
+		elseif hidden_pi then
 			-- Loading runs nvim's term:// BufReadCmd, which would start the job in
 			-- the 5-row autocmd window; pi's TUI redraws its whole history on every
 			-- frame at that height. A b:term_title makes it skip the buffer.
@@ -37,6 +43,11 @@ function M.resume_hidden()
 				vim.fn.jobstart(cmd, { term = true, cwd = cwd, width = info.width - info.textoff, height = info.height })
 			end)
 		end
+	end
+
+	if gone > 0 then
+		local noun = gone == 1 and "terminal whose directory is" or "terminals whose directories are"
+		vim.notify(("pi: not resuming %d %s gone"):format(gone, noun), vim.log.levels.WARN)
 	end
 end
 
