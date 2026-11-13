@@ -118,7 +118,7 @@ vim.api.nvim_create_autocmd("PackChanged", {
 vim.pack.add({
 	-- Theme (loaded first so colorscheme is set before other plugins)
 	"https://github.com/ellisonleao/gruvbox.nvim",
-	"https://github.com/shortcuts/no-neck-pain.nvim",
+	"https://github.com/junegunn/goyo.vim",
 
 	"https://github.com/wsdjeg/vim-fetch",
 	"https://github.com/tpope/vim-surround",
@@ -730,8 +730,8 @@ local function servery_closed_pick()
 	})
 end
 
--- no-neck-pain (centered layout)
-require("no-neck-pain").setup({ width = 120 })
+-- goyo (centered layout)
+vim.g.goyo_width = 120
 
 -- render-markdown (in-buffer markdown rendering)
 require("render-markdown").setup({ enabled = false })
@@ -1184,7 +1184,7 @@ vim.keymap.set("n", "<space>c", function() Snacks.explorer({ cwd = vim.fn.expand
 	{ desc = "File explorer (current file dir)" })
 
 -- Layout
-vim.keymap.set("n", "<space>g", "<cmd>NoNeckPain<CR>", { desc = "Toggle centered layout" })
+vim.keymap.set("n", "<space>g", "<cmd>Goyo<CR>", { desc = "Toggle centered layout" })
 
 -- =============================================================================
 -- Autocommands

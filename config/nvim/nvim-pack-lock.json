@@ -4,6 +4,10 @@
       "rev": "ef707fb93301a9b856f36eae4c8f56f5b988a794",
       "src": "https://github.com/lewis6991/gitsigns.nvim"
     },
+    "goyo.vim": {
+      "rev": "9c72fdf2d202914318581f9f0dd09fd102f8504d",
+      "src": "https://github.com/junegunn/goyo.vim"
+    },
     "gruvbox.nvim": {
       "rev": "48262cda6a8a921b159c8ec3e21b48ccd870b7b2",
       "src": "https://github.com/ellisonleao/gruvbox.nvim"
@@ -11,10 +15,6 @@
     "mini.diff": {
       "rev": "2890bd1edc42b57af769774e53c2bfbbe3f45d4d",
       "src": "https://github.com/echasnovski/mini.diff"
-    },
-    "no-neck-pain.nvim": {
-      "rev": "83ed5249cfdfc5790ab2c05f96038eeca7dd9451",
-      "src": "https://github.com/shortcuts/no-neck-pain.nvim"
     },
     "nvim-lspconfig": {
       "rev": "993d048db0d83d8e8ba3f9cb376456321acdcce3",

@@ -86,5 +86,5 @@ Managed via `vim.pack` (Neovim's built-in package manager):
 - nvim-lspconfig (completion via Neovim's built-in LSP client)
 - mini.diff, gitsigns.nvim (inline line blame only)
 - render-markdown.nvim
-- vim-surround, vim-fetch, no-neck-pain.nvim, which-key.nvim
+- vim-surround, vim-fetch, goyo.vim, which-key.nvim
 - gruvbox.nvim
