@@ -2,7 +2,9 @@
 
 Helpers for pi terminals in Neovim: finds the terminal pi runs in, its directory and
 jj workspace root, and `:Pi` types a slash command into it. After a session loads,
-it starts the pi terminals the session restored hidden. The shared rules (tests
+it starts the pi terminals the session restored hidden. In a pi terminal, `gd`
+finds the symbol under the cursor through `workspace/symbol` and opens it in a
+code window. The shared rules (tests
 first, code hygiene, commits) are in `../CLAUDE.md`.
 
 ## Tests
