@@ -39,7 +39,8 @@ export class Receiver {
 	poll(ctx: ExtensionContext) {
 		for (const meta of this.branches) {
 			for (const { file, message } of inbox(meta.id, "to-receiver")) {
-				this.deliver(ctx, meta, message.id, preview(message.text));
+				if (message.notice) this.deliver(ctx, meta, message.id, message.text, true);
+				else this.deliver(ctx, meta, message.id, preview(message.text));
 				fs.unlinkSync(file);
 			}
 			const exit = readJson<Exit>(exitFile(meta.id));
@@ -50,15 +51,20 @@ export class Receiver {
 		}
 	}
 
-	private deliver(ctx: ExtensionContext, meta: Meta, reportId: string, body: string) {
+	/** A notice is informational: it doesn't start a turn, and lands after the current one if there is one. */
+	private deliver(ctx: ExtensionContext, meta: Meta, reportId: string, body: string, notice = false) {
 		if (this.delivered.has(reportId)) return;
 		this.delivered.add(reportId);
 		const message = {
 			customType: REPORT_TYPE,
-			content: `Branch **${meta.name}** reported:\n\n${body}\n\nFull transcript: ${meta.workerFile}`,
+			content: notice ? `Branch **${meta.name}** ${body}` : `Branch **${meta.name}** reported:\n\n${body}\n\nFull transcript: ${meta.workerFile}`,
 			display: true,
 			details: { branchId: meta.id, reportId },
 		};
+		if (notice) {
+			this.pi.sendMessage(message, { triggerTurn: false });
+			return;
+		}
 		if (!ctx.isIdle()) {
 			this.pi.sendMessage(message, { deliverAs: "steer" });
 			return;
@@ -67,8 +73,8 @@ export class Receiver {
 	}
 }
 
-function preview(text: string): string {
+export function preview(text: string, max = PREVIEW_BYTES): string {
 	const bytes = Buffer.from(text);
-	if (bytes.length <= PREVIEW_BYTES) return text;
-	return `${bytes.subarray(0, PREVIEW_BYTES).toString().replace(/\uFFFD+$/, "")}\n…[truncated; the full answer is in the transcript]`;
+	if (bytes.length <= max) return text;
+	return `${bytes.subarray(0, max).toString().replace(/\uFFFD+$/, "")}\n…[truncated; the full answer is in the transcript]`;
 }

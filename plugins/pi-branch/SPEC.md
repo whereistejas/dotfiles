@@ -156,8 +156,22 @@ for it. The tool guidelines forbid sending on the agent's own initiative.
 - Every session polls its inbox with the branch poll. A message is posted as a
   `session-message` custom message that names the sender. It starts a turn if
   the session is idle and lands as a steer if it's busy. The receiving agent is
-  told to act on the message and to reply only when asked, so two agents don't
-  keep acknowledging each other.
+  told to act on the message and not to reply with `send`: the extension answers
+  for it.
+- On delivery the recipient sends the sender an ack quoting the message. The ack
+  shows in the sender without starting a turn (`triggerTurn: false`), so it lands
+  after the current turn if one is running.
+- If the recipient is a branch worker, it also posts its receiver a notice that
+  the sender messaged it and it acknowledged. A notice goes through the branch's
+  `to-receiver` box but isn't a report: it doesn't start a turn either.
+- When the recipient's run settles with a final answer newer than the one it had
+  when the message arrived, that answer goes back to the sender as a reply, with
+  the recipient's session file for the full text. A reply wakes the sender like a
+  branch report. A cancelled run replies that it was cancelled. A branch worker
+  still reports to its receiver as usual.
+- Acks and replies never get an ack or reply, so two agents don't keep answering
+  each other. Senders owed a reply are kept in memory: a `/reload` before the
+  run settles drops the reply.
 - Delivered message ids are recorded in the message's details, so `/reload`
   can't deliver a message twice. A file is deleted only after `sendMessage`
   accepts it.

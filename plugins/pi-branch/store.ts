@@ -37,6 +37,8 @@ export interface Exit {
 export interface Message {
 	id: string;
 	text: string;
+	/** To a receiver: something to know about rather than a report to act on. */
+	notice?: boolean;
 }
 
 export type Box = "to-receiver" | "to-worker";

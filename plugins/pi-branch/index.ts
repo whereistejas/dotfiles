@@ -52,9 +52,9 @@ export default function (pi: ExtensionAPI) {
 		worker = mine && (await Worker.attach(pi, mine, ctx));
 		if (ctx.sessionManager.getSessionFile()) {
 			const id = ctx.sessionManager.getSessionId();
-			self = { id, name: sessionName(id, ctx.cwd), cwd: ctx.cwd, pid: process.pid };
+			self = { id, name: sessionName(id, ctx.cwd), cwd: ctx.cwd, pid: process.pid, file: ctx.sessionManager.getSessionFile() };
 			register(self);
-			mailbox = new Mailbox(pi, ctx, id);
+			mailbox = new Mailbox(pi, ctx, self, (text) => worker?.notifyOwner(text));
 		}
 		if (worker || receiver.waiting || mailbox) startPolling();
 	});
@@ -80,7 +80,10 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("agent_end", () => worker?.onAgentEnd());
 
-	pi.on("agent_settled", (event, ctx) => worker?.onAgentSettled(ctx, event.aborted));
+	pi.on("agent_settled", (event, ctx) => {
+		worker?.onAgentSettled(ctx, event.aborted);
+		mailbox?.onAgentSettled(ctx, event.aborted);
+	});
 
 	pi.on("message_end", (event) => {
 		if (event.message.role === "user") worker?.onUserMessage(textOf(event.message.content));
@@ -188,7 +191,7 @@ export default function (pi: ExtensionAPI) {
 		if (!target || !text?.trim()) throw new Error("send needs a name and a message");
 		const to = findSession(target, liveSessions().filter((s) => s.id !== self?.id));
 		send(self, to, text);
-		return `Sent to "${to.name}". It lands as a steer if that session is busy, or starts a turn there if it's idle.`;
+		return `Sent to "${to.name}". It lands as a steer if that session is busy, or starts a turn there if it's idle. Its acknowledgement and then its answer arrive here as messages; don't wait for them.`;
 	}
 
 	pi.registerTool({
@@ -197,7 +200,7 @@ export default function (pi: ExtensionAPI) {
 		description: `Fork this conversation, or start a fresh one, in a background pi session (a Neovim terminal buffer) that works on a task and reports back here.
 - start: needs name and task. By default the branch inherits the whole conversation, so the task can be short. fresh: true starts it with no conversation (a subagent): the task must then be a complete brief. tools restricts what it can call (e.g. ["read", "ffgrep", "fffind"] for read-only research). Optional model ("provider/id:thinking"; default: this session's model; only use a 200K-context model like claude-haiku-4-5 for a fresh branch or when this conversation is well under that). write: true gives it its own jj workspace (a Rust one starts warm, with a build running in the background); leave it off for read-only work. remote: true lets it push/force-push its branches and write MRs (the default for a fresh branch; pass remote: false to block it); subagents: true lets it start its own branches — set it only when the user asked for that.
 - peek: the branch's progress so far. steer: send it a message; it lands after its current tool call finishes (a running command isn't interrupted). list: all branches of this session, and the other live pi sessions.
-- send: message any other live pi session (name: its session name or id, from list). Only when the user asks you to message another session.
+- send: message any other live pi session (name: its session name or id, from list). It acknowledges on delivery, tells its owner if it's a branch, and its answer arrives here as a message. Only when the user asks you to message another session.
 - close: once you've integrated its work, or dropped it: wipes its terminal buffer and, for a write branch, stops its warm-up build, forgets its jj workspace (its commits stay) and deletes the folder. Refused while it's running.
 Reports arrive as messages on their own. After start, return control or keep working: never sleep or poll waiting for a report.`,
 		promptSnippet: "Fork the conversation into a background pi session that reports back",

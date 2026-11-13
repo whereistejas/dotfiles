@@ -4,6 +4,7 @@ import os from "node:os";
 import { promisify } from "node:util";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { TOOL_NAME, textOf } from "./fork.ts";
+import { lastAnswer } from "./mailbox.ts";
 import { checkToolCall } from "./policy.ts";
 import { inbox, type Meta, moveTo, newId, post, ROOT, readJson, type Status, statusFile, writeJson } from "./store.ts";
 import type { Workspace } from "./workspace.ts";
@@ -64,14 +65,14 @@ export class Worker {
 		const repo = await run("jj", ["root"], { cwd: ctx.cwd }).then((r) => [r.stdout.trim()], () => []);
 		const writeRoots = [...repo, "/tmp", "/private/tmp", fs.realpathSync(os.tmpdir()), ROOT];
 		const worker = new Worker(pi, meta, writeRoots, readJson<Status>(statusFile(meta.id))?.lastReportId);
-		worker.startAnswerId = worker.lastAnswer(ctx)?.id;
+		worker.startAnswerId = lastAnswer(ctx)?.id;
 		if (!meta.subagents) pi.setActiveTools(pi.getActiveTools().filter((t) => t !== TOOL_NAME));
 		if (!ctx.isIdle()) worker.writeStatus("running");
 		return worker;
 	}
 
 	onAgentStart(ctx: ExtensionContext) {
-		this.startAnswerId = this.lastAnswer(ctx)?.id;
+		this.startAnswerId = lastAnswer(ctx)?.id;
 		this.settling = false;
 		this.writeStatus("running");
 	}
@@ -102,6 +103,11 @@ export class Worker {
 		}
 	}
 
+	/** Tells the receiver something without counting as a report. */
+	notifyOwner(text: string) {
+		post(this.meta.id, "to-receiver", { id: newId(), text, notice: true });
+	}
+
 	blockReason(toolName: string, input: Record<string, unknown>, cwd: string): string | undefined {
 		const readOnlyTools = new Set(this.pi.getAllTools().filter((t) => t.annotations?.readOnlyHint).map((t) => t.name));
 		const reason = checkToolCall(toolName, input, {
@@ -113,12 +119,8 @@ export class Worker {
 		return reason && `Blocked in a background branch: ${reason}. Note it in your handoff instead.`;
 	}
 
-	private lastAnswer(ctx: ExtensionContext) {
-		return ctx.sessionManager.getBranch().findLast((e) => e.type === "message" && e.message.role === "assistant");
-	}
-
 	private report(ctx: ExtensionContext, aborted: boolean) {
-		const last = this.lastAnswer(ctx);
+		const last = lastAnswer(ctx);
 		const fresh = last?.type === "message" && last.id !== this.lastReportId && last.id !== this.startAnswerId;
 		if (!aborted && !fresh) return;
 		const id = fresh ? last.id : newId();
