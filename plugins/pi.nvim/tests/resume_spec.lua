@@ -120,6 +120,33 @@ h.test("a restored session skips hidden pi terminals whose directory is gone", f
 	h.eq({ "pi: not resuming 1 terminal whose directory is gone" }, messages)
 end)
 
+h.test("a restored session starts hidden pi terminals whose directory is under home", function()
+	h.fake_pi()
+	local session = vim.fs.joinpath(h.dir(), "Session.vim")
+	local cmd = "pi --session home.jsonl"
+
+	-- Neovim names a terminal under $HOME term://~/…, which jobstart's cwd rejects.
+	local old = h.spawn()
+	h.remote(old, [[
+		local home, cmd, session = ...
+		vim.env.HOME = home
+		local buf = vim.api.nvim_create_buf(true, false)
+		vim.bo[buf].bufhidden = "hide"
+		vim.api.nvim_buf_call(buf, function() vim.fn.jobstart(cmd, { term = true, width = 80, height = 24 }) end)
+		vim.cmd.mksession(vim.fn.fnameescape(session))
+	]], { h.dir(), cmd, session })
+	local saved = table.concat(vim.fn.readfile(session), "\n"):match("term://%S*")
+	h.truthy(vim.startswith(saved or "", "term://~"), "the session saved no home-relative terminal: " .. tostring(saved))
+
+	local new = h.spawn()
+	h.remote(new, "vim.env.HOME = ...; vim.cmd.source(vim.fn.fnameescape(select(2, ...)))", { h.dir(), session })
+
+	h.truthy(vim.wait(3000, function()
+		local pi = terminals(new)[cmd]
+		return pi and pi.last ~= nil
+	end, 50), "the hidden pi terminal under home never ran: " .. vim.inspect(terminals(new)))
+end)
+
 h.test("a restored session leaves other hidden terminals unstarted", function()
 	local nvim = restore_hidden_terminals()
 

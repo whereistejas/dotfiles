@@ -29,9 +29,10 @@ function M.resume_hidden()
 	local info = vim.fn.getwininfo(vim.api.nvim_get_current_win())[1]
 	local gone = 0
 	for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-		local cwd, cmd = vim.api.nvim_buf_get_name(buf):match("^term://(.-)//%d+:(.*)$")
+		local name, cmd = vim.api.nvim_buf_get_name(buf):match("^term://(.-)//%d+:(.*)$")
+		local cwd = name and vim.fs.normalize(name)
 		local hidden_pi = vim.bo[buf].buflisted and not vim.api.nvim_buf_is_loaded(buf) and runs_pi(cmd)
-		if hidden_pi and vim.fn.isdirectory(vim.fs.normalize(cwd)) == 0 then
+		if hidden_pi and vim.fn.isdirectory(cwd) == 0 then
 			gone = gone + 1
 		elseif hidden_pi then
 			-- Loading runs nvim's term:// BufReadCmd, which would start the job in
