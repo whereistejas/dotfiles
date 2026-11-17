@@ -1,9 +1,5 @@
 {
   "plugins": {
-    "github-nvim-theme": {
-      "rev": "c106c9472154d6b2c74b74565616b877ae8ed31d",
-      "src": "https://github.com/projekt0n/github-nvim-theme"
-    },
     "gitsigns.nvim": {
       "rev": "dc7698f932792a764d3db95fedee26c38e728355",
       "src": "https://github.com/lewis6991/gitsigns.nvim"
@@ -19,10 +15,6 @@
     "mini.diff": {
       "rev": "91d6ce4b7f400439fe761f01a58280f2c0f99c01",
       "src": "https://github.com/echasnovski/mini.diff"
-    },
-    "no-neck-pain.nvim": {
-      "rev": "02a835c850a4059cc3c3b7b23ab78f286d56cef8",
-      "src": "https://github.com/shortcuts/no-neck-pain.nvim"
     },
     "nvim-lspconfig": {
       "rev": "6a3ddecf60e19f164390308f502e67f3199f58e8",
@@ -43,10 +35,6 @@
     "snacks.nvim": {
       "rev": "882c996cf28183f4d63640de0b4c02ec886d01f2",
       "src": "https://github.com/folke/snacks.nvim"
-    },
-    "solarized.nvim": {
-      "rev": "a8085e29883ddcfb39bd46197eb32ef00df05368",
-      "src": "https://github.com/maxmx03/solarized.nvim"
     },
     "vim-fetch": {
       "rev": "b88bc5c4a8652b73bcdb577e0c90700a5064fd00",
