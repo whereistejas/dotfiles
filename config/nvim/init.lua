@@ -296,6 +296,12 @@ end
 -- Theme
 vim.cmd("colorscheme kanagawa")
 
+-- pi in a :terminal gets no answer to its background query, so it falls back to
+-- COLORFGBG to pick its light or dark theme.
+local function set_colorfgbg() vim.env.COLORFGBG = vim.o.background == "light" and "0;15" or "15;0" end
+set_colorfgbg()
+vim.api.nvim_create_autocmd("ColorScheme", { callback = set_colorfgbg })
+
 -- mini.diff — gutter change markers. Uses a jj-aware source that diffs the
 -- buffer against jj's working-copy parent `@-`, so signs work in jj workspaces
 -- (which have no per-workspace .git and thus break gitsigns). Falls back to the
