@@ -296,12 +296,6 @@ end
 -- Theme
 vim.cmd("colorscheme kanagawa")
 
--- pi in a :terminal gets no answer to its background query, so it falls back to
--- COLORFGBG to pick its light or dark theme.
-local function set_colorfgbg() vim.env.COLORFGBG = vim.o.background == "light" and "0;15" or "15;0" end
-set_colorfgbg()
-vim.api.nvim_create_autocmd("ColorScheme", { callback = set_colorfgbg })
-
 -- mini.diff — gutter change markers. Uses a jj-aware source that diffs the
 -- buffer against jj's working-copy parent `@-`, so signs work in jj workspaces
 -- (which have no per-workspace .git and thus break gitsigns). Falls back to the
@@ -1134,6 +1128,23 @@ vim.api.nvim_create_autocmd("SourcePost", {
 -- replies). pi wraps every message in OSC 133 and redraws whole transcripts, so
 -- each handler call queues behind the next and the session stops taking input.
 vim.api.nvim_clear_autocmds({ event = "TermRequest", group = "nvim.terminal" })
+
+-- Answer OSC 10/11 colour queries with the colorscheme's own foreground and
+-- background, so pi picks its light or dark theme. Anything else returns at once.
+vim.api.nvim_create_autocmd("TermRequest", {
+	callback = function(ev)
+		local command = ev.data.sequence:match("^\027%](1[01]);%?$")
+		if not command then return end
+
+		local normal = vim.api.nvim_get_hl(0, { name = "Normal", link = false })
+		local color = command == "10" and normal.fg or normal.bg
+		if not color then return end
+
+		local r, g, b = bit.rshift(color, 16), bit.band(bit.rshift(color, 8), 0xff), bit.band(color, 0xff)
+		local reply = ("\027]%s;rgb:%02x%02x/%02x%02x/%02x%02x%s"):format(command, r, r, g, g, b, b, ev.data.terminator)
+		vim.api.nvim_chan_send(vim.bo[ev.buf].channel, reply)
+	end,
+})
 
 -- Terminal jobs (pi's Ctrl-G, jj, git) edit in this session instead of nesting an
 -- nvim, even when started without an interactive bash (e.g. `:term pi`).
