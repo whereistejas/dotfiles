@@ -294,6 +294,9 @@ end
 -- =============================================================================
 
 -- Theme
+-- No gutter background: Snacks' picker trees and servery's icons link to LineNr
+-- and CursorLineNr, which would otherwise paint it inside floats.
+require("kanagawa").setup({ colors = { theme = { all = { ui = { bg_gutter = "none" } } } } })
 vim.cmd("colorscheme kanagawa")
 
 -- mini.diff — gutter change markers. Uses a jj-aware source that diffs the
