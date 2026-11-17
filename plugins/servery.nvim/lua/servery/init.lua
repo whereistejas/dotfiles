@@ -347,7 +347,13 @@ list_servers = function()
 		end
 	end
 
-	return vim.tbl_map(get_server_info, out)
+	-- A server killed without cleaning up leaves its socket behind.
+	return vim.iter(out)
+		:map(function(server)
+			local ok, info = pcall(get_server_info, server)
+			return ok and info or nil
+		end)
+		:totable()
 end
 
 ---List configured session directories

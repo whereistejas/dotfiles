@@ -27,6 +27,16 @@ h.test("list_sessions lists each running session once", function()
 	h.eq({ vim.v.servername, other }, sockets(servery.list_sessions("active")))
 end)
 
+h.test("list_sessions skips a session socket nothing listens on", function()
+	local other = h.spawn(h.dir("other"))
+	local dead = h.spawn(h.dir("dead"))
+	vim.uv.kill(h.remote(dead, "return vim.fn.getpid()"), "sigkill")
+	h.truthy(h.wait_stopped(dead), "server never stopped at " .. dead)
+	h.truthy(vim.uv.fs_stat(dead), "the killed server left no socket behind")
+
+	h.eq({ other }, sockets(servery.list_sessions("active")))
+end)
+
 h.test("list_sessions filters by status", function()
 	local dir = h.dir("idle")
 	h.setup({ dirs = { dir } })
