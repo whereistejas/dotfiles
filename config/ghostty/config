@@ -2,7 +2,7 @@ font-family = "Berkeley Mono"
 font-family = "JuliaMono"
 font-size = 14
 cursor-style-blink = true
-theme = "Gruvbox Light"
+theme = light:kanagawa-lotus,dark:kanagawa-wave
 command="/opt/homebrew/bin/bash"
 macos-option-as-alt = true
 
