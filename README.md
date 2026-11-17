@@ -87,4 +87,4 @@ Managed via `vim.pack` (Neovim's built-in package manager):
 - mini.diff, gitsigns.nvim (inline line blame only)
 - render-markdown.nvim
 - vim-surround, vim-fetch, goyo.vim, which-key.nvim
-- gruvbox.nvim
+- kanagawa.nvim

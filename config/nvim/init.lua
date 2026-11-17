@@ -119,7 +119,7 @@ vim.api.nvim_create_autocmd("PackChanged", {
 
 vim.pack.add({
 	-- Theme (loaded first so colorscheme is set before other plugins)
-	"https://github.com/ellisonleao/gruvbox.nvim",
+	"https://github.com/rebelot/kanagawa.nvim",
 	"https://github.com/junegunn/goyo.vim",
 
 	"https://github.com/wsdjeg/vim-fetch",
@@ -294,8 +294,7 @@ end
 -- =============================================================================
 
 -- Theme
-vim.o.background = "light"
-vim.cmd("colorscheme gruvbox")
+vim.cmd("colorscheme kanagawa")
 
 -- mini.diff — gutter change markers. Uses a jj-aware source that diffs the
 -- buffer against jj's working-copy parent `@-`, so signs work in jj workspaces
