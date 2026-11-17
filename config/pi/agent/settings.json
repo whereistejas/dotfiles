@@ -14,11 +14,11 @@
     "npm:@earendil-works/pi-voice"
   ],
   "extensions": [
-    "~/build/plugins/pi-branch",
-    "~/build/plugins/pi-nvim-terminal",
-    "~/build/plugins/pi-window-title",
-    "~/build/plugins/pi-minimal-footer",
-    "~/build/plugins/pi-mention"
+    "~/build/dotfiles/plugins/pi-branch",
+    "~/build/dotfiles/plugins/pi-nvim-terminal",
+    "~/build/dotfiles/plugins/pi-window-title",
+    "~/build/dotfiles/plugins/pi-minimal-footer",
+    "~/build/dotfiles/plugins/pi-mention"
   ],
   "quietStartup": true,
   "tuiMode": "regular",
