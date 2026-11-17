@@ -1,0 +1,28 @@
+# pi-minimal-footer
+
+Replaces pi's footer with one line: repo, work item, jj change or git commit,
+session and token counts.
+
+The shared rules (tests first, code hygiene, commits) are in `../CLAUDE.md`.
+
+pi loads `index.ts` through `jiti`, so there is no build step. After an edit, run
+`/reload` in a running pi, or load only this extension into a fresh one with
+`pi --no-extensions --extension .`.
+
+## Tests
+
+Run `node --test repo-watch.test.ts`. Revision watcher selection lives in `repo-watch.ts`, which loads without pi runtime dependencies. In jj repositories, watch only jj operation heads, never Git refs: even revision queries can rewrite Git refs and trigger a refresh loop.
+
+## pi runtime
+
+- Don't start timers, watchers, processes or sockets in the factory: some
+  invocations load extensions without starting a session. Start them in
+  `session_start` or in the command or tool that needs them, and stop them in an
+  idempotent `session_shutdown` handler.
+- Extensions also load in `pi -p` subagents and in branch sessions. Anything that
+  assumes the user is watching a TUI must check `ctx.mode === "tui"` first.
+
+## Style
+
+TypeScript uses tabs and `biome-ignore` comments where a lint must be silenced.
+`index.ts` opens with a doc comment saying what the extension does; keep it true.
